@@ -238,7 +238,7 @@ export default function ServicesPage() {
     // These stats would ideally come from a dedicated stats endpoint for accuracy across all pages
     active: services.filter((s) => s.status === 'active').length,
     combo: services.filter((s) => s.isCombo).length,
-    totalRevenue: services.reduce((sum, s) => sum + s.price, 0),
+    totalRevenue: services.reduce((sum, s) => sum + (Number(s.price) || 0), 0),
   }), [services, totalServices]);
 
   const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, service: Service) => {
@@ -411,25 +411,25 @@ export default function ServicesPage() {
             </CardContent>
           </Card>
         </Grid>
-        <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Box>
-                  <Typography color="text.secondary" variant="body2" gutterBottom>
-                    Total Value
-                  </Typography>
-                  <Typography variant="h4" fontWeight="bold">
-                    {isLoadingServices ? <CircularProgress size={24} /> : formatCurrency(stats.totalRevenue)}
-                  </Typography>
+          {/* <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
+            <Card>
+              <CardContent>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Box>
+                    <Typography color="text.secondary" variant="body2" gutterBottom>
+                      Total Value
+                    </Typography>
+                    <Typography variant="h4" fontWeight="bold">
+                      {isLoadingServices ? <CircularProgress size={24} /> : formatCurrency(stats.totalRevenue)}
+                    </Typography>
+                  </Box>
+                  <Avatar sx={{ bgcolor: alpha(INFO_COLOR, 0.1), width: 56, height: 56 }}>
+                    <TrendingUp sx={{ color: INFO_COLOR, fontSize: 28 }} />
+                  </Avatar>
                 </Box>
-                <Avatar sx={{ bgcolor: alpha(INFO_COLOR, 0.1), width: 56, height: 56 }}>
-                  <TrendingUp sx={{ color: INFO_COLOR, fontSize: 28 }} />
-                </Avatar>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
+              </CardContent>
+            </Card>
+          </Grid> */}
       </Grid>
 
       {/* Actions Bar */}

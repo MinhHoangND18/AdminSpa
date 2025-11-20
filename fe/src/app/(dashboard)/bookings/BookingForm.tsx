@@ -1187,7 +1187,7 @@ export default function BookingsPage() {
             </Dialog>
 
             {/* Quick Actions Toolbar */}
-            <Box sx={{ position: 'fixed', bottom: 24, right: 24, zIndex: 1000 }}>
+            <Box sx={{ position: 'fixed', bottom: 24, left: "18%", zIndex: 1000 }}>
                 <Card sx={{ boxShadow: 3 }}>
                     <CardContent sx={{ p: 2 }}>
                         <Stack direction="row" spacing={1}>

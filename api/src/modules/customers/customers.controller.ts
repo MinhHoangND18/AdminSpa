@@ -10,6 +10,8 @@ import {
   HttpCode,
   HttpStatus,
   ParseIntPipe,
+  Optional,
+  DefaultValuePipe,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -62,10 +64,19 @@ export class CustomersController {
     status: HttpStatus.OK,
     description: 'Thống kê khách hàng',
   })
-  getStatistics(@Query('storeId', ParseIntPipe) storeId?: number) {
-    return this.customersService.getStatistics(storeId);
-  }
+  getStatistics(@Query('storeId') storeId?: string) {
+    let parsedStoreId: number | undefined;
 
+    if (storeId) {
+      const num = parseInt(storeId, 10);
+
+      if (!isNaN(num)) {
+        parsedStoreId = num;
+      }
+    }
+
+    return this.customersService.getStatistics(parsedStoreId);
+  }
   @Get(':id')
   @ApiOperation({ summary: 'Lấy thông tin khách hàng theo ID' })
   @ApiParam({ name: 'id', type: Number })
@@ -117,7 +128,8 @@ export class CustomersController {
   @ApiParam({ name: 'id', type: Number })
   @ApiResponse({
     status: HttpStatus.OK,
-    description: 'Cập nhật visit thành công. Tự động nâng hạng khách hàng nếu đủ điều kiện.',
+    description:
+      'Cập nhật visit thành công. Tự động nâng hạng khách hàng nếu đủ điều kiện.',
   })
   @ApiResponse({
     status: HttpStatus.NOT_FOUND,

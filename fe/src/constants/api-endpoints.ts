@@ -1,0 +1,16 @@
+export const API_ENDPOINTS = {
+  AUTH: '/auth',
+  USERS: '/users',
+  CUSTOMERS: '/customers',
+  STORES: '/stores',
+  SERVICES: '/services',
+  SERVICE_CATEGORIES: '/service-categories',
+  BOOKINGS: '/bookings',
+  INVOICES: '/invoices',
+  PAYMENTS: '/payments',
+  PROMOTIONS: '/promotions',
+  REPORTS: '/reports',
+  PERMISSIONS: '/permissions',
+  STAFF: '/staff',
+  UPLOADS: '/uploads',
+};

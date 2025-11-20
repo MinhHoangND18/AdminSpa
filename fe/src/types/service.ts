@@ -18,6 +18,10 @@ export interface Service {
   createdAt: string;
   updatedAt: string;
 }
+interface PaginatedServiceResponse {
+  data: Service[];
+  total: number;
+}
 
 export interface CreateServiceDto {
   name: string;
