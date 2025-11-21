@@ -8,16 +8,34 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like, ILike } from 'typeorm';
 import { Store } from '../stores/entities/store.entity';
 import { CreateStoreDto, UpdateStoreDto, QueryStoreDto } from './stores.dto';
+import { UsersService } from '../users/users.service';
+import { UserRole } from '../users/entities/user.entity';
 
 @Injectable()
 export class StoresService {
   constructor(
     @InjectRepository(Store)
     private readonly storeRepository: Repository<Store>,
+    private readonly usersService: UsersService,
   ) {}
 
+  private async validateManager(manager_id: number): Promise<void> {
+    if (!manager_id) return;
+
+    const managerUser = await this.usersService.findOne(manager_id);
+
+    if (managerUser.role !== UserRole.MANAGER) {
+      throw new BadRequestException(
+        `User ID ${manager_id} must have the role '${UserRole.MANAGER}' to be assigned as a store manager. Current role: ${managerUser.role}.`,
+      );
+    }
+  }
+
   async create(createStoreDto: CreateStoreDto): Promise<Store> {
-    // Check if code already exists
+    if (createStoreDto.manager_id) {
+      await this.validateManager(createStoreDto.manager_id);
+    }
+
     const existingCode = await this.storeRepository.findOne({
       where: { code: createStoreDto.code },
     });
@@ -25,7 +43,6 @@ export class StoresService {
       throw new ConflictException('Store code already exists');
     }
 
-    // Check if domain already exists (if provided)
     if (createStoreDto.domain) {
       const existingDomain = await this.storeRepository.findOne({
         where: { domain: createStoreDto.domain },
@@ -58,7 +75,7 @@ export class StoresService {
       queryBuilder.andWhere('store.isActive = :isActive', { isActive });
     }
 
-    queryBuilder.skip(skip).take(limit).orderBy('store.createdAt', 'DESC');
+    queryBuilder.skip(skip).take(limit).orderBy('store.id', 'ASC');
 
     const [data, total] = await queryBuilder.getManyAndCount();
 
@@ -100,22 +117,24 @@ export class StoresService {
   async update(id: number, updateStoreDto: UpdateStoreDto): Promise<Store> {
     const store = await this.findOne(id);
 
-    // Check if code is being updated and already exists
+    if (updateStoreDto.manager_id) {
+      await this.validateManager(updateStoreDto.manager_id);
+    }
+
     if (updateStoreDto.code && updateStoreDto.code !== store.code) {
       const existingCode = await this.storeRepository.findOne({
         where: { code: updateStoreDto.code },
       });
-      if (existingCode) {
+      if (existingCode && existingCode.id !== store.id) {
         throw new ConflictException('Store code already exists');
       }
     }
 
-    // Check if domain is being updated and already exists
     if (updateStoreDto.domain && updateStoreDto.domain !== store.domain) {
       const existingDomain = await this.storeRepository.findOne({
         where: { domain: updateStoreDto.domain },
       });
-      if (existingDomain) {
+      if (existingDomain && existingDomain.id !== store.id) {
         throw new ConflictException('Store domain already exists');
       }
     }

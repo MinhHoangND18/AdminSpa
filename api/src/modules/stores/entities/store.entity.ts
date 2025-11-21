@@ -10,7 +10,7 @@ import {
   Index,
 } from 'typeorm';
 import { UserEntity } from '../../users/entities/user.entity';
-import { Staff } from '../../staff/entities/staff.entity'; 
+import { Staff } from '../../staff/entities/staff.entity';
 
 @Entity('stores')
 //@Index(['domain'])
@@ -21,6 +21,9 @@ export class Store {
 
   @Column({ type: 'varchar', length: 20, unique: true, nullable: false })
   code: string;
+
+  @Column({ type: 'bigint', nullable: true })
+  manager_id: number;
 
   @Column({ type: 'varchar', length: 150, nullable: false })
   name: string;
@@ -49,8 +52,8 @@ export class Store {
   @Column({ type: 'decimal', precision: 11, scale: 8, nullable: true })
   longitude: number;
 
-  @Column({ type: 'bigint', nullable: true })
-  managerId: number;
+  // @Column({ type: 'bigint', nullable: true })
+  // managerId: number;
 
   @ManyToOne(() => UserEntity, { nullable: true })
   @JoinColumn({ name: 'manager_id' })

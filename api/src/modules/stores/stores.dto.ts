@@ -76,7 +76,7 @@ export class CreateStoreDto {
   @ApiPropertyOptional({ example: 1 })
   @IsNumber()
   @IsOptional()
-  managerId?: number;
+  manager_id?: number;
 
   @ApiPropertyOptional({ default: true })
   @IsBoolean()

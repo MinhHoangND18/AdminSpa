@@ -168,7 +168,7 @@ interface CustomerFormData {
   fullName: string;
   phone: string;
   email: string;
-  gender: Gender | "null";
+  gender: Gender | "";
   birthday: string;
   address: string;
   notes: string;
@@ -181,7 +181,7 @@ const initialFormData: CustomerFormData = {
   fullName: "",
   phone: "",
   email: "",
-  gender: "null",
+  gender: "",
   birthday: "",
   address: "",
   notes: "",
@@ -228,7 +228,7 @@ const CustomerFormDialog: React.FC<CustomerFormDialogProps> = ({
         fullName: customerData.fullName || "",
         phone: customerData.phone || "",
         email: customerData.email || "",
-        gender: customerData.gender || "null",
+        gender: customerData.gender || "",
         birthday: formatToFormDate(customerData.birthday),
         address: customerData.address || "",
         notes: customerData.notes || "",
@@ -295,7 +295,7 @@ const CustomerFormDialog: React.FC<CustomerFormDialogProps> = ({
       phone: formData.phone,
       email: formData.email || undefined,
       gender:
-        formData.gender !== "null" ? (formData.gender as Gender) : undefined,
+        formData.gender !== "" ? (formData.gender as Gender) : undefined,
       birthday: formData.birthday || undefined,
       address: formData.address || undefined,
       notes: formData.notes || undefined,
@@ -564,7 +564,7 @@ const CustomerFormDialog: React.FC<CustomerFormDialogProps> = ({
                   label="Gender"
                   onChange={handleFormChange("gender")}
                 >
-                  <MenuItem value="null">-- Select Gender --</MenuItem>
+                  <MenuItem value="">-- Select Gender --</MenuItem>
                   <MenuItem value={Gender.MALE}>Male</MenuItem>
                   <MenuItem value={Gender.FEMALE}>Female</MenuItem>
                   <MenuItem value={Gender.OTHER}>Other</MenuItem>
