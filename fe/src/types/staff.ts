@@ -30,12 +30,12 @@ export interface StaffFormData {
   full_name: string;
   phone: string;
   email?: string;
-  gender?: Gender;
+  gender?: Gender | null | '';
   birthday?: string;
   address?: string;
-  store_id?: number | null;
+  store_id?: number | null | '';
   hire_date?: string;
-  salary_type?: SalaryType;
+  salary_type?: SalaryType | null | '';
   base_salary?: number;
   commission_rate?: number;
   status?: StaffStatus;

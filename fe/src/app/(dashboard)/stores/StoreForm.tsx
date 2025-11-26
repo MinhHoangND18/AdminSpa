@@ -131,7 +131,7 @@ export default function StoresPage() {
   const fetchManagers = async () => {
     try {
       const response = await usersApi.getAll({ role: "manager", limit: 1000 });
-      const managersArray = response?.data?.data || [];
+      const managersArray = response?.data || [];
 
       setAvailableManagers(Array.isArray(managersArray) ? managersArray : []);
     } catch (error) {
@@ -271,7 +271,7 @@ export default function StoresPage() {
   const handleEdit = () => {
     if (selectedStore) {
       setDialogMode("edit");
-      
+
       const matchedManager = availableManagers.find(
         (manager) => manager.username === selectedStore.manager_name
       );
@@ -328,13 +328,12 @@ export default function StoresPage() {
     setSelectedStore(null);
   };
 
-  const handleFormChange = (
-    field: keyof StoreFormData,
-    isSelect: boolean = false
-  ) => (event: any) => {
-    const value = isSelect ? event.target.value : event.target.value;
-    setFormData({ ...formData, [field]: value });
-  };
+  const handleFormChange =
+    (field: keyof StoreFormData, isSelect: boolean = false) =>
+    (event: any) => {
+      const value = isSelect ? event.target.value : event.target.value;
+      setFormData({ ...formData, [field]: value });
+    };
 
   const handleSwitchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, isActive: event.target.checked });
@@ -779,7 +778,7 @@ export default function StoresPage() {
                   </MenuItem>
                   {availableManagers.map((manager) => (
                     <MenuItem key={manager.id} value={String(manager.id)}>
-                      {manager.username} (ID: {manager.id})
+                      ID: {manager.id} ({manager.username} )
                     </MenuItem>
                   ))}
                 </Select>
@@ -852,6 +851,7 @@ export default function StoresPage() {
         open={snackbar.open}
         autoHideDuration={6000}
         onClose={handleSnackbarClose}
+        anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
       >
         <Alert
           onClose={handleSnackbarClose}

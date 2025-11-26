@@ -34,6 +34,8 @@ import {
   Tooltip,
   Switch,
   FormControlLabel,
+  FormHelperText,
+  Snackbar, 
 } from "@mui/material";
 import { usersApi } from "@/lib/api/user";
 import {
@@ -59,6 +61,7 @@ import {
   CalendarToday,
   Security,
   Group,
+  Close as CloseIcon, 
 } from "@mui/icons-material";
 
 const PRIMARY_COLOR = "#14b8a6";
@@ -202,18 +205,64 @@ export default function UsersPage() {
   const [dialogMode, setDialogMode] = useState<"add" | "edit" | "view">("add");
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [lockConfirmOpen, setLockConfirmOpen] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<
+    Partial<Record<keyof UserFormData, string>>
+  >({});
+  
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: "",
+    severity: "success" as "success" | "error" | "warning",
+  });
 
   const initialFormData: UserFormData = {
     username: "",
     email: "",
     password: "",
-    role: "staff",
+    role: "" as UserRole,
     staff_id: "",
     store_id: "",
     is_active: true,
   };
 
   const [formData, setFormData] = useState<UserFormData>(initialFormData);
+
+  const validateForm = () => {
+    const errors: Partial<Record<keyof UserFormData, string>> = {};
+
+    if (!formData.username.trim()) {
+      errors.username = "Username is required.";
+    }
+
+    if (dialogMode === "add" && !formData.password) {
+      errors.password = "Password is required for new users.";
+    }
+
+    if (formData.email && !/^\S+@\S+\.\S+$/.test(formData.email)) {
+      errors.email = "Invalid email format.";
+    }
+
+    if (!formData.role) {
+      errors.role = "Role is required.";
+    }
+
+    const rolesRequiringStaff = ["staff", "receptionist"];
+    if (rolesRequiringStaff.includes(formData.role) && !formData.staff_id) {
+      errors.staff_id = `${getRoleLabel(
+        formData.role
+      )} must be linked to a Staff member.`;
+    }
+
+    const rolesRequiringStore = ["store_admin", "manager", "receptionist"];
+    if (rolesRequiringStore.includes(formData.role) && !formData.store_id) {
+      errors.store_id = `${getRoleLabel(
+        formData.role
+      )} must be assigned to a Store.`;
+    }
+
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
 
   const fetchUsers = useCallback(async () => {
     const filters = {
@@ -232,7 +281,8 @@ export default function UsersPage() {
 
     try {
       const response = await usersApi.getAll(filters);
-      const usersWithNames = response.data.map((user: User) => {
+      const usersArray = response.data || [];
+      const usersWithNames = usersArray.map((user: User) => {
         const staff = availableStaff.find((s) => s.id === user.staff_id);
         const store = availableStores.find((s) => s.id === user.store_id);
         return {
@@ -261,11 +311,10 @@ export default function UsersPage() {
       const staffResponse = await StaffApi.getAll({});
       const storeResponse = await storesApi.getAll();
 
-      const staffData = staffResponse?.data?.data || [];
-
+      const staffData = staffResponse?.data || [];
       setAvailableStaff(Array.isArray(staffData) ? staffData : []);
 
-      const storeData = storeResponse?.data?.data || [];
+      const storeData = storeResponse || [];
       setAvailableStores(Array.isArray(storeData) ? storeData : []);
     } catch (error) {
       console.error("Failed to fetch dropdown data:", error);
@@ -312,7 +361,7 @@ export default function UsersPage() {
         email: selectedUser.email || "",
         password: "",
         role: selectedUser.role,
-        staff_id: selectedUser.staff_id?.toString() || "",
+        staff_id: selectedUser.staff_id?.toString() || "", 
         store_id: selectedUser.store_id?.toString() || "",
         is_active: selectedUser.is_active,
       });
@@ -346,8 +395,19 @@ export default function UsersPage() {
         setDeleteConfirmOpen(false);
         setSelectedUser(null);
         fetchUsers();
-      } catch (error) {
+        setSnackbar({
+          open: true,
+          message: `User ${selectedUser.username} deleted successfully.`,
+          severity: "success",
+        });
+      } catch (error: any) {
         console.error("Failed to delete user:", error);
+        const errorMessage = error.response?.data?.message || error.message || "An unknown error occurred.";
+        setSnackbar({
+          open: true,
+          message: `Deletion failed: ${errorMessage}`,
+          severity: "error",
+        });
       }
     }
   };
@@ -360,8 +420,19 @@ export default function UsersPage() {
         setLockConfirmOpen(false);
         setSelectedUser(null);
         fetchUsers();
-      } catch (error) {
+        setSnackbar({
+          open: true,
+          message: `User ${selectedUser.username} has been ${isLocked ? 'locked' : 'unlocked'}.`,
+          severity: isLocked ? "warning" : "success",
+        });
+      } catch (error: any) {
         console.error("Failed to toggle lock:", error);
+        const errorMessage = error.response?.data?.message || error.message || "An unknown error occurred.";
+        setSnackbar({
+          open: true,
+          message: `Action failed: ${errorMessage}`,
+          severity: "error",
+        });
       }
     }
   };
@@ -369,6 +440,15 @@ export default function UsersPage() {
   const handleDialogClose = () => {
     setOpenDialog(false);
     setFormData(initialFormData);
+    setValidationErrors({});
+  };
+
+  const handleSnackbarClose = (
+    event?: React.SyntheticEvent | Event,
+    reason?: string
+  ) => {
+    if (reason === "clickaway") return;
+    setSnackbar({ ...snackbar, open: false });
   };
 
   const handleFormChange =
@@ -379,6 +459,7 @@ export default function UsersPage() {
         | { target: { value: string } }
     ) => {
       setFormData({ ...formData, [field]: event.target.value });
+      setValidationErrors((prev) => ({ ...prev, [field]: undefined }));
     };
 
   const handleSwitchChange =
@@ -388,25 +469,51 @@ export default function UsersPage() {
     };
 
   const handleSubmit = async () => {
+    if (!validateForm()) {
+      return;
+    }
+
     try {
       const dataToSend = {
         ...formData,
         staff_id: formData.staff_id ? parseInt(formData.staff_id) : null,
         store_id: formData.store_id ? parseInt(formData.store_id) : null,
       };
+
       if (dialogMode === "edit" && !dataToSend.password) {
         delete (dataToSend as any).password;
       }
+
+      let successMessage = '';
+      
       if (dialogMode === "add") {
         await usersApi.create(dataToSend);
+        successMessage = `User ${formData.username} created successfully!`;
       } else if (dialogMode === "edit" && selectedUser) {
         await usersApi.update(selectedUser.id, dataToSend);
+        successMessage = `User ${selectedUser.username} updated successfully!`;
       }
 
       handleDialogClose();
       fetchUsers();
-    } catch (error) {
+      setSnackbar({
+        open: true,
+        message: successMessage,
+        severity: "success",
+      });
+
+    } catch (error: any) {
       console.error(`Failed to ${dialogMode} user:`, error);
+      const errorMessage =
+        error.response?.data?.message ||
+        error.message ||
+        "An unknown error occurred.";
+      
+      setSnackbar({
+        open: true,
+        message: `Action failed: ${errorMessage}`,
+        severity: "error",
+      });
     }
   };
 
@@ -952,6 +1059,7 @@ export default function UsersPage() {
             : "User Details"}
         </DialogTitle>
         <DialogContent dividers>
+
           {dialogMode === "view" && selectedUser ? (
             <Grid container spacing={3} sx={{ mt: 0.5 }}>
               <Grid sx={{ gridColumn: "span 12" }}>
@@ -1095,6 +1203,8 @@ export default function UsersPage() {
                   onChange={handleFormChange("username")}
                   required
                   disabled={dialogMode === "view"}
+                  error={!!validationErrors.username}
+                  helperText={validationErrors.username}
                 />
               </Grid>
               <Grid sx={{ gridColumn: { xs: "span 12", sm: "span 6" } }}>
@@ -1105,6 +1215,8 @@ export default function UsersPage() {
                   value={formData.email}
                   onChange={handleFormChange("email")}
                   disabled={dialogMode === "view"}
+                  error={!!validationErrors.email}
+                  helperText={validationErrors.email}
                 />
               </Grid>
               <Grid sx={{ gridColumn: { xs: "span 12", sm: "span 6" } }}>
@@ -1116,31 +1228,41 @@ export default function UsersPage() {
                   onChange={handleFormChange("password")}
                   required={dialogMode === "add"}
                   disabled={dialogMode === "view"}
+                  error={!!validationErrors.password}
                   helperText={
-                    dialogMode === "edit"
+                    validationErrors.password ||
+                    (dialogMode === "edit"
                       ? "Leave blank to keep current password"
-                      : ""
+                      : "")
                   }
                 />
               </Grid>
               <Grid sx={{ gridColumn: { xs: "span 12", sm: "span 6" } }}>
-                <FormControl fullWidth required>
+                <FormControl
+                  fullWidth
+                  required
+                  disabled={dialogMode === "view"}
+                  error={!!validationErrors.role}
+                >
                   <InputLabel>Role</InputLabel>
                   <Select
                     value={formData.role}
                     label="Role"
-                    onChange={(e) =>
+                    onChange={(e) => {
                       setFormData({
                         ...formData,
                         role: e.target.value as UserRole,
-                      })
-                    }
+                      });
+                      setValidationErrors((prev) => ({
+                        ...prev,
+                        role: undefined,
+                      }));
+                    }}
                     sx={{
                       "& .MuiSelect-select": {
                         paddingRight: "75px !important",
                       },
                     }}
-                    disabled={dialogMode === "view"}
                   >
                     <MenuItem value="staff">Staff</MenuItem>
                     <MenuItem value="receptionist">Receptionist</MenuItem>
@@ -1150,48 +1272,56 @@ export default function UsersPage() {
                       <MenuItem value="super_admin">Super Admin</MenuItem>
                     )}
                   </Select>
+                  {validationErrors.role && (
+                    <FormHelperText>{validationErrors.role}</FormHelperText>
+                  )}
                 </FormControl>
               </Grid>
               <Grid sx={{ gridColumn: { xs: "span 12", sm: "span 6" } }}>
-                <FormControl fullWidth>
+                <FormControl
+                  fullWidth
+                  disabled={dialogMode === "view"}
+                  error={!!validationErrors.staff_id}
+                >
                   <InputLabel>Staff</InputLabel>
                   <Select
                     value={formData.staff_id}
                     label="Staff"
-                    onChange={(e) =>
-                      setFormData({ ...formData, staff_id: e.target.value })
-                    }
+                    onChange={handleFormChange("staff_id")}
                     sx={{
                       "& .MuiSelect-select": {
                         paddingRight: "75px !important",
                       },
                     }}
-                    disabled={dialogMode === "view"}
                   >
                     <MenuItem value="">No Staff</MenuItem>
                     {availableStaff.map((staff) => (
-                      <MenuItem key={staff.id} value={staff.id}>
+                      <MenuItem key={staff.id} value={staff.id.toString()}>
                         {staff.full_name}
                       </MenuItem>
                     ))}
                   </Select>
+                  {validationErrors.staff_id && (
+                    <FormHelperText>{validationErrors.staff_id}</FormHelperText>
+                  )}
                 </FormControl>
               </Grid>
               <Grid sx={{ gridColumn: { xs: "span 12", sm: "span 6" } }}>
-                <FormControl fullWidth>
+                <FormControl
+                  fullWidth
+                  disabled={dialogMode === "view"}
+                  error={!!validationErrors.store_id}
+                >
                   <InputLabel>Store</InputLabel>
                   <Select
                     value={formData.store_id}
                     label="Store"
-                    onChange={(e) =>
-                      setFormData({ ...formData, store_id: e.target.value })
-                    }
+                    onChange={handleFormChange("store_id")}
                     sx={{
                       "& .MuiSelect-select": {
                         paddingRight: "75px !important",
                       },
                     }}
-                    disabled={dialogMode === "view"}
                   >
                     <MenuItem value="">No Store</MenuItem>
                     {availableStores.map((store) => (
@@ -1200,6 +1330,9 @@ export default function UsersPage() {
                       </MenuItem>
                     ))}
                   </Select>
+                  {validationErrors.store_id && (
+                    <FormHelperText>{validationErrors.store_id}</FormHelperText>
+                  )}
                 </FormControl>
               </Grid>
               <Grid sx={{ gridColumn: "span 12" }}>
@@ -1339,6 +1472,31 @@ export default function UsersPage() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={5000}
+        onClose={handleSnackbarClose}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+      >
+        <Alert
+          onClose={handleSnackbarClose}
+          severity={snackbar.severity}
+          sx={{ width: "100%" }}
+          action={
+            <IconButton
+              aria-label="close"
+              color="inherit"
+              size="small"
+              onClick={handleSnackbarClose}
+            >
+              <CloseIcon fontSize="inherit" />
+            </IconButton>
+          }
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

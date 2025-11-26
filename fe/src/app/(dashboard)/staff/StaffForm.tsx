@@ -177,12 +177,12 @@ export default function StaffPage() {
     full_name: "",
     phone: "",
     email: "",
-    gender: "male",
+    gender: "",
     birthday: "",
     address: "",
-    store_id: null,
+    store_id: "",
     hire_date: "",
-    salary_type: "fixed",
+    salary_type: "",
     base_salary: 0,
     commission_rate: 0,
     status: "active",
@@ -1074,7 +1074,7 @@ export default function StaffPage() {
         open={snackbar.open}
         autoHideDuration={5000}
         onClose={handleCloseSnackbar}
-        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+        anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
       >
         <Alert
           onClose={handleCloseSnackbar}
