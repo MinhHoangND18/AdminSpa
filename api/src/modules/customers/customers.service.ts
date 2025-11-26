@@ -82,7 +82,7 @@ export class CustomersService {
       queryBuilder.andWhere('customer.storeId = :storeId', { storeId });
     }
 
-    queryBuilder.skip(skip).take(limit).orderBy('customer.createdAt', 'DESC');
+    queryBuilder.skip(skip).take(limit).orderBy('customer.createdAt', 'ASC');
 
     const [data, total] = await queryBuilder.getManyAndCount();
 

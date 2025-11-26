@@ -79,15 +79,24 @@ export class StoresService {
 
     const [data, total] = await queryBuilder.getManyAndCount();
 
+    const sanitizedData = data.map((store) => this.sanitize(store));
     return {
-      data,
+      data: sanitizedData,
       total,
-      page,
-      limit,
+      page: queryDto.page ?? 1,
+      limit: queryDto.limit ?? 10,
       totalPages: Math.ceil(total / limit),
     };
   }
-
+  private sanitize(store: Store) {
+    const { manager, ...rest } = store;
+    const manager_name = manager ? manager.username : undefined;
+    const sanitizedStore: any = {
+      ...rest,
+      manager_name: manager_name,
+    };
+    return sanitizedStore;
+  }
   async findOne(id: number): Promise<Store> {
     const store = await this.storeRepository.findOne({
       where: { id },
@@ -98,7 +107,7 @@ export class StoresService {
       throw new NotFoundException(`Store with ID ${id} not found`);
     }
 
-    return store;
+    return this.sanitize(store);
   }
 
   async findByCode(code: string): Promise<Store> {
@@ -140,7 +149,8 @@ export class StoresService {
     }
 
     Object.assign(store, updateStoreDto);
-    return await this.storeRepository.save(store);
+    const saved = await this.storeRepository.save(store);
+    return this.sanitize(saved);
   }
 
   async remove(id: number): Promise<void> {

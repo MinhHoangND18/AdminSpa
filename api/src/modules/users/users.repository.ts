@@ -20,7 +20,7 @@ export class UsersRepository {
   }
 
   findById(id: number) {
-    return this.repository.findOne({ where: { id } });
+    return this.repository.findOne({ where: { id },relations: ['store', 'staff'] });
   }
 
   findByUsername(username: string) {
@@ -32,8 +32,9 @@ export class UsersRepository {
   }
 
   async findAll(filter: FilterUsersDto) {
-    const qb = this.repository.createQueryBuilder('user');
-
+    const qb = this.repository.createQueryBuilder('user')
+      .leftJoinAndSelect('user.store', 'store') 
+      .leftJoinAndSelect('user.staff', 'staff');
     if (filter.role) {
       qb.andWhere('user.role = :role', { role: filter.role });
     }
@@ -51,7 +52,7 @@ export class UsersRepository {
       );
     }
 
-    qb.orderBy('user.created_at', 'DESC');
+    qb.orderBy('user.created_at', 'ASC');
 
     return qb.getMany();
   }

@@ -7,6 +7,7 @@ import {
   IsEmail,
   IsDecimal,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export enum GenderEnum {
   male = 'male',
@@ -90,5 +91,16 @@ export class FilterStaffDto {
 
   @IsOptional()
   @IsNumber()
+  @Type(() => Number)
   store_id?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number) 
+  page?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  limit?: number;
 }

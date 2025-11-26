@@ -53,8 +53,18 @@ export class CreateUserDto {
 }
 
 export class UpdateUserDto extends PartialType(CreateUserDto) {}
+export class PageOptionsDto {
+  @IsOptional()
+  @Transform(({ value }) => (value !== undefined ? Number(value) : 1))
+  @IsNumber({}, { message: 'Page must be a number' })
+  readonly page?: number = 1;
 
-export class FilterUsersDto {
+  @IsOptional()
+  @Transform(({ value }) => (value !== undefined ? Number(value) : 10))
+  @IsNumber({}, { message: 'Limit must be a number' })
+  readonly limit?: number = 10;
+}
+export class FilterUsersDto extends PageOptionsDto {
   @IsOptional()
   @IsEnum(UserRole)
   role?: UserRole;
@@ -70,4 +80,3 @@ export class FilterUsersDto {
   @IsString()
   search?: string;
 }
-

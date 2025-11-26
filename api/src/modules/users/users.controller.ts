@@ -8,6 +8,7 @@ import {
   Patch,
   Post,
   Query,
+  Put,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { UsersService } from './users.service';
@@ -40,7 +41,7 @@ export class UsersController {
     return this.usersService.create(dto);
   }
 
-  @Patch(':id')
+  @Put(':id')
   @ApiOperation({ summary: 'Update user by id' })
   update(
     @Param('id', ParseIntPipe) id: number,
@@ -53,6 +54,18 @@ export class UsersController {
   @ApiOperation({ summary: 'Delete user by id' })
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.usersService.remove(id);
+  }
+
+  @Patch(':id/lock') 
+  @ApiOperation({ summary: 'Lock user by id' })
+  lockUser(@Param('id', ParseIntPipe) id: number) {
+    return this.usersService.lockUser(id);
+  }
+
+  @Patch(':id/unlock') 
+  @ApiOperation({ summary: 'Unlock user by id' })
+  unlockUser(@Param('id', ParseIntPipe) id: number) {
+    return this.usersService.unlockUser(id);
   }
 }
 

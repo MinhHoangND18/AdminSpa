@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from "react";
 import {
- Grid,
+  Grid,
   Card,
   CardContent,
   Typography,
@@ -18,10 +18,8 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  Stack,
   alpha,
   Avatar,
-  Divider,
   Alert,
   Select,
   FormControl,
@@ -32,10 +30,10 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  Paper,
   TablePagination,
-  Tooltip,
-} from '@mui/material';
+  CircularProgress,
+  Snackbar,
+} from "@mui/material";
 import {
   Add,
   Search,
@@ -44,168 +42,55 @@ import {
   Delete,
   Visibility,
   People,
-  Phone,
-  Email,
   Store as StoreIcon,
   CheckCircle,
   Cancel,
   BeachAccess,
-  DateRange,
-  AttachMoney,
-  Person,
   FilterList,
-} from '@mui/icons-material';
+} from "@mui/icons-material";
+import { storesApi } from "@/lib/api/stores";
+import { Store } from "@/types/store";
+import {
+  Staff,
+  StaffFormData as StaffFormDataType,
+  StaffStatus,
+  SalaryType,
+  Gender,
+} from "@/types/staff";
+import {
+  getStaff,
+  createStaff,
+  updateStaff,
+  deleteStaff,
+} from "@/lib/api/staff";
 
-// Colors
-const PRIMARY_COLOR = '#14b8a6';
-const PRIMARY_DARK = '#0f766e';
-const SUCCESS_COLOR = '#10b981';
-const ERROR_COLOR = '#ef4444';
-const WARNING_COLOR = '#f59e0b';
-const INFO_COLOR = '#3b82f6';
+const PRIMARY_COLOR = "#14b8a6";
+const PRIMARY_DARK = "#0f766e";
+const SUCCESS_COLOR = "#10b981";
+const ERROR_COLOR = "#ef4444";
+const WARNING_COLOR = "#f59e0b";
 
-// Types
-type Gender = 'male' | 'female' | 'other';
-type SalaryType = 'fixed' | 'hourly' | 'commission';
-type Status = 'active' | 'inactive' | 'on_leave';
-
-interface Staff {
-  id: number;
-  code: string;
-  full_name: string;
-  phone: string;
-  email: string | null;
-  gender: Gender;
-  birthday: string | null;
-  address: string | null;
-  store_id: number | null;
-  store_name?: string;
-  hire_date: string | null;
-  salary_type: SalaryType;
-  base_salary: number | null;
-  commission_rate: number | null;
-  status: Status;
-  created_at: string;
-  updated_at: string;
-}
-
-interface StaffFormData {
-  code: string;
-  full_name: string;
-  phone: string;
-  email: string;
-  gender: Gender;
-  birthday: string;
-  address: string;
-  store_id: string;
-  hire_date: string;
-  salary_type: SalaryType;
-  base_salary: string;
-  commission_rate: string;
-  status: Status;
-}
-
-// Mock Data
-const mockStaff: Staff[] = [
-  {
-    id: 1,
-    code: 'ST001',
-    full_name: 'Nguyen Thi Mai',
-    phone: '+84 901 234 567',
-    email: 'mai.nguyen@spa.com',
-    gender: 'female',
-    birthday: '1995-03-15',
-    address: '123 Le Loi, District 1, HCMC',
-    store_id: 1,
-    store_name: 'Spa Harmony Downtown',
-    hire_date: '2023-01-15',
-    salary_type: 'fixed',
-    base_salary: 15000000,
-    commission_rate: null,
-    status: 'active',
-    created_at: '2023-01-15T08:00:00',
-    updated_at: '2023-01-15T08:00:00',
-  },
-  {
-    id: 2,
-    code: 'ST002',
-    full_name: 'Tran Van Hung',
-    phone: '+84 902 345 678',
-    email: 'hung.tran@spa.com',
-    gender: 'male',
-    birthday: '1992-07-20',
-    address: '456 Nguyen Hue, District 3, HCMC',
-    store_id: 1,
-    store_name: 'Spa Harmony Downtown',
-    hire_date: '2023-02-01',
-    salary_type: 'commission',
-    base_salary: 8000000,
-    commission_rate: 15.5,
-    status: 'active',
-    created_at: '2023-02-01T09:00:00',
-    updated_at: '2023-02-01T09:00:00',
-  },
-  {
-    id: 3,
-    code: 'ST003',
-    full_name: 'Le Thi Hoa',
-    phone: '+84 903 456 789',
-    email: 'hoa.le@spa.com',
-    gender: 'female',
-    birthday: '1998-11-08',
-    address: '789 Tran Hung Dao, District 5, HCMC',
-    store_id: 2,
-    store_name: 'Spa Serenity Garden',
-    hire_date: '2023-03-10',
-    salary_type: 'hourly',
-    base_salary: 100000,
-    commission_rate: null,
-    status: 'on_leave',
-    created_at: '2023-03-10T10:00:00',
-    updated_at: '2023-03-10T10:00:00',
-  },
-  {
-    id: 4,
-    code: 'ST004',
-    full_name: 'Pham Minh Tuan',
-    phone: '+84 904 567 890',
-    email: null,
-    gender: 'male',
-    birthday: '1990-05-25',
-    address: null,
-    store_id: 2,
-    store_name: 'Spa Serenity Garden',
-    hire_date: '2023-04-20',
-    salary_type: 'fixed',
-    base_salary: 12000000,
-    commission_rate: null,
-    status: 'inactive',
-    created_at: '2023-04-20T11:00:00',
-    updated_at: '2023-04-20T11:00:00',
-  },
-];
-
-const getStatusColor = (status: Status) => {
+const getStatusColor = (status: StaffStatus) => {
   switch (status) {
-    case 'active':
+    case "active":
       return SUCCESS_COLOR;
-    case 'inactive':
+    case "inactive":
       return ERROR_COLOR;
-    case 'on_leave':
+    case "on_leave":
       return WARNING_COLOR;
     default:
       return PRIMARY_COLOR;
   }
 };
 
-const getStatusLabel = (status: Status) => {
+const getStatusLabel = (status: StaffStatus) => {
   switch (status) {
-    case 'active':
-      return 'Active';
-    case 'inactive':
-      return 'Inactive';
-    case 'on_leave':
-      return 'On Leave';
+    case "active":
+      return "Active";
+    case "inactive":
+      return "Inactive";
+    case "on_leave":
+      return "On Leave";
     default:
       return status;
   }
@@ -213,72 +98,147 @@ const getStatusLabel = (status: Status) => {
 
 const getSalaryTypeLabel = (type: SalaryType) => {
   switch (type) {
-    case 'fixed':
-      return 'Fixed Salary';
-    case 'hourly':
-      return 'Hourly Rate';
-    case 'commission':
-      return 'Commission';
+    case "fixed":
+      return "Fixed Salary";
+    case "hourly":
+      return "Hourly Rate";
+    case "commission":
+      return "Commission";
     default:
       return type;
   }
 };
 
 export default function StaffPage() {
-  const [staff, setStaff] = useState<Staff[]>(mockStaff);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterStatus, setFilterStatus] = useState<Status | 'all'>('all');
+  const [staff, setStaff] = useState<Staff[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [loading, setLoading] = useState(false);
+
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterStatus, setFilterStatus] = useState<StaffStatus | "all">("all");
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null);
   const [openDialog, setOpenDialog] = useState(false);
-  const [dialogMode, setDialogMode] = useState<'add' | 'edit' | 'view'>('add');
+  const [dialogMode, setDialogMode] = useState<"add" | "edit" | "view">("add");
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
-  const initialFormData: StaffFormData = {
-    code: '',
-    full_name: '',
-    phone: '',
-    email: '',
-    gender: 'male',
-    birthday: '',
-    address: '',
-    store_id: '',
-    hire_date: '',
-    salary_type: 'fixed',
-    base_salary: '',
-    commission_rate: '',
-    status: 'active',
-  };
+  const [storeList, setStoreList] = useState<Store[]>([]);
+  useEffect(() => {
+    const fetchStores = async () => {
+      try {
+        const response: any = await storesApi.getAll({
+          limit: 100,
+          isActive: true, 
+        });
 
-  const [formData, setFormData] = useState<StaffFormData>(initialFormData);
+        let stores = [];
+        if (
+          response.data?.data?.data &&
+          Array.isArray(response.data.data.data)
+        ) {
+          stores = response.data.data.data;
+          console.log("Store list loaded. Count:", stores.length);
+        }
 
-  // Filter and search
-  const filteredStaff = staff.filter((s) => {
-    const matchesSearch =
-      s.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      s.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      s.phone.includes(searchQuery);
-    const matchesStatus = filterStatus === 'all' || s.status === filterStatus;
-    return matchesSearch && matchesStatus;
+        else {
+          console.warn("Could not parse store data structure:", response);
+          stores = [];
+        }
+
+        setStoreList(stores);
+      } catch (error) {
+        console.error("Failed to load stores for dropdown", error);
+        setStoreList([]);
+      }
+    };
+    fetchStores();
+  }, []); 
+
+
+  const [snackbar, setSnackbar] = useState<{
+    open: boolean;
+    message: string;
+    severity: "success" | "error" | "warning";
+  }>({
+    open: false,
+    message: "",
+    severity: "success",
   });
 
-  // Pagination
-  const paginatedStaff = filteredStaff.slice(
-    page * rowsPerPage,
-    page * rowsPerPage + rowsPerPage
-  );
-
-  // Stats
-  const stats = {
-    total: staff.length,
-    active: staff.filter((s) => s.status === 'active').length,
-    inactive: staff.filter((s) => s.status === 'inactive').length,
-    onLeave: staff.filter((s) => s.status === 'on_leave').length,
+  const handleCloseSnackbar = () => {
+    setSnackbar({ ...snackbar, open: false });
   };
 
-  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, staffMember: Staff) => {
+  const initialFormData: StaffFormDataType = {
+    code: "",
+    full_name: "",
+    phone: "",
+    email: "",
+    gender: "male",
+    birthday: "",
+    address: "",
+    store_id: null,
+    hire_date: "",
+    salary_type: "fixed",
+    base_salary: 0,
+    commission_rate: 0,
+    status: "active",
+  };
+
+  const [formData, setFormData] = useState<StaffFormDataType>(initialFormData);
+
+  const fetchStaffData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params: any = {
+        page: page + 1,
+        limit: rowsPerPage,
+        keyword: searchQuery,
+      };
+      if (filterStatus !== "all") params.status = filterStatus;
+
+      const response: any = await getStaff(params);
+
+      if (response && response.data && Array.isArray(response.data.data)) {
+        setStaff(response.data.data);
+        setTotalCount(response.data.total);
+      } else if (response && Array.isArray(response.data)) {
+        setStaff(response.data);
+        setTotalCount(response.total || response.data.length);
+      } else {
+        console.warn("Strange data structure:", response);
+        setStaff([]);
+        setTotalCount(0);
+      }
+    } catch (error) {
+      console.error("Failed to fetch staff:", error);
+      setStaff([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [page, rowsPerPage, searchQuery, filterStatus]);
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      fetchStaffData();
+    }, 500);
+    return () => clearTimeout(timeoutId);
+  }, [fetchStaffData]);
+
+  const stats = {
+    total: staff.length,
+    active: staff.filter((s) => s.status === "active").length,
+    inactive: staff.filter((s) => s.status === "inactive").length,
+    onLeave: staff.filter((s) => s.status === "on_leave").length,
+  };
+
+  const handleMenuOpen = (
+    event: React.MouseEvent<HTMLElement>,
+    staffMember: Staff
+  ) => {
     setAnchorEl(event.currentTarget);
     setSelectedStaff(staffMember);
   };
@@ -288,27 +248,31 @@ export default function StaffPage() {
   };
 
   const handleAddNew = () => {
-    setDialogMode('add');
+    setDialogMode("add");
     setFormData(initialFormData);
     setOpenDialog(true);
   };
 
   const handleEdit = () => {
     if (selectedStaff) {
-      setDialogMode('edit');
+      setDialogMode("edit");
       setFormData({
         code: selectedStaff.code,
         full_name: selectedStaff.full_name,
         phone: selectedStaff.phone,
-        email: selectedStaff.email || '',
+        email: selectedStaff.email || "",
         gender: selectedStaff.gender,
-        birthday: selectedStaff.birthday || '',
-        address: selectedStaff.address || '',
-        store_id: selectedStaff.store_id?.toString() || '',
-        hire_date: selectedStaff.hire_date || '',
+        birthday: selectedStaff.birthday
+          ? new Date(selectedStaff.birthday).toISOString().split("T")[0]
+          : "",
+        address: selectedStaff.address || "",
+        store_id: selectedStaff.store?.id ?? selectedStaff.store_id ?? null,
+        hire_date: selectedStaff.hire_date
+          ? new Date(selectedStaff.hire_date).toISOString().split("T")[0]
+          : "",
         salary_type: selectedStaff.salary_type,
-        base_salary: selectedStaff.base_salary?.toString() || '',
-        commission_rate: selectedStaff.commission_rate?.toString() || '',
+        base_salary: selectedStaff.base_salary || 0,
+        commission_rate: selectedStaff.commission_rate || 0,
         status: selectedStaff.status,
       });
       setOpenDialog(true);
@@ -318,7 +282,26 @@ export default function StaffPage() {
 
   const handleView = () => {
     if (selectedStaff) {
-      setDialogMode('view');
+      setDialogMode("view");
+      setFormData({
+        code: selectedStaff.code,
+        full_name: selectedStaff.full_name,
+        phone: selectedStaff.phone,
+        email: selectedStaff.email || "",
+        gender: selectedStaff.gender,
+        birthday: selectedStaff.birthday
+          ? new Date(selectedStaff.birthday).toISOString().split("T")[0]
+          : "",
+        address: selectedStaff.address || "",
+        store_id: selectedStaff.store?.id ?? selectedStaff.store_id ?? null,
+        hire_date: selectedStaff.hire_date
+          ? new Date(selectedStaff.hire_date).toISOString().split("T")[0]
+          : "",
+        salary_type: selectedStaff.salary_type,
+        base_salary: selectedStaff.base_salary || 0,
+        commission_rate: selectedStaff.commission_rate || 0,
+        status: selectedStaff.status,
+      });
       setOpenDialog(true);
     }
     handleMenuClose();
@@ -329,11 +312,16 @@ export default function StaffPage() {
     handleMenuClose();
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (selectedStaff) {
-      setStaff(staff.filter((s) => s.id !== selectedStaff.id));
-      setDeleteConfirmOpen(false);
-      setSelectedStaff(null);
+      try {
+        await deleteStaff(selectedStaff.id);
+        fetchStaffData();
+        setDeleteConfirmOpen(false);
+        setSelectedStaff(null);
+      } catch (error) {
+        console.error("Failed to delete staff:", error);
+      }
     }
   };
 
@@ -342,58 +330,118 @@ export default function StaffPage() {
     setFormData(initialFormData);
   };
 
-  const handleFormChange = (field: keyof StaffFormData) => (
-    event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | { target: { value: string } }
-  ) => {
-    setFormData({ ...formData, [field]: event.target.value });
-  };
+  const handleFormChange =
+    (field: keyof StaffFormDataType) =>
+    (
+      event:
+        | React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+        | { target: { value: string | number } }
+    ) => {
+      setFormData({ ...formData, [field]: event.target.value });
+    };
+  const validateForm = (data: StaffFormDataType): string | null => {
+    if (!data.code?.trim()) return "Staff Code is required.";
+    if (!data.full_name?.trim()) return "Full Name is required.";
+    if (!data.phone?.trim()) return "Phone number is required.";
+    if (!data.email?.trim()) return "Email is required.";
+    if (!data.address?.trim()) return "Address is required.";
+    if (!data.birthday) return "Birthday is required.";
+    if (!data.hire_date) return "Hire Date is required.";
+    if (!data.store_id) return "Please select a store.";
 
-  const handleSubmit = () => {
-    if (dialogMode === 'add') {
-      const newStaff: Staff = {
-        id: staff.length + 1,
-        ...formData,
-        email: formData.email || null,
-        birthday: formData.birthday || null,
-        address: formData.address || null,
-        store_id: formData.store_id ? parseInt(formData.store_id) : null,
-        hire_date: formData.hire_date || null,
-        base_salary: formData.base_salary ? parseFloat(formData.base_salary) : null,
-        commission_rate: formData.commission_rate ? parseFloat(formData.commission_rate) : null,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-      setStaff([...staff, newStaff]);
-    } else if (dialogMode === 'edit' && selectedStaff) {
-      setStaff(
-        staff.map((s) =>
-          s.id === selectedStaff.id
-            ? {
-                ...s,
-                ...formData,
-                email: formData.email || null,
-                birthday: formData.birthday || null,
-                address: formData.address || null,
-                store_id: formData.store_id ? parseInt(formData.store_id) : null,
-                hire_date: formData.hire_date || null,
-                base_salary: formData.base_salary ? parseFloat(formData.base_salary) : null,
-                commission_rate: formData.commission_rate
-                  ? parseFloat(formData.commission_rate)
-                  : null,
-                updated_at: new Date().toISOString(),
-              }
-            : s
-        )
-      );
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (data.email && !emailRegex.test(data.email)) {
+      return "Invalid email format.";
     }
-    handleDialogClose();
+
+    const phoneRegex = /^(0|\+84)[0-9]{9,10}$/;
+    if (data.phone && !phoneRegex.test(data.phone)) {
+      return "Invalid phone number format.";
+    }
+
+    if (data.base_salary && Number(data.base_salary) < 0) {
+      return "Base salary cannot be negative.";
+    }
+
+    if (data.salary_type === "commission") {
+      if (!data.commission_rate || Number(data.commission_rate) <= 0) {
+        return "Commission rate is required for Commission salary type.";
+      }
+    }
+
+    if (data.salary_type === "fixed") {
+      if (!data.base_salary || Number(data.base_salary) <= 0) {
+        return "Base salary is required for Fixed salary type.";
+      }
+    }
+
+    return null;
+  };
+  const handleSubmit = async () => {
+    const errorMsg = validateForm(formData);
+
+    if (errorMsg) {
+      setSnackbar({
+        open: true,
+        message: errorMsg,
+        severity: "error",
+      });
+      return;
+    }
+
+    try {
+      const submitData: any = {
+        ...formData,
+        store_id: Number(formData.store_id),
+        base_salary: formData.base_salary ? Number(formData.base_salary) : 0,
+        commission_rate: formData.commission_rate
+          ? Number(formData.commission_rate)
+          : null,
+        email: formData.email,
+        address: formData.address,
+      };
+
+      if (dialogMode === "add") {
+        await createStaff(submitData);
+        setSnackbar({
+          open: true,
+          message: "Staff member added successfully.",
+          severity: "success",
+        });
+      } else if (dialogMode === "edit" && selectedStaff) {
+        await updateStaff({ id: selectedStaff.id, data: submitData });
+        setSnackbar({
+          open: true,
+          message: "Staff member updated successfully.",
+          severity: "success",
+        });
+      }
+
+      fetchStaffData();
+      handleDialogClose();
+    } catch (error: any) {
+      console.error("Failed to save staff:", error);
+
+      const backendError = error.response?.data?.message;
+      const displayMessage = Array.isArray(backendError)
+        ? backendError[0]
+        : backendError || "An error occurred. Please try again.";
+
+      setSnackbar({
+        open: true,
+        message: displayMessage,
+        severity: "error",
+      });
+    }
   };
 
   const handleChangePage = (event: unknown, newPage: number) => {
     setPage(newPage);
   };
 
-  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChangeRowsPerPage = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
     setRowsPerPage(parseInt(event.target.value, 10));
     setPage(0);
   };
@@ -415,16 +463,32 @@ export default function StaffPage() {
         <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
           <Card>
             <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
                 <Box>
-                  <Typography color="text.secondary" variant="body2" gutterBottom>
+                  <Typography
+                    color="text.secondary"
+                    variant="body2"
+                    gutterBottom
+                  >
                     Total Staff
                   </Typography>
                   <Typography variant="h4" fontWeight="bold">
                     {stats.total}
                   </Typography>
                 </Box>
-                <Avatar sx={{ bgcolor: alpha(PRIMARY_COLOR, 0.1), width: 56, height: 56 }}>
+                <Avatar
+                  sx={{
+                    bgcolor: alpha(PRIMARY_COLOR, 0.1),
+                    width: 56,
+                    height: 56,
+                  }}
+                >
                   <People sx={{ color: PRIMARY_COLOR, fontSize: 28 }} />
                 </Avatar>
               </Box>
@@ -434,16 +498,32 @@ export default function StaffPage() {
         <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
           <Card>
             <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
                 <Box>
-                  <Typography color="text.secondary" variant="body2" gutterBottom>
-                    Active Staff
+                  <Typography
+                    color="text.secondary"
+                    variant="body2"
+                    gutterBottom
+                  >
+                    Active
                   </Typography>
                   <Typography variant="h4" fontWeight="bold">
                     {stats.active}
                   </Typography>
                 </Box>
-                <Avatar sx={{ bgcolor: alpha(SUCCESS_COLOR, 0.1), width: 56, height: 56 }}>
+                <Avatar
+                  sx={{
+                    bgcolor: alpha(SUCCESS_COLOR, 0.1),
+                    width: 56,
+                    height: 56,
+                  }}
+                >
                   <CheckCircle sx={{ color: SUCCESS_COLOR, fontSize: 28 }} />
                 </Avatar>
               </Box>
@@ -453,16 +533,32 @@ export default function StaffPage() {
         <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
           <Card>
             <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
                 <Box>
-                  <Typography color="text.secondary" variant="body2" gutterBottom>
+                  <Typography
+                    color="text.secondary"
+                    variant="body2"
+                    gutterBottom
+                  >
                     On Leave
                   </Typography>
                   <Typography variant="h4" fontWeight="bold">
                     {stats.onLeave}
                   </Typography>
                 </Box>
-                <Avatar sx={{ bgcolor: alpha(WARNING_COLOR, 0.1), width: 56, height: 56 }}>
+                <Avatar
+                  sx={{
+                    bgcolor: alpha(WARNING_COLOR, 0.1),
+                    width: 56,
+                    height: 56,
+                  }}
+                >
                   <BeachAccess sx={{ color: WARNING_COLOR, fontSize: 28 }} />
                 </Avatar>
               </Box>
@@ -472,16 +568,32 @@ export default function StaffPage() {
         <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
           <Card>
             <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
                 <Box>
-                  <Typography color="text.secondary" variant="body2" gutterBottom>
+                  <Typography
+                    color="text.secondary"
+                    variant="body2"
+                    gutterBottom
+                  >
                     Inactive
                   </Typography>
                   <Typography variant="h4" fontWeight="bold">
                     {stats.inactive}
                   </Typography>
                 </Box>
-                <Avatar sx={{ bgcolor: alpha(ERROR_COLOR, 0.1), width: 56, height: 56 }}>
+                <Avatar
+                  sx={{
+                    bgcolor: alpha(ERROR_COLOR, 0.1),
+                    width: 56,
+                    height: 56,
+                  }}
+                >
                   <Cancel sx={{ color: ERROR_COLOR, fontSize: 28 }} />
                 </Avatar>
               </Box>
@@ -493,7 +605,7 @@ export default function StaffPage() {
       {/* Actions Bar */}
       <Card sx={{ mb: 3 }}>
         <CardContent>
-          <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+          <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
             <TextField
               placeholder="Search staff..."
               value={searchQuery}
@@ -512,7 +624,9 @@ export default function StaffPage() {
               <Select
                 value={filterStatus}
                 label="Status"
-                onChange={(e) => setFilterStatus(e.target.value as Status | 'all')}
+                onChange={(e) =>
+                  setFilterStatus(e.target.value as StaffStatus | "all")
+                }
                 startAdornment={
                   <InputAdornment position="start">
                     <FilterList sx={{ color: PRIMARY_COLOR }} />
@@ -531,8 +645,8 @@ export default function StaffPage() {
               onClick={handleAddNew}
               sx={{
                 bgcolor: PRIMARY_COLOR,
-                '&:hover': { bgcolor: PRIMARY_DARK },
-                textTransform: 'none',
+                "&:hover": { bgcolor: PRIMARY_DARK },
+                textTransform: "none",
                 fontWeight: 600,
               }}
             >
@@ -560,12 +674,18 @@ export default function StaffPage() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {paginatedStaff.length > 0 ? (
-                paginatedStaff.map((staffMember) => (
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={7} align="center" sx={{ py: 6 }}>
+                    <CircularProgress sx={{ color: PRIMARY_COLOR }} />
+                  </TableCell>
+                </TableRow>
+              ) : staff.length > 0 ? (
+                staff.map((staffMember) => (
                   <TableRow
                     key={staffMember.id}
                     sx={{
-                      '&:hover': { bgcolor: alpha(PRIMARY_COLOR, 0.02) },
+                      "&:hover": { bgcolor: alpha(PRIMARY_COLOR, 0.02) },
                     }}
                   >
                     <TableCell>
@@ -580,7 +700,9 @@ export default function StaffPage() {
                       />
                     </TableCell>
                     <TableCell>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                      <Box
+                        sx={{ display: "flex", alignItems: "center", gap: 1.5 }}
+                      >
                         <Avatar
                           sx={{
                             bgcolor: alpha(PRIMARY_COLOR, 0.1),
@@ -596,7 +718,10 @@ export default function StaffPage() {
                             {staffMember.full_name}
                           </Typography>
                           {staffMember.email && (
-                            <Typography variant="caption" color="text.secondary">
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                            >
                               {staffMember.email}
                             </Typography>
                           )}
@@ -605,13 +730,27 @@ export default function StaffPage() {
                     </TableCell>
                     <TableCell>{staffMember.phone}</TableCell>
                     <TableCell>
-                      {staffMember.store_name ? (
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                          <StoreIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
-                          <Typography variant="body2">{staffMember.store_name}</Typography>
+                      {staffMember.store ? (
+                        <Box
+                          sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 0.5,
+                          }}
+                        >
+                          <StoreIcon
+                            sx={{ fontSize: 16, color: "text.secondary" }}
+                          />
+                          <Typography variant="body2" fontWeight="500">
+                            {staffMember.store.name}
+                          </Typography>
                         </Box>
                       ) : (
-                        <Typography variant="body2" color="text.secondary">
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          sx={{ fontStyle: "italic" }}
+                        >
                           Not assigned
                         </Typography>
                       )}
@@ -628,7 +767,10 @@ export default function StaffPage() {
                         label={getStatusLabel(staffMember.status)}
                         size="small"
                         sx={{
-                          bgcolor: alpha(getStatusColor(staffMember.status), 0.1),
+                          bgcolor: alpha(
+                            getStatusColor(staffMember.status),
+                            0.1
+                          ),
                           color: getStatusColor(staffMember.status),
                           fontWeight: 600,
                         }}
@@ -647,15 +789,21 @@ export default function StaffPage() {
               ) : (
                 <TableRow>
                   <TableCell colSpan={7}>
-                    <Box sx={{ textAlign: 'center', py: 6 }}>
-                      <People sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }} />
-                      <Typography variant="h6" color="text.secondary" gutterBottom>
+                    <Box sx={{ textAlign: "center", py: 6 }}>
+                      <People
+                        sx={{ fontSize: 64, color: "text.disabled", mb: 2 }}
+                      />
+                      <Typography
+                        variant="h6"
+                        color="text.secondary"
+                        gutterBottom
+                      >
                         No staff members found
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
-                        {searchQuery || filterStatus !== 'all'
-                          ? 'Try adjusting your search or filters'
-                          : 'Get started by adding your first staff member'}
+                        {searchQuery || filterStatus !== "all"
+                          ? "Try adjusting your search or filters"
+                          : "Get started by adding your first staff member"}
                       </Typography>
                     </Box>
                   </TableCell>
@@ -667,7 +815,7 @@ export default function StaffPage() {
         <TablePagination
           rowsPerPageOptions={[5, 10, 25, 50]}
           component="div"
-          count={filteredStaff.length}
+          count={totalCount}
           rowsPerPage={rowsPerPage}
           page={page}
           onPageChange={handleChangePage}
@@ -676,7 +824,11 @@ export default function StaffPage() {
       </Card>
 
       {/* Menu */}
-      <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleMenuClose}>
+      <Menu
+        anchorEl={anchorEl}
+        open={Boolean(anchorEl)}
+        onClose={handleMenuClose}
+      >
         <MenuItem onClick={handleView}>
           <Visibility sx={{ mr: 1, fontSize: 20 }} />
           View Details
@@ -692,13 +844,18 @@ export default function StaffPage() {
       </Menu>
 
       {/* Add/Edit Dialog */}
-      <Dialog open={openDialog} onClose={handleDialogClose} maxWidth="md" fullWidth>
+      <Dialog
+        open={openDialog}
+        onClose={handleDialogClose}
+        maxWidth="md"
+        fullWidth
+      >
         <DialogTitle>
-          {dialogMode === 'add'
-            ? 'Add New Staff'
-            : dialogMode === 'edit'
-            ? 'Edit Staff'
-            : 'Staff Details'}
+          {dialogMode === "add"
+            ? "Add New Staff"
+            : dialogMode === "edit"
+            ? "Edit Staff"
+            : "Staff Details"}
         </DialogTitle>
         <DialogContent dividers>
           <Grid container spacing={3} sx={{ mt: 0.5 }}>
@@ -707,8 +864,8 @@ export default function StaffPage() {
                 label="Staff Code *"
                 fullWidth
                 value={formData.code}
-                onChange={handleFormChange('code')}
-                disabled={dialogMode === 'view'}
+                onChange={handleFormChange("code")}
+                disabled={dialogMode === "view"}
               />
             </Grid>
             <Grid size={{ xs: 12, sm: 6 }}>
@@ -716,8 +873,8 @@ export default function StaffPage() {
                 label="Full Name *"
                 fullWidth
                 value={formData.full_name}
-                onChange={handleFormChange('full_name')}
-                disabled={dialogMode === 'view'}
+                onChange={handleFormChange("full_name")}
+                disabled={dialogMode === "view"}
               />
             </Grid>
             <Grid size={{ xs: 12, sm: 6 }}>
@@ -725,8 +882,8 @@ export default function StaffPage() {
                 label="Phone *"
                 fullWidth
                 value={formData.phone}
-                onChange={handleFormChange('phone')}
-                disabled={dialogMode === 'view'}
+                onChange={handleFormChange("phone")}
+                disabled={dialogMode === "view"}
               />
             </Grid>
             <Grid size={{ xs: 12, sm: 6 }}>
@@ -735,17 +892,17 @@ export default function StaffPage() {
                 fullWidth
                 type="email"
                 value={formData.email}
-                onChange={handleFormChange('email')}
-                disabled={dialogMode === 'view'}
+                onChange={handleFormChange("email")}
+                disabled={dialogMode === "view"}
               />
             </Grid>
             <Grid size={{ xs: 12, sm: 6 }}>
-              <FormControl fullWidth disabled={dialogMode === 'view'}>
+              <FormControl fullWidth disabled={dialogMode === "view"}>
                 <InputLabel>Gender</InputLabel>
                 <Select
                   value={formData.gender}
                   label="Gender"
-                  onChange={handleFormChange('gender')}
+                  onChange={handleFormChange("gender") as any}
                 >
                   <MenuItem value="male">Male</MenuItem>
                   <MenuItem value="female">Female</MenuItem>
@@ -759,8 +916,8 @@ export default function StaffPage() {
                 fullWidth
                 type="date"
                 value={formData.birthday}
-                onChange={handleFormChange('birthday')}
-                disabled={dialogMode === 'view'}
+                onChange={handleFormChange("birthday")}
+                disabled={dialogMode === "view"}
                 InputLabelProps={{ shrink: true }}
               />
             </Grid>
@@ -769,19 +926,35 @@ export default function StaffPage() {
                 label="Address"
                 fullWidth
                 value={formData.address}
-                onChange={handleFormChange('address')}
-                disabled={dialogMode === 'view'}
+                onChange={handleFormChange("address")}
+                disabled={dialogMode === "view"}
               />
             </Grid>
             <Grid size={{ xs: 12, sm: 6 }}>
-              <TextField
-                label="Store ID"
-                fullWidth
-                type="number"
-                value={formData.store_id}
-                onChange={handleFormChange('store_id')}
-                disabled={dialogMode === 'view'}
-              />
+              <FormControl fullWidth disabled={dialogMode === "view"}>
+                <InputLabel id="store-select-label">Store *</InputLabel>
+                <Select
+                  labelId="store-select-label"
+                  label="Store *"
+                  value={formData.store_id || ""}
+                  onChange={(e) => {
+                    setFormData({
+                      ...formData,
+                      store_id: Number(e.target.value),
+                    });
+                  }}
+                >
+                  <MenuItem value="">
+                    <em>Select a store</em>
+                  </MenuItem>
+
+                  {storeList.map((store) => (
+                    <MenuItem key={store.id} value={store.id}>
+                      ID {store.id}: {store.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
             </Grid>
             <Grid size={{ xs: 12, sm: 6 }}>
               <TextField
@@ -789,18 +962,18 @@ export default function StaffPage() {
                 fullWidth
                 type="date"
                 value={formData.hire_date}
-                onChange={handleFormChange('hire_date')}
-                disabled={dialogMode === 'view'}
+                onChange={handleFormChange("hire_date")}
+                disabled={dialogMode === "view"}
                 InputLabelProps={{ shrink: true }}
               />
             </Grid>
             <Grid size={{ xs: 12, sm: 6 }}>
-              <FormControl fullWidth disabled={dialogMode === 'view'}>
+              <FormControl fullWidth disabled={dialogMode === "view"}>
                 <InputLabel>Salary Type</InputLabel>
                 <Select
                   value={formData.salary_type}
                   label="Salary Type"
-                  onChange={handleFormChange('salary_type')}
+                  onChange={handleFormChange("salary_type") as any}
                 >
                   <MenuItem value="fixed">Fixed Salary</MenuItem>
                   <MenuItem value="hourly">Hourly Rate</MenuItem>
@@ -814,35 +987,39 @@ export default function StaffPage() {
                 fullWidth
                 type="number"
                 value={formData.base_salary}
-                onChange={handleFormChange('base_salary')}
-                disabled={dialogMode === 'view'}
+                onChange={handleFormChange("base_salary")}
+                disabled={dialogMode === "view"}
                 InputProps={{
-                  startAdornment: <InputAdornment position="start">$</InputAdornment>,
+                  startAdornment: (
+                    <InputAdornment position="start">$</InputAdornment>
+                  ),
                 }}
               />
             </Grid>
-            {formData.salary_type === 'commission' && (
+            {formData.salary_type === "commission" && (
               <Grid size={{ xs: 12, sm: 6 }}>
                 <TextField
                   label="Commission Rate"
                   fullWidth
                   type="number"
                   value={formData.commission_rate}
-                  onChange={handleFormChange('commission_rate')}
-                  disabled={dialogMode === 'view'}
+                  onChange={handleFormChange("commission_rate")}
+                  disabled={dialogMode === "view"}
                   InputProps={{
-                    endAdornment: <InputAdornment position="end">%</InputAdornment>,
+                    endAdornment: (
+                      <InputAdornment position="end">%</InputAdornment>
+                    ),
                   }}
                 />
               </Grid>
             )}
             <Grid size={{ xs: 12, sm: 6 }}>
-              <FormControl fullWidth disabled={dialogMode === 'view'}>
+              <FormControl fullWidth disabled={dialogMode === "view"}>
                 <InputLabel>Status</InputLabel>
                 <Select
                   value={formData.status}
                   label="Status"
-                  onChange={handleFormChange('status')}
+                  onChange={handleFormChange("status") as any}
                 >
                   <MenuItem value="active">Active</MenuItem>
                   <MenuItem value="inactive">Inactive</MenuItem>
@@ -853,33 +1030,36 @@ export default function StaffPage() {
           </Grid>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleDialogClose} sx = {{color: PRIMARY_COLOR,}}>
-            {dialogMode === 'view' ? 'Close' : 'Cancel'}
+          <Button onClick={handleDialogClose} sx={{ color: PRIMARY_COLOR }}>
+            {dialogMode === "view" ? "Close" : "Cancel"}
           </Button>
-          {dialogMode !== 'view' && (
+          {dialogMode !== "view" && (
             <Button
               onClick={handleSubmit}
               variant="contained"
               sx={{
                 bgcolor: PRIMARY_COLOR,
-                '&:hover': { bgcolor: PRIMARY_DARK },
+                "&:hover": { bgcolor: PRIMARY_DARK },
               }}
             >
-              {dialogMode === 'add' ? 'Add Staff' : 'Save Changes'}
+              {dialogMode === "add" ? "Add Staff" : "Save Changes"}
             </Button>
           )}
         </DialogActions>
       </Dialog>
 
       {/* Delete Confirmation Dialog */}
-      <Dialog open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)}>
+      <Dialog
+        open={deleteConfirmOpen}
+        onClose={() => setDeleteConfirmOpen(false)}
+      >
         <DialogTitle>Confirm Delete</DialogTitle>
         <DialogContent>
           <Alert severity="warning" sx={{ mb: 2 }}>
             This action cannot be undone!
           </Alert>
           <Typography>
-            Are you sure you want to delete staff member{' '}
+            Are you sure you want to delete staff member{" "}
             <strong>{selectedStaff?.full_name}</strong>?
           </Typography>
         </DialogContent>
@@ -890,6 +1070,26 @@ export default function StaffPage() {
           </Button>
         </DialogActions>
       </Dialog>
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={5000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+      >
+        <Alert
+          onClose={handleCloseSnackbar}
+          severity={snackbar.severity}
+          variant="standard"
+          sx={{
+            width: "100%",
+            boxShadow: 3,
+            fontSize: "0.95rem",
+            alignItems: "center",
+          }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </>
   );
 }

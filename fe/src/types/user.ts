@@ -40,3 +40,18 @@ export interface Store {
   name: string;
   address: string;
 }
+
+export interface UserFilters {
+  search?: string; 
+  role?: UserRole | 'all';
+  is_active?: boolean | 'all' | string; 
+  page?: number;
+  limit?: number;
+}
+
+export interface UserResponse {
+  data: User[];
+  total: number;
+  page: number;
+  limit: number;
+}

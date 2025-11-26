@@ -5,11 +5,12 @@ import {
   Index,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
-  // JoinColumn,
-  // ManyToOne,
+  JoinColumn,
+  ManyToOne,
+  OneToOne,
 } from 'typeorm';
-// import { StaffEntity } from '@/modules/staff/entities/staff.entity';
-// import { StoreEntity } from '@/modules/stores/entities/store.entity';
+import { Staff } from '@/modules/staff/entities/staff.entity';
+import { Store } from '@/modules/stores/entities/store.entity';
 
 export enum UserRole {
   SUPER_ADMIN = 'super_admin',
@@ -46,16 +47,22 @@ export class UserEntity {
   @Column({ type: 'bigint', nullable: true })
   staff_id: number;
 
-  // @ManyToOne(() => StaffEntity, { nullable: true })
-  // @JoinColumn({ name: 'staff_id' })
-  // staff: StaffEntity;
+  @ManyToOne(() => Staff, (staff) => staff.users, {
+    nullable: true,
+    onDelete: 'SET NULL',
+  })
+  @JoinColumn({ name: 'staff_id' })
+  staff: Staff;
 
   @Column({ type: 'bigint', nullable: true })
   store_id: number | null;
 
-  // @ManyToOne(() => StoreEntity, { nullable: true })
-  // @JoinColumn({ name: 'store_id' })
-  // store: StoreEntity;
+  @ManyToOne(() => Store, (store) => store.users, {
+    nullable: true,
+    onDelete: 'SET NULL',
+  })
+  @JoinColumn({ name: 'store_id' })
+  store: Store;
 
   @Column({ type: 'timestamp', nullable: true })
   last_login: Date;

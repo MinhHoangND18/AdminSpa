@@ -12,7 +12,7 @@ export interface Store {
   latitude: number | null;
   longitude: number | null;
   manager_id: number | null;
-  manager_name?: string;
+  manager_name?: string | null;
   isActive: boolean;
   created_at: string;
   updated_at: string;

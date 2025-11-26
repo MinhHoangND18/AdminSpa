@@ -271,7 +271,6 @@ export default function StoresPage() {
   const handleEdit = () => {
     if (selectedStore) {
       setDialogMode("edit");
-      
       const matchedManager = availableManagers.find(
         (manager) => manager.username === selectedStore.manager_name
       );

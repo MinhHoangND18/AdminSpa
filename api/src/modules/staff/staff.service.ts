@@ -16,7 +16,10 @@ export class StaffService {
     return this.staffRepo.save(staff);
   }
 
-  async findAll(filter: FilterStaffDto): Promise<Staff[]> {
+async findAll(filter: FilterStaffDto): Promise<{ data: Staff[], total: number }> {
+    const { page = 1, limit = 10 } = filter; 
+    const skip = (page - 1) * limit;
+
     const where: any = {};
 
     if (filter.status) where.status = filter.status;
@@ -24,7 +27,15 @@ export class StaffService {
     if (filter.keyword)
       where.full_name = Like(`%${filter.keyword}%`);
 
-    return this.staffRepo.find({ where });
+    const [result, total] = await this.staffRepo.findAndCount({
+      where,
+      take: limit,
+      skip: skip,
+      order: { created_at: 'ASC' },
+      relations: ['store'],
+    });
+
+    return { data: result, total };
   }
 
   async findOne(id: number): Promise<Staff> {

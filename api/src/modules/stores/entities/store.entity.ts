@@ -69,5 +69,8 @@ export class Store {
   updatedAt: Date;
 
   @OneToMany(() => Staff, (staff) => staff.store)
-  staff: Staff[];
+  staff: Staff[]
+
+  @OneToMany(() => UserEntity, (user) => user.store)
+  users: UserEntity[];
 }

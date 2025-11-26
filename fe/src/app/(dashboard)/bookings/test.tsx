@@ -201,7 +201,8 @@ export default function BookingsPage() {
             setLoading(true);
             setError(null);
 
-            const filters: any = {
+            // Build filters
+            const filters: BookingFilters = {
                 page: page + 1,
                 limit: rowsPerPage,
             };
@@ -209,96 +210,54 @@ export default function BookingsPage() {
             if (filterStatus !== 'all') {
                 filters.status = filterStatus;
             }
-            if (filterStore !== 'all' && typeof filterStore === 'number') {
+            if (filterStore !== 'all') {
                 filters.storeId = filterStore;
             }
-            if (filterDate && filterDate.trim() !== '') {
+            if (filterDate) {
                 filters.bookingDate = filterDate;
             }
 
             // Load bookings
-            const response: any = await getBookings(filters); // ← Thêm type any
+            const bookingResponse = await getBookings(filters);
+            setBookings(bookingResponse.data);
+            setTotalRecords(bookingResponse.meta.total);
+            setTotalPages(bookingResponse.meta.totalPages);
 
-            // Xử lý response linh hoạt
-            let bookingData, metaData;
-
-            if (response.data?.data) {
-                // Trường hợp: { data: { data: [], meta: {} } }
-                bookingData = response.data.data;
-                metaData = response.data.meta;
-            } else if (response.data) {
-                // Trường hợp: { data: [], meta: {} }
-                bookingData = response.data;
-                metaData = response.meta;
-            } else if (Array.isArray(response)) {
-                // Trường hợp: trả về array trực tiếp
-                bookingData = response;
-                metaData = {};
-            } else {
-                bookingData = [];
-                metaData = {};
-            }
-
-            setBookings(Array.isArray(bookingData) ? bookingData : []);
-            setTotalRecords(metaData?.total || bookingData.length || 0);
-            setTotalPages(metaData?.totalPages || 1);
-
-            // Load customers
+            // Load customers and stores if not loaded
             if (customers.length === 0) {
-                const customerResponse: any = await getCustomers({ limit: 1000 });
-                let customerData;
-
-                if (customerResponse.data?.data) {
-                    customerData = customerResponse.data.data;
-                } else if (customerResponse.data) {
-                    customerData = customerResponse.data;
-                } else {
-                    customerData = customerResponse;
-                }
-
-                setCustomers(Array.isArray(customerData) ? customerData : []);
+                const response: any = await getCustomers({ limit: 1000 });
+                setCustomers(response.data || response);
             }
 
-            // Load stores
             if (stores.length === 0) {
-                const storeResponse: any = await storesApi.getAll({ limit: 1000 });
-                let storeData;
-
-                if (storeResponse.data?.data) {
-                    storeData = storeResponse.data.data;
-                } else if (storeResponse.data) {
-                    storeData = storeResponse.data;
-                } else {
-                    storeData = storeResponse;
-                }
-
-                setStores(Array.isArray(storeData) ? storeData : []);
+                const storeResponse = await storesApi.getAll({ limit: 1000 });
+                setStores(storeResponse.data);
             }
         } catch (err: any) {
+            setError(err.message || 'Failed to load data');
             console.error('Error loading data:', err);
-            console.error('Error response:', err.response?.data);
-            setError(err.response?.data?.message || err.message || 'Failed to load data');
-            setBookings([]);
         } finally {
             setLoading(false);
         }
     };
+
     // Filter bookings by search query (client-side)
-    const filteredBookings = Array.isArray(bookings) ? bookings.filter((booking) => {
+    const filteredBookings = bookings.filter((booking) => {
         if (!searchQuery) return true;
         const query = searchQuery.toLowerCase();
         return (
-            booking.customer?.full_name?.toLowerCase().includes(query) ||
-            booking.customer?.phone?.includes(query) ||
+            booking.customer?.full_name.toLowerCase().includes(query) ||
+            booking.customer?.phone.includes(query) ||
             booking.customer?.email?.toLowerCase().includes(query)
         );
-    }) : [];
+    });
+
     // Stats
     const stats = {
         total: totalRecords,
-        pending: Array.isArray(bookings) ? bookings.filter((b) => b.status === BookingStatus.PENDING).length : 0,
-        confirmed: Array.isArray(bookings) ? bookings.filter((b) => b.status === BookingStatus.CONFIRMED).length : 0,
-        today: Array.isArray(bookings) ? bookings.filter((b) => b.bookingDate === new Date().toISOString().split('T')[0]).length : 0,
+        pending: bookings.filter((b) => b.status === BookingStatus.PENDING).length,
+        confirmed: bookings.filter((b) => b.status === BookingStatus.CONFIRMED).length,
+        today: bookings.filter((b) => b.bookingDate === new Date().toISOString().split('T')[0]).length,
     };
 
     const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, booking: Booking) => {

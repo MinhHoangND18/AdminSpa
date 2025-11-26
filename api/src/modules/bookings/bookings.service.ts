@@ -49,7 +49,7 @@ export class BookingsService {
 
     const skip = (page - 1) * limit;
     queryBuilder.skip(skip).take(limit);
-    queryBuilder.orderBy('booking.createdAt', 'DESC');
+    queryBuilder.orderBy('booking.createdAt', 'ASC');
 
     const [data, total] = await queryBuilder.getManyAndCount();
 

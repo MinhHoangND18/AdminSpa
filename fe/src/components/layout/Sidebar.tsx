@@ -34,7 +34,7 @@ interface MenuItem {
   path: string;
 }
 
-const menuItems: MenuItem[] = [
+export const menuItems: MenuItem[] = [
   { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
   { text: 'Stores', icon: <StoreIcon />, path: '/stores' },
   { text: 'User', icon: <AccountBoxIcon />, path: '/users' },

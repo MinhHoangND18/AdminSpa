@@ -42,14 +42,10 @@ export default function TopBar({
   };
 
   const handleLogout = () => {
-    try {
-      localStorage.removeItem('token'); 
-      // await fetch('/api/logout', { method: 'POST', credentials: 'include' });
-    } catch (e) {
-    } finally {
-      router.replace('/login');
-      handleClose();
-    }
+    handleClose();
+    document.cookie =
+      'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax';
+    router.replace('/login');
   };
 
   return (

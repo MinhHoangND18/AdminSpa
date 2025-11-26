@@ -31,16 +31,33 @@ interface LoginFormValues {
 }
 
 interface LoginResponse {
-  token?: string;
+  success: boolean;
+  message: string;
+  data: {
+    token: string;
+    user: object;
+  };
 }
 
 const getErrorMessage = (error: unknown): string => {
   if (error && typeof error === 'object') {
-    const maybeAxios = error as { response?: { data?: { message?: string } } };
+    // Handle NestJS validation errors which can be an array of strings
+    const maybeAxios = error as {
+      response?: { data?: { message?: string | string[] } };
+    };
     const axiosMessage = maybeAxios.response?.data?.message;
-    if (axiosMessage) return axiosMessage;
+    if (axiosMessage) {
+      if (Array.isArray(axiosMessage)) {
+        return axiosMessage.join(', ');
+      }
+      return axiosMessage;
+    }
 
-    if ('message' in error && typeof (error as { message?: unknown }).message === 'string') {
+    // Standard error message property
+    if (
+      'message' in error &&
+      typeof (error as { message?: unknown }).message === 'string'
+    ) {
       return (error as { message: string }).message;
     }
   }
@@ -61,7 +78,8 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
 
   const handleChange =
-    (field: keyof LoginFormValues) => (event: React.ChangeEvent<HTMLInputElement>) => {
+    (field: keyof LoginFormValues) =>
+    (event: React.ChangeEvent<HTMLInputElement>) => {
       setValues((prev) => ({
         ...prev,
         [field]: event.target.value,
@@ -82,7 +100,7 @@ export default function LoginPage() {
       setLoading(true);
       setError(null);
       const response = await api.post<LoginResponse>('/auth/login', values);
-      const token = response.data.token;
+      const token = response.data.data.token;
       if (token) {
         document.cookie = `token=${token}; path=/; SameSite=Lax`;
       }
@@ -104,7 +122,7 @@ export default function LoginPage() {
         position: 'relative',
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'flex-start', 
+        justifyContent: 'flex-start',
         overflow: 'hidden',
       }}
     >
@@ -139,8 +157,8 @@ export default function LoginPage() {
           zIndex: 10,
           width: '100%',
           maxWidth: 480,
-          ml: { xs: 3, md: 8, lg: 12 }, 
-          mr: 'auto', 
+          ml: { xs: 3, md: 8, lg: 12 },
+          mr: 'auto',
         }}
       >
         {/* Logo & Title */}

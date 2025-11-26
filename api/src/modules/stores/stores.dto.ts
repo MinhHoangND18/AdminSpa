@@ -10,6 +10,7 @@ import {
   Max,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
+import { Type, Transform } from 'class-transformer';
 
 export class CreateStoreDto {
   @ApiProperty({ maxLength: 20, example: 'ST001' })
@@ -95,6 +96,7 @@ export class QueryStoreDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsBoolean()
+  @Transform(({ value }) => value === 'true' || value === true)
   isActive?: boolean;
 
   @ApiPropertyOptional({ default: 1 })
@@ -105,5 +107,6 @@ export class QueryStoreDto {
   @ApiPropertyOptional({ default: 10 })
   @IsOptional()
   @IsNumber()
+  @Type(() => Number)
   limit?: number;
 }

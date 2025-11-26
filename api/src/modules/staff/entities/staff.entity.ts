@@ -6,8 +6,10 @@ import {
   UpdateDateColumn,
   ManyToOne,
   JoinColumn,
+  OneToMany,
 } from 'typeorm';
 import { Store } from '../../stores/entities/store.entity';
+import { UserEntity } from '../../users/entities/user.entity';
 
 @Entity('staff')
 export class Staff {
@@ -41,6 +43,9 @@ export class Staff {
   @ManyToOne(() => Store, (store) => store.staff, { onDelete: 'SET NULL' })
   @JoinColumn({ name: 'store_id' })
   store: Store;
+
+  @OneToMany(() => UserEntity, (user) => user.staff)
+  users: UserEntity[];
 
   @Column({ type: 'date', nullable: true })
   hire_date: Date;

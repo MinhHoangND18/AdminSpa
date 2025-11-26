@@ -84,6 +84,8 @@ import {
   getCustomer,
   CustomerStats,
 } from "@/lib/api/customers";
+import { storesApi } from "@/lib/api/stores";
+import { Store } from "@/types/store";
 
 const PRIMARY_COLOR = "#14b8a6";
 const PRIMARY_DARK = "#0f766e";
@@ -207,9 +209,34 @@ const CustomerFormDialog: React.FC<CustomerFormDialogProps> = ({
 }) => {
   const queryClient = useQueryClient();
   const [formData, setFormData] = useState<CustomerFormData>(initialFormData);
+  const [storeList, setStoreList] = useState<Store[]>([]);
 
   const isEditMode = dialogMode === "edit";
   const isViewMode = dialogMode === "view";
+
+  useEffect(() => {
+    if (!open) return;
+    
+    const fetchStores = async () => {
+      try {
+        const response: any = await storesApi.getAll({
+          limit: 100,
+          isActive: true,
+        });
+
+        let stores = [];
+        if (response.data?.data?.data && Array.isArray(response.data.data.data)) {
+          stores = response.data.data.data;
+        } else if (response.data && Array.isArray(response.data)) {
+          stores = response.data;
+        }
+        setStoreList(stores);
+      } catch (error) {
+        console.error("Failed to load stores for customer dropdown:", error);
+      }
+    };
+    fetchStores();
+  }, [open]);
 
   const {
     data: customerData,
@@ -611,21 +638,32 @@ const CustomerFormDialog: React.FC<CustomerFormDialogProps> = ({
               </FormControl>
             </Grid>
             <Grid size={{ xs: 12, sm: 6 }}>
-              <TextField
-                fullWidth
-                label="Store ID"
-                value={formData.storeId}
-                onChange={handleFormChange("storeId")}
-                disabled={isViewMode}
-                type="number"
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <StoreIcon sx={{ color: "text.secondary" }} />
-                    </InputAdornment>
-                  ),
-                }}
-              />
+              <FormControl fullWidth disabled={isViewMode}>
+                <InputLabel id="store-select-label">Store ID</InputLabel>
+                <Select
+                  labelId="store-select-label"
+                  label="Store ID"
+                  value={formData.storeId || ""}
+                  onChange={handleFormChange("storeId")}
+                  required
+                >
+                  <MenuItem value="">
+                    <em>Select a store</em>
+                  </MenuItem>
+
+                  {storeList.length === 0 ? (
+                    <MenuItem disabled>
+                      {isLoadingCustomer ? 'Loading stores...' : 'No active stores found'}
+                    </MenuItem>
+                  ) : (
+                    storeList.map((store) => (
+                      <MenuItem key={store.id} value={store.id.toString()}>
+                        {store.id}: {store.name}
+                      </MenuItem>
+                    ))
+                  )}
+                </Select>
+              </FormControl>
             </Grid>
             <Grid size={{ xs: 12 }}>
               <TextField
