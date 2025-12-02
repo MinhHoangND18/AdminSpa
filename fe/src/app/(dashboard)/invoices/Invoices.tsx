@@ -101,7 +101,7 @@ interface Store {
 
 interface Booking {
     id: number;
-    voucher: string;
+    maBK: string;
     customer_id: number;
     store_id: number;
 }
@@ -183,9 +183,9 @@ const mockStores: Store[] = [
 ];
 
 const mockBookings: Booking[] = [
-    { id: 1, voucher: 'BK001', customer_id: 1, store_id: 1 },
-    { id: 2, voucher: 'BK002', customer_id: 2, store_id: 1 },
-    { id: 3, voucher: 'BK003', customer_id: 3, store_id: 2 },
+    { id: 1, maBK: 'BK001', customer_id: 1, store_id: 1 },
+    { id: 2, maBK: 'BK002', customer_id: 2, store_id: 1 },
+    { id: 3, maBK: 'BK003', customer_id: 3, store_id: 2 },
 ];
 
 const mockStaff: Staff[] = [
@@ -905,7 +905,7 @@ export default function InvoicesPage() {
                                         <TableCell>
                                             {invoice.booking ? (
                                                 <Chip
-                                                    label={invoice.booking.voucher}
+                                                    label={invoice.booking.id}
                                                     size="small"
                                                     variant="outlined"
                                                 />
@@ -1114,7 +1114,7 @@ export default function InvoicesPage() {
                                     Booking
                                 </Typography>
                                 <Typography variant="body1">
-                                    {selectedInvoice.booking ? selectedInvoice.booking.voucher : 'No booking'}
+                                    {selectedInvoice.booking ? selectedInvoice.booking.maBK : 'No booking'}
                                 </Typography>
                             </Grid>
 
@@ -1310,7 +1310,7 @@ export default function InvoicesPage() {
                                         <MenuItem value="">No Booking</MenuItem>
                                         {mockBookings.map((booking) => (
                                             <MenuItem key={booking.id} value={booking.id}>
-                                                {booking.voucher} - {mockCustomers.find(c => c.id === booking.customer_id)?.full_name}
+                                                {booking.maBK} - {mockCustomers.find(c => c.id === booking.customer_id)?.full_name}
                                             </MenuItem>
                                         ))}
                                     </Select>

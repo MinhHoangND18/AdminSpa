@@ -4,7 +4,6 @@ import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { BookingStatus } from '../bookings/entities/booking.entity';
 
-// DTO cho việc tạo booking mới
 export class CreateBookingDto {
   @ApiProperty({ example: 1 })
   @IsNotEmpty()
@@ -24,16 +23,16 @@ export class CreateBookingDto {
   @ApiProperty({ example: '09:00:00' })
   @IsNotEmpty()
   @IsString()
-  @Matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$/, {
-    message: 'startTime must be in format HH:MM:SS'
+  @Matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, {
+    message: 'startTime must be in format HH:MM'
   })
   startTime: string;
 
   @ApiPropertyOptional({ example: '10:00:00' })
   @IsOptional()
   @IsString()
-  @Matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$/, {
-    message: 'endTime must be in format HH:MM:SS'
+  @Matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, {
+    message: 'endTime must be in format HH:MM'
   })
   endTime?: string;
 
@@ -63,10 +62,8 @@ export class CreateBookingDto {
   createdBy?: number;
 }
 
-// DTO cho việc cập nhật booking (tất cả field đều optional)
 export class UpdateBookingDto extends PartialType(CreateBookingDto) {}
 
-// DTO cho việc query/filter booking
 export class QueryBookingDto {
   @ApiPropertyOptional({ example: 1 })
   @IsOptional()

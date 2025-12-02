@@ -17,7 +17,7 @@ import { Edit, Security, Store, Person } from '@mui/icons-material';
 import { User } from '@/types/user';
 
 export const UserProfile: React.FC = () => {
-  const { user } = useAuth() as { user: User };
+  const { user } = useAuth() as unknown as { user: User | null };
 
   if (!user) return null;
 

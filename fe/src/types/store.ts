@@ -32,3 +32,16 @@ export interface StoreFormData {
   manager_id: string;
   isActive: boolean;
 }
+
+export interface StoreResponse {
+   data:{
+    data: Store[];
+    meta?: {
+        total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+    };
+
+   } 
+}

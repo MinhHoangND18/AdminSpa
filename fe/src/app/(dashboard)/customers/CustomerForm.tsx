@@ -74,6 +74,7 @@ import {
   Customer as CustomerTypeInterface,
   CreateCustomerDto,
   UpdateCustomerDto,
+  CustomerResponse,
 } from "@/types/customer";
 import {
   getCustomers,
@@ -86,6 +87,79 @@ import {
 } from "@/lib/api/customers";
 import { storesApi } from "@/lib/api/stores";
 import { Store } from "@/types/store";
+
+
+interface CustomerDetailResponse {
+  data: Customer;
+}
+
+interface PaginatedCustomerResponse {
+  data: {
+    data: Customer[];
+    total: number;
+    page: number;
+    limit: number;
+  };
+}
+interface CustomErrorResponse {
+  data?: {
+    message?: string;
+  };
+}
+
+interface AxiosErrorLike extends Error {
+  response?: CustomErrorResponse;
+}
+interface PaginatedStoreResponse {
+  data: {
+    data: Store[];
+    total: number;
+  };
+}
+type DirectStoreArrayResponse = Store[];
+
+interface AxiosResponseWrapper {
+  data: unknown; 
+}
+interface GenericListResponse<T> {
+    data: T[];
+    meta: {
+        total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+    };
+}
+
+const isPaginatedStoreResponse = (data: unknown): data is PaginatedStoreResponse => {
+  return (
+    typeof data === 'object' &&
+    data !== null &&
+    'data' in data &&
+    typeof (data as PaginatedStoreResponse).data === 'object' &&
+    (data as PaginatedStoreResponse).data !== null &&
+    'data' in (data as PaginatedStoreResponse).data &&
+    Array.isArray((data as PaginatedStoreResponse).data.data)
+  );
+};
+
+const isAxiosErrorLike = (error: unknown): error is AxiosErrorLike => {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "response" in error
+  );
+};
+
+const getErrorMessage = (error: unknown): string => {
+  if (isAxiosErrorLike(error) && error.response?.data?.message) {
+    return error.response.data.message;
+  }
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return "An unexpected error occurred.";
+};
 
 const PRIMARY_COLOR = "#14b8a6";
 const PRIMARY_DARK = "#0f766e";
@@ -214,22 +288,27 @@ const CustomerFormDialog: React.FC<CustomerFormDialogProps> = ({
   const isEditMode = dialogMode === "edit";
   const isViewMode = dialogMode === "view";
 
+  // Sửa response của fetchStores
   useEffect(() => {
     if (!open) return;
-    
+
     const fetchStores = async () => {
       try {
-        const response: any = await storesApi.getAll({
+  
+        const response: unknown = await storesApi.getAll({
           limit: 100,
           isActive: true,
         });
 
-        let stores = [];
-        if (response.data?.data?.data && Array.isArray(response.data.data.data)) {
-          stores = response.data.data.data;
-        } else if (response.data && Array.isArray(response.data)) {
-          stores = response.data;
+        let stores: Store[] = [];
+        const unwrappedResponse = (response as AxiosResponseWrapper)?.data ?? response;
+        if (isPaginatedStoreResponse(unwrappedResponse)) {
+          stores = unwrappedResponse.data.data;
         }
+        else if (Array.isArray(unwrappedResponse)) {
+          stores = unwrappedResponse as Store[];
+        }
+
         setStoreList(stores);
       } catch (error) {
         console.error("Failed to load stores for customer dropdown:", error);
@@ -242,16 +321,16 @@ const CustomerFormDialog: React.FC<CustomerFormDialogProps> = ({
     data: customerData,
     isLoading: isLoadingCustomer,
     isError: isErrorFetching,
-  } = useQuery({
+  } = useQuery<CustomerDetailResponse, Error, Customer>({
     queryKey: ["customer", customerId],
-    queryFn: () => getCustomer(customerId!),
+    queryFn: () => getCustomer(customerId!) as Promise<CustomerDetailResponse>,
     enabled: !!customerId && open,
-    select: (data) => data.data as Customer,
+    select: (data) => data.data,
   });
 
-  useEffect(() => {
+  const initialFormDataValue = useMemo(() => {
     if (customerData && (isEditMode || isViewMode)) {
-      setFormData({
+      return {
         fullName: customerData.fullName || "",
         phone: customerData.phone || "",
         email: customerData.email || "",
@@ -262,11 +341,15 @@ const CustomerFormDialog: React.FC<CustomerFormDialogProps> = ({
         storeId: customerData.storeId?.toString() || "",
         customerType: customerData.customerType,
         status: customerData.status,
-      });
-    } else if (dialogMode === "add") {
-      setFormData(initialFormData);
+      };
     }
-  }, [customerData, dialogMode, isEditMode, isViewMode]);
+    return initialFormData;
+  }, [customerData, isEditMode, isViewMode]);
+
+  useEffect(() => {
+    setFormData(initialFormDataValue);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customerData, dialogMode]);
 
   const createMutation = useMutation({
     mutationFn: createCustomer,
@@ -276,11 +359,8 @@ const CustomerFormDialog: React.FC<CustomerFormDialogProps> = ({
       queryClient.invalidateQueries({ queryKey: ["customerStats"] });
       onClose();
     },
-    onError: (error: any) => {
-      const errorMessage =
-        error.response?.data?.message ||
-        error.message ||
-        "Failed to create customer.";
+    onError: (error: unknown) => {
+      const errorMessage = getErrorMessage(error) || "Failed to create customer.";
       onSuccess(`Error: ${errorMessage}`, "error");
     },
   });
@@ -295,26 +375,25 @@ const CustomerFormDialog: React.FC<CustomerFormDialogProps> = ({
       queryClient.invalidateQueries({ queryKey: ["customerStats"] });
       onClose();
     },
-    onError: (error: any) => {
-      const errorMessage =
-        error.response?.data?.message ||
-        error.message ||
-        "Failed to update customer.";
+    onError: (error: unknown) => {
+      const errorMessage = getErrorMessage(error) || "Failed to update customer.";
       onSuccess(`Error: ${errorMessage}`, "error");
     },
   });
 
   const isSubmitting = createMutation.isPending || updateMutation.isPending;
-
   const handleFormChange =
     (field: keyof CustomerFormData) =>
-    (
-      event:
-        | React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-        | { target: { value: string | Gender | CustomerStatus | CustomerType } }
-    ) => {
-      setFormData({ ...formData, [field]: event.target.value as any });
-    };
+      (
+        event:
+          | React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+          | { target: { value: string | Gender | CustomerStatus | CustomerType } }
+      ) => {
+        setFormData({
+          ...formData,
+          [field]: event.target.value as string
+        });
+      };
 
   const handleSubmit = () => {
     const dataToSubmit: CreateCustomerDto | UpdateCustomerDto = {
@@ -375,8 +454,8 @@ const CustomerFormDialog: React.FC<CustomerFormDialogProps> = ({
         {dialogMode === "add"
           ? "Add New Customer"
           : dialogMode === "edit"
-          ? `Edit Customer: ${currentCustomer?.fullName}`
-          : "Customer Details"}
+            ? `Edit Customer: ${currentCustomer?.fullName}`
+            : "Customer Details"}
       </DialogTitle>
       <DialogContent dividers>
         {isViewMode && currentCustomer ? (
@@ -744,11 +823,13 @@ export default function CustomersPage() {
     severity: "success" | "error";
   } | null>(null);
 
+  // Áp dụng generic type cho danh sách khách hàng
   const {
+    // Dùng CustomerResponse (kiểu chuẩn)
     data: paginatedCustomers,
     isLoading: isLoadingCustomers,
     isError: isErrorCustomers,
-  } = useQuery({
+  } = useQuery<CustomerResponse>({ // <-- SỬA TÊN KIỂU Ở ĐÂY
     queryKey: ["customers", page, rowsPerPage, filters, searchQuery],
     queryFn: () =>
       getCustomers({
@@ -761,15 +842,20 @@ export default function CustomersPage() {
     placeholderData: keepPreviousData,
   });
 
-  const customers: Customer[] = paginatedCustomers?.data?.data ?? [];
+  // Truy cập dữ liệu an toàn
+  const customers = useMemo((): Customer[] => {
+    return paginatedCustomers?.data?.data ?? [];
+  }, [paginatedCustomers]);
+
+  // Truy cập tổng số an toàn
   const totalCustomers = paginatedCustomers?.data?.total ?? 0;
 
   const { data: customerStats, isLoading: isLoadingStats } =
-    useQuery<CustomerStats>({
-      queryKey: ["customerStats"],
-      queryFn: () => getCustomerStats(),
-      select: (data) => data,
-    });
+  useQuery<CustomerStats>({
+    queryKey: ["customerStats"],
+    queryFn: () => getCustomerStats(),
+  
+  });
 
   const deleteMutation = useMutation({
     mutationFn: deleteCustomer,
@@ -779,11 +865,8 @@ export default function CustomersPage() {
       queryClient.invalidateQueries({ queryKey: ["customerStats"] });
       setDeleteConfirmOpen(false);
     },
-    onError: (error: any) => {
-      const errorMessage =
-        error.response?.data?.message ||
-        error.message ||
-        "Failed to delete customer.";
+    onError: (error: unknown) => {
+      const errorMessage = getErrorMessage(error) || "Failed to delete customer.";
       handleSnackbarOpen(`Error: ${errorMessage}`, "error");
     },
   });
@@ -859,13 +942,15 @@ export default function CustomersPage() {
     setPage(0);
   };
 
+  // SỬA LỖI AS ANY CÒN SÓT LẠI
   const handleFilterChange = (
     key: "customerType" | "status",
     value: string
   ) => {
     setFilters((prev) => ({
       ...prev,
-      [key]: value === "all" ? undefined : value,
+      // Ép kiểu giá trị thành CustomerType hoặc CustomerStatus
+      [key]: value === "all" ? undefined : (value as CustomerType | CustomerStatus),
     }));
     setPage(0);
   };
@@ -873,6 +958,10 @@ export default function CustomersPage() {
   const handleSearch = () => {
     setPage(0);
   };
+
+  // Thay thế bằng dữ liệu từ customerStats để phù hợp với API
+  const totalRevenue = customerStats?.totalRevenue ?? 0;
+
   const stats = {
     total: customers.length,
     new: customers.filter((c) => c.customerType === "new").length,
@@ -880,6 +969,7 @@ export default function CustomersPage() {
     vip: customers.filter((c) => c.customerType === "vip").length,
     totalRevenue: customers.reduce((sum, c) => sum + Number(c.totalSpent), 0),
   };
+
   return (
     <>
       {/* Header */}
@@ -913,7 +1003,7 @@ export default function CustomersPage() {
                     Total Customers
                   </Typography>
                   <Typography variant="h4" fontWeight="bold">
-                    {stats.total}
+                    {customerStats?.totalCustomers ?? 0}
                   </Typography>
                 </Box>
                 <Avatar
@@ -948,7 +1038,7 @@ export default function CustomersPage() {
                     VIP Customers
                   </Typography>
                   <Typography variant="h4" fontWeight="bold">
-                    {stats.vip}
+                    {customerStats?.vipCustomers ?? 0}
                   </Typography>
                 </Box>
                 <Avatar
@@ -1036,7 +1126,6 @@ export default function CustomersPage() {
         </Grid>
       </Grid>
 
-      {/* Actions Bar */}
       <Card sx={{ mb: 3 }}>
         <CardContent>
           <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
@@ -1187,14 +1276,14 @@ export default function CustomersPage() {
                           <Typography variant="body2" fontWeight="600">
                             {customer.fullName}
                           </Typography>
-                          {customer.storeId && (
+                          {/* {customer.storeId && (
                             <Typography
                               variant="caption"
                               color="text.secondary"
                             >
                               Store ID: {customer.storeId}
                             </Typography>
-                          )}
+                          )} */}
                         </Box>
                       </Box>
                     </TableCell>

@@ -65,7 +65,7 @@ const getErrorMessage = (error: unknown): string => {
   return 'Login failed, please try again.';
 };
 
-export default function LoginPage() {
+export default function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
 

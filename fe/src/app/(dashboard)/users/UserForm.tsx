@@ -35,15 +35,15 @@ import {
   Switch,
   FormControlLabel,
   FormHelperText,
-  Snackbar, 
+  Snackbar,
 } from "@mui/material";
-import { usersApi } from "@/lib/api/user";
+import { usersApi } from "@/lib/api/users";
 import {
   getStaff,
   createStaff,
   updateStaff,
   deleteStaff,
-} from "@/lib/api/staff";
+} from "@/lib/api/staffs";
 import { storesApi } from "@/lib/api/stores";
 import {
   Add,
@@ -61,9 +61,24 @@ import {
   CalendarToday,
   Security,
   Group,
-  Close as CloseIcon, 
+  Close as CloseIcon,
 } from "@mui/icons-material";
+interface AxiosErrorResponse {
+  response?: {
+    data?: {
+      message?: string | string[];
+    };
+  };
+}
 
+const isAxiosError = (error: unknown): error is AxiosErrorResponse => {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'response' in error &&
+    typeof (error as AxiosErrorResponse).response === 'object'
+  );
+};
 const PRIMARY_COLOR = "#14b8a6";
 const PRIMARY_DARK = "#0f766e";
 const SUCCESS_COLOR = "#10b981";
@@ -208,7 +223,7 @@ export default function UsersPage() {
   const [validationErrors, setValidationErrors] = useState<
     Partial<Record<keyof UserFormData, string>>
   >({});
-  
+
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: "",
@@ -272,8 +287,8 @@ export default function UsersPage() {
         filterStatus === "active" || filterStatus === "locked"
           ? "true"
           : filterStatus === "inactive"
-          ? "false"
-          : undefined,
+            ? "false"
+            : undefined,
       is_locked: filterStatus === "locked" ? true : undefined,
       page: page + 1,
       limit: rowsPerPage,
@@ -305,29 +320,72 @@ export default function UsersPage() {
     availableStaff,
     availableStores,
   ]);
-
-  const fetchDropdownData = async () => {
-    try {
-      const staffResponse = await StaffApi.getAll({});
-      const storeResponse = await storesApi.getAll();
-
-      const staffData = staffResponse?.data || [];
-      setAvailableStaff(Array.isArray(staffData) ? staffData : []);
-
-      const storeData = storeResponse || [];
-      setAvailableStores(Array.isArray(storeData) ? storeData : []);
-    } catch (error) {
-      console.error("Failed to fetch dropdown data:", error);
-    }
-  };
-
   useEffect(() => {
-    fetchDropdownData();
-  }, []);
-
-  useEffect(() => {
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     fetchUsers();
   }, [fetchUsers]);
+
+
+  const fetchStaffData = async (): Promise<Staff[]> => {
+    const staffResponse = await StaffApi.getAll({});
+
+    // Kiểm tra cấu trúc giống như trong StaffForm
+    if (staffResponse?.data?.data && Array.isArray(staffResponse.data.data)) {
+      return staffResponse.data.data;
+    } else if (staffResponse?.data && Array.isArray(staffResponse.data)) {
+      return staffResponse.data;
+    } else if (Array.isArray(staffResponse)) {
+      return staffResponse;
+    }
+
+    console.warn('Unexpected staff data structure:', staffResponse);
+    return [];
+  };
+  const fetchStoreData = async (): Promise<StoreData[]> => {
+    const storeResponse = await storesApi.getAll();
+
+    // Kiểm tra cấu trúc giống như trong StoreForm
+    if (storeResponse?.data?.data && Array.isArray(storeResponse.data.data)) {
+      return storeResponse.data.data;
+    } else if (Array.isArray(storeResponse)) {
+      return storeResponse;
+    }
+
+    console.warn('Unexpected store data structure:', storeResponse);
+    return [];
+  };
+  //   const fetchDropdownData = async () => {
+  //     try {
+  //         const staffData = await fetchStaffData(); 
+  //         const storeData = await fetchStoreData();
+
+  //         setAvailableStaff(staffData);
+  //         setAvailableStores(storeData);
+  //     } catch (error) {
+  //         console.error("Failed to fetch dropdown data:", error);
+  //     }
+  // };
+
+  // useEffect(() => {
+  //   fetchDropdownData();
+  // }, []);
+
+  useEffect(() => {
+    const loadDropdownData = async () => {
+      try {
+        const staffData = await fetchStaffData();
+        const storeData = await fetchStoreData();
+
+        // Gọi setState trực tiếp trong thân useEffect
+        setAvailableStaff(staffData);
+        setAvailableStores(storeData);
+      } catch (error) {
+        console.error("Failed to load dropdown data:", error);
+      }
+    };
+    loadDropdownData();
+  }, []);
+
 
   const stats = {
     total: users.length,
@@ -361,7 +419,7 @@ export default function UsersPage() {
         email: selectedUser.email || "",
         password: "",
         role: selectedUser.role,
-        staff_id: selectedUser.staff_id?.toString() || "", 
+        staff_id: selectedUser.staff_id?.toString() || "",
         store_id: selectedUser.store_id?.toString() || "",
         is_active: selectedUser.is_active,
       });
@@ -400,9 +458,15 @@ export default function UsersPage() {
           message: `User ${selectedUser.username} deleted successfully.`,
           severity: "success",
         });
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error("Failed to delete user:", error);
-        const errorMessage = error.response?.data?.message || error.message || "An unknown error occurred.";
+        const errorMessage = isAxiosError(error)
+          ? Array.isArray(error.response?.data?.message)
+            ? error.response?.data?.message[0] || "An unknown error occurred."
+            : error.response?.data?.message || "An unknown error occurred."
+          : error instanceof Error
+            ? error.message
+            : "An unknown error occurred.";
         setSnackbar({
           open: true,
           message: `Deletion failed: ${errorMessage}`,
@@ -425,9 +489,15 @@ export default function UsersPage() {
           message: `User ${selectedUser.username} has been ${isLocked ? 'locked' : 'unlocked'}.`,
           severity: isLocked ? "warning" : "success",
         });
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error("Failed to toggle lock:", error);
-        const errorMessage = error.response?.data?.message || error.message || "An unknown error occurred.";
+        const errorMessage = isAxiosError(error)
+          ? Array.isArray(error.response?.data?.message)
+            ? error.response?.data?.message[0] || "An unknown error occurred."
+            : error.response?.data?.message || "An unknown error occurred."
+          : error instanceof Error
+            ? error.message
+            : "An unknown error occurred.";
         setSnackbar({
           open: true,
           message: `Action failed: ${errorMessage}`,
@@ -453,20 +523,20 @@ export default function UsersPage() {
 
   const handleFormChange =
     (field: keyof UserFormData) =>
-    (
-      event:
-        | React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-        | { target: { value: string } }
-    ) => {
-      setFormData({ ...formData, [field]: event.target.value });
-      setValidationErrors((prev) => ({ ...prev, [field]: undefined }));
-    };
+      (
+        event:
+          | React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+          | { target: { value: string } }
+      ) => {
+        setFormData({ ...formData, [field]: event.target.value });
+        setValidationErrors((prev) => ({ ...prev, [field]: undefined }));
+      };
 
   const handleSwitchChange =
     (field: keyof UserFormData) =>
-    (event: React.ChangeEvent<HTMLInputElement>) => {
-      setFormData({ ...formData, [field]: event.target.checked });
-    };
+      (event: React.ChangeEvent<HTMLInputElement>) => {
+        setFormData({ ...formData, [field]: event.target.checked });
+      };
 
   const handleSubmit = async () => {
     if (!validateForm()) {
@@ -474,18 +544,23 @@ export default function UsersPage() {
     }
 
     try {
-      const dataToSend = {
+      type DataToSend = Omit<UserFormData, 'password' | 'staff_id' | 'store_id'> & {
+        password?: string;
+        staff_id: number | null;
+        store_id: number | null;
+      };
+      const dataToSend: DataToSend = {
         ...formData,
         staff_id: formData.staff_id ? parseInt(formData.staff_id) : null,
         store_id: formData.store_id ? parseInt(formData.store_id) : null,
       };
 
       if (dialogMode === "edit" && !dataToSend.password) {
-        delete (dataToSend as any).password;
+        delete dataToSend.password;
       }
 
       let successMessage = '';
-      
+
       if (dialogMode === "add") {
         await usersApi.create(dataToSend);
         successMessage = `User ${formData.username} created successfully!`;
@@ -502,13 +577,17 @@ export default function UsersPage() {
         severity: "success",
       });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(`Failed to ${dialogMode} user:`, error);
       const errorMessage =
-        error.response?.data?.message ||
-        error.message ||
-        "An unknown error occurred.";
-      
+        isAxiosError(error)
+          ? Array.isArray(error.response?.data?.message)
+            ? error.response?.data?.message[0] || "An unknown error occurred."
+            : error.response?.data?.message || "An unknown error occurred."
+          : error instanceof Error
+            ? error.message
+            : "An unknown error occurred.";
+
       setSnackbar({
         open: true,
         message: `Action failed: ${errorMessage}`,
@@ -980,8 +1059,8 @@ export default function UsersPage() {
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
                         {searchQuery ||
-                        filterRole !== "all" ||
-                        filterStatus !== "all"
+                          filterRole !== "all" ||
+                          filterStatus !== "all"
                           ? "Try adjusting your search or filters"
                           : "Get started by adding your first user"}
                       </Typography>
@@ -1055,8 +1134,8 @@ export default function UsersPage() {
           {dialogMode === "add"
             ? "Add New User"
             : dialogMode === "edit"
-            ? "Edit User"
-            : "User Details"}
+              ? "Edit User"
+              : "User Details"}
         </DialogTitle>
         <DialogContent dividers>
 
@@ -1172,8 +1251,8 @@ export default function UsersPage() {
                   {selectedUser.is_locked
                     ? "Locked"
                     : selectedUser.is_active
-                    ? "Active"
-                    : "Inactive"}
+                      ? "Active"
+                      : "Inactive"}
                 </Typography>
               </Grid>
               <Grid sx={{ gridColumn: { xs: "span 12", sm: "span 6" } }}>

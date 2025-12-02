@@ -8,11 +8,16 @@ import {
 } from '@/types/booking';
 import api from './axios';
 
-// Lấy danh sách bookings (có phân trang, filter)
-export const getBookings = async (filters: BookingFilters) => {
-  const response = await api.get('/bookings', { params: filters });
-  return response.data;
-};
+interface ApiResponseWrapper {
+    success: boolean;
+    data: BookingResponse; 
+}
+
+export const getBookings = async (filters: BookingFilters): Promise<BookingResponse> => {
+  const response = await api.get<ApiResponseWrapper>('/bookings', { params: filters });
+
+  return response.data.data; 
+}
 
 export const getBooking = async (id: number) => {
   const { data } = await api.get(`${API_ENDPOINTS.BOOKINGS}/${id}`);

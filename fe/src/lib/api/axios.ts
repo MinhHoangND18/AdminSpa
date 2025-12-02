@@ -1,7 +1,12 @@
 import axios from 'axios';
 
+let endpoint = process.env.NEXT_LOCAL_API_URL || 'http://localhost:3001/api';
+if (process.env.NODE_ENV === 'production') {
+  endpoint = process.env.NEXT_PUBLIC_API_URL || endpoint;
+}
+
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api',
+  baseURL: endpoint,
   withCredentials: true,
 });
 

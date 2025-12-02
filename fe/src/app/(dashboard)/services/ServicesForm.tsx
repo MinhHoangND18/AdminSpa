@@ -39,6 +39,7 @@ import {
   Switch,
   CircularProgress,
   Snackbar,
+  SelectChangeEvent
 } from '@mui/material';
 import {
   Add,
@@ -74,6 +75,7 @@ import {
   QueryServiceDto,
   UpdateServiceDto,
   CreateServiceDto,
+  PaginatedServices,
 } from '@/types';
 
 // Colors
@@ -171,17 +173,25 @@ export default function ServicesPage() {
   const { data: categories = [], isLoading: isLoadingCategories } = useQuery({
     queryKey: ['activeServiceCategories'],
     queryFn: getActiveServiceCategories,
-    select: (data: any) => data.data,
+    select: (data) => Array.isArray(data) ? data : [],
   });
 
-  const { data: paginatedServices, isLoading: isLoadingServices, isError } = useQuery({
+  const {
+    data: paginatedServices,
+    isLoading: isLoadingServices,
+    isError,
+  } = useQuery<PaginatedServices>({
     queryKey: ['services', page, rowsPerPage, filters],
     queryFn: () => getServices({ ...filters, page: page + 1, limit: rowsPerPage }),
     placeholderData: (previousData) => previousData,
   });
 
-  const services: Service[] = paginatedServices?.data?.data ?? [];
-  const totalServices = paginatedServices?.data?.total ?? 0;
+  const services = useMemo((): Service[] => {
+    if (!paginatedServices?.data) return [];
+    return Array.isArray(paginatedServices.data) ? paginatedServices.data : [];
+  }, [paginatedServices]);
+
+  const totalServices = paginatedServices?.total ?? 0;
 
   const createMutation = useMutation({
     mutationFn: createService,
@@ -227,19 +237,29 @@ export default function ServicesPage() {
     }));
     setPage(0);
   };
-  
+
   const handleSearch = () => {
     setFilters(prev => ({ ...prev, search: searchQuery }));
     setPage(0);
   };
 
-  const stats = useMemo(() => ({
-    total: totalServices,
-    // These stats would ideally come from a dedicated stats endpoint for accuracy across all pages
-    active: services.filter((s) => s.status === 'active').length,
-    combo: services.filter((s) => s.isCombo).length,
-    totalRevenue: services.reduce((sum, s) => sum + (Number(s.price) || 0), 0),
-  }), [services, totalServices]);
+  const stats = useMemo(() => {
+    if (!Array.isArray(services)) {
+      return {
+        total: 0,
+        active: 0,
+        combo: 0,
+        totalRevenue: 0,
+      };
+    }
+
+    return {
+      total: totalServices,
+      active: services.filter((s) => s.status === 'active').length,
+      combo: services.filter((s) => s.isCombo).length,
+      totalRevenue: services.reduce((sum, s) => sum + (Number(s.price) || 0), 0),
+    };
+  }, [services, totalServices]);
 
   const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, service: Service) => {
     setAnchorEl(event.currentTarget);
@@ -411,7 +431,7 @@ export default function ServicesPage() {
             </CardContent>
           </Card>
         </Grid>
-          {/* <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
+        {/* <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
             <Card>
               <CardContent>
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -453,13 +473,15 @@ export default function ServicesPage() {
             <FormControl sx={{ minWidth: 180 }}>
               <InputLabel>Category</InputLabel>
               <Select
-                value={filters.categoryId || 'all'}
+                value={filters.categoryId?.toString() || 'all'}
                 label="Category"
-                onChange={(e) => handleFilterChange('categoryId', e.target.value as number | 'all')}
+                onChange={(e: SelectChangeEvent) =>
+                  handleFilterChange('categoryId', e.target.value === 'all' ? 'all' : Number(e.target.value))
+                }
                 disabled={isLoadingCategories}
               >
                 <MenuItem value="all">All Categories</MenuItem>
-                {categories.map((category: ServiceCategory) => (
+                {Array.isArray(categories) && categories.map((category: ServiceCategory) => (
                   <MenuItem key={category.id} value={category.id}>
                     {category.name}
                   </MenuItem>
@@ -471,7 +493,7 @@ export default function ServicesPage() {
               <Select
                 value={filters.status || 'all'}
                 label="Status"
-                onChange={(e) => handleFilterChange('status', e.target.value as ServiceStatus | 'all')}
+                onChange={(e: SelectChangeEvent<unknown>) => handleFilterChange('status', e.target.value as ServiceStatus | 'all')}
               >
                 <MenuItem value="all">All Status</MenuItem>
                 <MenuItem value="active">Active</MenuItem>
@@ -483,7 +505,7 @@ export default function ServicesPage() {
               <Select
                 value={filters.isCombo === undefined ? 'all' : String(filters.isCombo)}
                 label="Type"
-                onChange={(e) => handleFilterChange('isCombo', e.target.value === 'all' ? 'all' : e.target.value === 'true')}
+                onChange={(e: SelectChangeEvent<unknown>) => handleFilterChange('isCombo', e.target.value === 'all' ? 'all' : e.target.value === 'true')}
               >
                 <MenuItem value="all">All Types</MenuItem>
                 <MenuItem value="true">Combo Packages</MenuItem>
@@ -534,9 +556,9 @@ export default function ServicesPage() {
                   </TableCell>
                 </TableRow>
               ) : isError ? (
-                 <TableRow>
+                <TableRow>
                   <TableCell colSpan={8} align="center" sx={{ py: 10 }}>
-                     <Alert severity="error">Failed to load services.</Alert>
+                    <Alert severity="error">Failed to load services.</Alert>
                   </TableCell>
                 </TableRow>
               ) : services.length > 0 ? (
@@ -694,8 +716,8 @@ export default function ServicesPage() {
           {dialogMode === 'add'
             ? 'Add New Service'
             : dialogMode === 'edit'
-            ? 'Edit Service'
-            : 'Service Details'}
+              ? 'Edit Service'
+              : 'Service Details'}
         </DialogTitle>
         <DialogContent dividers>
           {dialogMode === 'view' && selectedService ? (
@@ -772,7 +794,7 @@ export default function ServicesPage() {
                 </Typography>
               </Grid>
               {selectedService.description && (
-              <Grid size={{ xs: 12 }}>
+                <Grid size={{ xs: 12 }}>
                   <Typography variant="caption" color="text.secondary">
                     Description
                   </Typography>
@@ -816,11 +838,11 @@ export default function ServicesPage() {
                   <Select
                     value={formData.categoryId}
                     label="Category"
-                    onChange={(e) =>
+                    onChange={(e: SelectChangeEvent) =>
                       setFormData({ ...formData, categoryId: e.target.value })
                     }
                   >
-                    {categories.map((category: ServiceCategory) => (
+                    {Array.isArray(categories) && categories.map((category: ServiceCategory) => (
                       <MenuItem key={category.id} value={category.id}>
                         {category.name}
                       </MenuItem>
@@ -965,7 +987,7 @@ export default function ServicesPage() {
         <DialogTitle>Confirm Delete</DialogTitle>
         <DialogContent>
           <Alert severity="warning" sx={{ mb: 2 }}>
-            Are you sure you want to delete service "{selectedService?.name}"?
+            Are you sure you want to delete service {selectedService?.name}?
             This action cannot be undone.
           </Alert>
           {selectedService && (
@@ -1004,7 +1026,7 @@ export default function ServicesPage() {
           </Button>
         </DialogActions>
       </Dialog>
-      
+
       {/* Snackbar for notifications */}
       <Snackbar
         open={snackbar?.open}

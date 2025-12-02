@@ -17,13 +17,9 @@ export const getServiceCategories = async (
   return data;
 };
 
-export const getActiveServiceCategories = async (): Promise<
-  ServiceCategory[]
-> => {
-  const { data } = await api.get<ServiceCategory[]>(
-    '/service-categories/active',
-  );
-  return data;
+export const getActiveServiceCategories = async (): Promise<ServiceCategory[]> => {
+  const { data } = await api.get<ServiceCategory[]>('/service-categories/active');
+  return Array.isArray(data) ? data : [];
 };
 
 export const createServiceCategory = async (

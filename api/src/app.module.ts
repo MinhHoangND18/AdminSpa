@@ -23,7 +23,7 @@ import { ServiceCategoriesModule } from './modules/service_categories/service_ca
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: '.env',
+      envFilePath: ".env",
     }),
     TypeOrmModule.forRoot(databaseConfig),
     AuthModule,

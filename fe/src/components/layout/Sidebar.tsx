@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import {usePathname} from 'next/navigation';
 import {
   Box,
   Drawer,
@@ -34,7 +35,7 @@ interface MenuItem {
   path: string;
 }
 
-export const menuItems: MenuItem[] = [
+const menuItems: MenuItem[] = [
   { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
   { text: 'Stores', icon: <StoreIcon />, path: '/stores' },
   { text: 'User', icon: <AccountBoxIcon />, path: '/users' },
@@ -56,10 +57,10 @@ interface SidebarProps {
 }
 
 //Teal/Cyan
-const PRIMARY_COLOR = '#14b8a6'; 
+const PRIMARY_COLOR = '#14b8a6';
 const PRIMARY_LIGHT = '#2dd4bf';
-const PRIMARY_DARK = '#0f766e'; 
-const ACCENT_COLOR = '#ec4899'; 
+const PRIMARY_DARK = '#0f766e';
+const ACCENT_COLOR = '#ec4899';
 
 // Purple
 // const PRIMARY_COLOR = '#a855f7';
@@ -83,6 +84,15 @@ export default function Sidebar({
   onMenuSelect,
   drawerWidth,
 }: SidebarProps) {
+  const pathname = usePathname();
+  const isSelected = (itemPath: string) => {
+    // Nếu là trang dashboard, phải khớp chính xác
+    if (itemPath === '/dashboard' && pathname === '/dashboard') return true;
+    // Các trang khác có thể dùng startsWith để active cả trang con (ví dụ /stores/create vẫn active Stores)
+    // Lưu ý: cần xử lý trường hợp path là '/#' của settings để tránh lỗi
+    if (itemPath !== '/#' && pathname.startsWith(itemPath)) return true;
+    return false;
+  };
   const drawerContent = (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <Box sx={{ p: 2.5 }}>
@@ -95,55 +105,60 @@ export default function Sidebar({
       </Box>
       <Divider />
       <List sx={{ flex: 1, px: 1.5, pt: 2 }}>
-        {menuItems.map((item) => (
-          <ListItem key={item.text} disablePadding sx={{ mb: 0.5 }}>
-            <Link href={item.path} style={{ textDecoration: 'none', width: '100%' }}>
-              <ListItemButton
-                selected={selectedMenu === item.text}
-                onClick={() => onMenuSelect(item.text)}
-                sx={{
-                  borderRadius: 2,
-                  '&.Mui-selected': {
-                    bgcolor: PRIMARY_COLOR,
-                    color: 'white',
-                    '&:hover': {
-                      bgcolor: PRIMARY_DARK,
-                    },
-                    '& .MuiListItemIcon-root': {
+        {menuItems.map((item) => {
+          // <--- 3. TÍNH TOÁN TRẠNG THÁI ACTIVE DỰA TRÊN URL
+          const active = isSelected(item.path);
+
+          return (
+            <ListItem key={item.text} disablePadding sx={{ mb: 0.5 }}>
+              <Link href={item.path} style={{ textDecoration: 'none', width: '100%' }}>
+                <ListItemButton
+                  selected={active} // <--- 4. DÙNG BIẾN ACTIVE THAY VÌ selectedMenu
+                  onClick={() => onMenuSelect(item.text)}
+                  sx={{
+                    borderRadius: 2,
+                    '&.Mui-selected': {
+                      bgcolor: PRIMARY_COLOR,
                       color: 'white',
+                      '&:hover': {
+                        bgcolor: PRIMARY_DARK,
+                      },
+                      '& .MuiListItemIcon-root': {
+                        color: 'white',
+                      },
                     },
-                  },
-                  '&:hover': {
-                    bgcolor: alpha(PRIMARY_COLOR, 0.08),
-                  },
-                }}
-              >
-                <ListItemIcon
-                  sx={{ 
-                    minWidth: 40, 
-                    color: selectedMenu === item.text ? 'white' : PRIMARY_COLOR 
+                    '&:hover': {
+                      bgcolor: alpha(PRIMARY_COLOR, 0.08),
+                    },
                   }}
                 >
-                  {item.icon}
-                </ListItemIcon>
-                <ListItemText
-                  sx={{ 
-                    color: selectedMenu === item.text ? 'white' : PRIMARY_COLOR 
-                  }}
-                  primary={item.text}
-                  primaryTypographyProps={{
-                    fontWeight: selectedMenu === item.text ? 600 : 400,
-                  }}
-                />
-              </ListItemButton>
-            </Link>
-          </ListItem>
-        ))}
+                  <ListItemIcon
+                    sx={{
+                      minWidth: 40,
+                      color: active ? 'white' : PRIMARY_COLOR  // <--- 5. CẬP NHẬT MÀU ICON
+                    }}
+                  >
+                    {item.icon}
+                  </ListItemIcon>
+                  <ListItemText
+                    sx={{
+                      color: active ? 'white' : PRIMARY_COLOR // <--- 6. CẬP NHẬT MÀU CHỮ
+                    }}
+                    primary={item.text}
+                    primaryTypographyProps={{
+                      fontWeight: active ? 600 : 400, // <--- 7. CẬP NHẬT FONT WEIGHT
+                    }}
+                  />
+                </ListItemButton>
+              </Link>
+            </ListItem>
+          )
+        })}
       </List>
       <Divider />
       <Box sx={{ p: 2 }}>
-        <Paper sx={{ 
-          p: 2, 
+        <Paper sx={{
+          p: 2,
           bgcolor: alpha(PRIMARY_COLOR, 0.08),
           border: `1px solid ${alpha(PRIMARY_COLOR, 0.2)}`
         }}>

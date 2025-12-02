@@ -1,4 +1,14 @@
-// import { Store } from './store';
+import { Store } from './store';
+
+
+export interface CustomerResponse { 
+  data: {
+    data: Customer[];
+    total: number;
+    page: number;
+    limit: number;
+  };
+}
 
 export enum Gender {
   MALE = 'MALE',
@@ -32,7 +42,7 @@ export interface Customer {
   lastVisitDate: string | null;
   notes: string | null;
   storeId: number | null;
-  // store?: Store;
+  store?: Store;
   status: CustomerStatus;
   createdAt: string;
   updatedAt: string;

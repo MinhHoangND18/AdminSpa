@@ -52,11 +52,26 @@ import {
   Close as CloseIcon,
 } from "@mui/icons-material";
 
-import { usersApi } from "@/lib/api/user";
+import { usersApi } from "@/lib/api/users";
 import { User } from "@/types/user";
 import { storesApi } from "@/lib/api/stores";
-import { Store, StoreFormData } from "@/types/store";
+import { Store, StoreFormData, StoreResponse } from "@/types/store";
+interface AxiosErrorResponse {
+  response?: {
+    data?: {
+      message?: string | string[];
+    };
+  };
+}
 
+const isAxiosError = (error: unknown): error is AxiosErrorResponse => {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'response' in error &&
+    typeof (error as AxiosErrorResponse).response === 'object'
+  );
+};
 const PRIMARY_COLOR = "#14b8a6";
 const PRIMARY_DARK = "#0f766e";
 const SUCCESS_COLOR = "#10b981";
@@ -64,18 +79,29 @@ const ERROR_COLOR = "#ef4444";
 
 const QUERY_KEY = ["stores"];
 
-const fetchStores = async (searchQuery: string) => {
+const fetchStores = async (searchQuery: string): Promise<Store[]> => {
   const params: { search?: string } = {};
 
   if (searchQuery) {
     params.search = searchQuery;
   }
   const response = await storesApi.getAll(params);
+  // console.log('API Response:', response);
+  // console.log('Stores data:', response?.data?.data);
 
-  const storeArray = response?.data?.data;
+  // const storeArray = response?.data || [];
+  if (response?.data?.data && Array.isArray(response.data.data)) {
+    return response.data.data;
+  }
+  return [];
+};
+// const [availableManagers, setAvailableManagers] = useState<User[]>([]);
+const fetchManagers = async (): Promise<User[]> => {
+  const response = await usersApi.getAll({ role: "manager", limit: 1000 });
+  const managersArray = response?.data || [];
 
-  if (Array.isArray(storeArray)) {
-    return storeArray;
+  if (Array.isArray(managersArray)) {
+    return managersArray as User[];
   }
   return [];
 };
@@ -127,21 +153,31 @@ export default function StoresPage() {
   const [openDialog, setOpenDialog] = useState(false);
   const [dialogMode, setDialogMode] = useState<"add" | "edit" | "view">("add");
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const [availableManagers, setAvailableManagers] = useState<User[]>([]);
-  const fetchManagers = async () => {
-    try {
-      const response = await usersApi.getAll({ role: "manager", limit: 1000 });
-      const managersArray = response?.data || [];
+  const {
+    data: availableManagers = [],
+    isLoading: isLoadingManagers
+  } = useQuery<User[], Error>({
+    queryKey: ["managers", "available"],
+    queryFn: fetchManagers,
+    staleTime: 5 * 60 * 1000,
+  });
 
-      setAvailableManagers(Array.isArray(managersArray) ? managersArray : []);
-    } catch (error) {
-      console.error("Failed to fetch managers:", error);
-    }
-  };
 
-  useEffect(() => {
-    fetchManagers();
-  }, []);
+
+  // const fetchManagers = async (): Promise<User[]> => {
+  //   try {
+  //     const response = await usersApi.getAll({ role: "manager", limit: 1000 });
+  //     const managersArray = response?.data || [];
+
+  //     setAvailableManagers(Array.isArray(managersArray) ? managersArray : []);
+  //   } catch (error) {
+  //     console.error("Failed to fetch managers:", error);
+  //   }
+  // };
+
+  // useEffect(() => {
+  //   fetchManagers();
+  // }, []);
 
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -175,7 +211,7 @@ export default function StoresPage() {
   };
 
   const storeMutation = useMutation<
-    any,
+    Store,
     Error,
     Partial<Store> & { id?: number }
   >({
@@ -195,11 +231,18 @@ export default function StoresPage() {
       });
       handleDialogClose();
     },
-    onError: (err: any) => {
-      const errorMessage =
-        err.response?.data?.message ||
-        err.message ||
-        "An unexpected error occurred.";
+    onError: (err: unknown) => {
+      let errorMessage: string = "An unexpected error occurred.";
+      if (isAxiosError(err)) {
+        const backendMessage = err.response?.data?.message;
+        if (Array.isArray(backendMessage)) {
+          errorMessage = backendMessage[0] || errorMessage;
+        } else if (typeof backendMessage === 'string') {
+          errorMessage = backendMessage;
+        }
+      } else if (err instanceof Error) {
+        errorMessage = err.message;
+      }
       setSnackbar({
         open: true,
         message: `Action failed: ${errorMessage}`,
@@ -221,11 +264,18 @@ export default function StoresPage() {
       setDeleteConfirmOpen(false);
       setSelectedStore(null);
     },
-    onError: (err: any) => {
-      const errorMessage =
-        err.response?.data?.message ||
-        err.message ||
-        "An unexpected error occurred.";
+    onError: (err: unknown) => {
+      let errorMessage: string = "An unexpected error occurred.";
+      if (isAxiosError(err)) {
+        const backendMessage = err.response?.data?.message;
+        if (Array.isArray(backendMessage)) {
+          errorMessage = backendMessage[0] || errorMessage;
+        } else if (typeof backendMessage === 'string') {
+          errorMessage = backendMessage;
+        }
+      } else if (err instanceof Error) {
+        errorMessage = err.message;
+      }
       setSnackbar({
         open: true,
         message: `Deletion failed: ${errorMessage}`,
@@ -329,11 +379,18 @@ export default function StoresPage() {
   };
 
   const handleFormChange =
-    (field: keyof StoreFormData, isSelect: boolean = false) =>
-    (event: any) => {
-      const value = isSelect ? event.target.value : event.target.value;
-      setFormData({ ...formData, [field]: value });
-    };
+    (field: keyof StoreFormData) =>
+      (
+        event:
+          | React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+          | { target: { value: unknown } }
+      ) => {
+
+        const target = event.target as { value: string | number };
+        const value = target.value;
+
+        setFormData({ ...formData, [field]: value });
+      };
 
   const handleSwitchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, isActive: event.target.checked });
@@ -389,12 +446,12 @@ export default function StoresPage() {
 
   return (
     <>
-      <Backdrop
+      {/* <Backdrop
         sx={{ color: "#fff", zIndex: (theme) => theme.zIndex.drawer + 1 }}
         open={loading}
       >
         <CircularProgress color="inherit" />
-      </Backdrop>
+      </Backdrop> */}
 
       <Box sx={{ mb: 3 }}>
         <Typography variant="h4" fontWeight="bold" gutterBottom>
@@ -661,8 +718,8 @@ export default function StoresPage() {
           {dialogMode === "add"
             ? "Add New Store"
             : dialogMode === "edit"
-            ? "Edit Store"
-            : "Store Details"}
+              ? "Edit Store"
+              : "Store Details"}
         </DialogTitle>
         <DialogContent dividers>
           <Grid container spacing={3} sx={{ mt: 0.5 }}>

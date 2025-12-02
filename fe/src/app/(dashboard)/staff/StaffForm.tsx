@@ -56,14 +56,35 @@ import {
   StaffStatus,
   SalaryType,
   Gender,
+  StaffFilters,
+  StaffFormData,
 } from "@/types/staff";
 import {
   getStaff,
   createStaff,
   updateStaff,
   deleteStaff,
-} from "@/lib/api/staff";
+} from "@/lib/api/staffs";
 
+interface AxiosErrorResponse {
+  response?: {
+    data?: {
+      message?: string | string[];
+    };
+    status?: number;
+  };
+}
+
+
+const isAxiosError = (error: unknown): error is AxiosErrorResponse => {
+  // Kiểm tra xem nó có phải là đối tượng và có thuộc tính 'response' không
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'response' in error &&
+    typeof (error as AxiosErrorResponse).response === 'object'
+  );
+};
 const PRIMARY_COLOR = "#14b8a6";
 const PRIMARY_DARK = "#0f766e";
 const SUCCESS_COLOR = "#10b981";
@@ -109,6 +130,7 @@ const getSalaryTypeLabel = (type: SalaryType) => {
   }
 };
 
+
 export default function StaffPage() {
   const [staff, setStaff] = useState<Staff[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -129,21 +151,17 @@ export default function StaffPage() {
   useEffect(() => {
     const fetchStores = async () => {
       try {
-        const response: any = await storesApi.getAll({
+        const response = await storesApi.getAll({
           limit: 100,
-          isActive: true, 
+          isActive: true,
         });
 
-        let stores = [];
-        if (
-          response.data?.data?.data &&
-          Array.isArray(response.data.data.data)
-        ) {
-          stores = response.data.data.data;
+        let stores: Store[] = [];
+        if (Array.isArray(response)) {
+          stores = response;
           console.log("Store list loaded. Count:", stores.length);
-        }
-
-        else {
+        } else {
+          // Trường hợp lỗi hoặc cấu trúc không như mong đợi
           console.warn("Could not parse store data structure:", response);
           stores = [];
         }
@@ -155,7 +173,7 @@ export default function StaffPage() {
       }
     };
     fetchStores();
-  }, []); 
+  }, []);
 
 
   const [snackbar, setSnackbar] = useState<{
@@ -193,21 +211,21 @@ export default function StaffPage() {
   const fetchStaffData = useCallback(async () => {
     setLoading(true);
     try {
-      const params: any = {
+      const params: StaffFilters = {
         page: page + 1,
         limit: rowsPerPage,
         keyword: searchQuery,
       };
       if (filterStatus !== "all") params.status = filterStatus;
 
-      const response: any = await getStaff(params);
+      const response = await getStaff(params);
 
       if (response && response.data && Array.isArray(response.data.data)) {
         setStaff(response.data.data);
         setTotalCount(response.data.total);
       } else if (response && Array.isArray(response.data)) {
         setStaff(response.data);
-        setTotalCount(response.total || response.data.length);
+        setTotalCount(response.data.total);
       } else {
         console.warn("Strange data structure:", response);
         setStaff([]);
@@ -332,13 +350,13 @@ export default function StaffPage() {
 
   const handleFormChange =
     (field: keyof StaffFormDataType) =>
-    (
-      event:
-        | React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-        | { target: { value: string | number } }
-    ) => {
-      setFormData({ ...formData, [field]: event.target.value });
-    };
+      (
+        event:
+          | React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+          | { target: { value: string | number | StaffStatus | SalaryType | Gender | null | '' } }
+      ) => {
+        setFormData({ ...formData, [field]: event.target.value });
+      };
   const validateForm = (data: StaffFormDataType): string | null => {
     if (!data.code?.trim()) return "Staff Code is required.";
     if (!data.full_name?.trim()) return "Full Name is required.";
@@ -390,14 +408,14 @@ export default function StaffPage() {
     }
 
     try {
-      const submitData: any = {
+      const submitData: StaffFormData = {
         ...formData,
         store_id: Number(formData.store_id),
         base_salary: formData.base_salary ? Number(formData.base_salary) : 0,
         commission_rate: formData.commission_rate
           ? Number(formData.commission_rate)
-          : null,
-        email: formData.email,
+          : undefined,
+        email: formData.email || undefined,
         address: formData.address,
       };
 
@@ -419,10 +437,14 @@ export default function StaffPage() {
 
       fetchStaffData();
       handleDialogClose();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Failed to save staff:", error);
 
-      const backendError = error.response?.data?.message;
+      let backendError: string | string[] | undefined;
+
+      if (isAxiosError(error)) {
+        backendError = error.response?.data?.message;
+      }
       const displayMessage = Array.isArray(backendError)
         ? backendError[0]
         : backendError || "An error occurred. Please try again.";
@@ -854,8 +876,8 @@ export default function StaffPage() {
           {dialogMode === "add"
             ? "Add New Staff"
             : dialogMode === "edit"
-            ? "Edit Staff"
-            : "Staff Details"}
+              ? "Edit Staff"
+              : "Staff Details"}
         </DialogTitle>
         <DialogContent dividers>
           <Grid container spacing={3} sx={{ mt: 0.5 }}>
@@ -902,7 +924,7 @@ export default function StaffPage() {
                 <Select
                   value={formData.gender}
                   label="Gender"
-                  onChange={handleFormChange("gender") as any}
+                  onChange={handleFormChange("gender")}
                 >
                   <MenuItem value="male">Male</MenuItem>
                   <MenuItem value="female">Female</MenuItem>
@@ -973,7 +995,7 @@ export default function StaffPage() {
                 <Select
                   value={formData.salary_type}
                   label="Salary Type"
-                  onChange={handleFormChange("salary_type") as any}
+                  onChange={handleFormChange("salary_type")}
                 >
                   <MenuItem value="fixed">Fixed Salary</MenuItem>
                   <MenuItem value="hourly">Hourly Rate</MenuItem>
@@ -1019,7 +1041,7 @@ export default function StaffPage() {
                 <Select
                   value={formData.status}
                   label="Status"
-                  onChange={handleFormChange("status") as any}
+                  onChange={handleFormChange("status")}
                 >
                   <MenuItem value="active">Active</MenuItem>
                   <MenuItem value="inactive">Inactive</MenuItem>

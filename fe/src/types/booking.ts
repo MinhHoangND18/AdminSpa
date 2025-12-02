@@ -1,4 +1,5 @@
 // types/booking.ts
+import { Customer as CustomerType } from './customer';
 
 export enum BookingStatus {
     PENDING = 'pending',
@@ -9,12 +10,13 @@ export enum BookingStatus {
     NO_SHOW = 'no_show'
 }
 
-export interface Customer {
-    id: number;
-    full_name: string; 
-    phone: string;
-    email: string | null;
-}
+// export interface Customer {
+//     id: number;
+//     full_name: string; 
+//     phone: string;
+//     email: string | null;
+// }
+export type Customer = CustomerType;
 
 export interface Store {
     id: number;
