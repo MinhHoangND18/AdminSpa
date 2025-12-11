@@ -14,12 +14,20 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { BookingsService } from './bookings.service';
-import { CreateBookingDto, UpdateBookingDto, QueryBookingDto } from './bookings.dto';
+import { CreateBookingDto, UpdateBookingDto, QueryBookingDto, CreateBookingOrderDto } from './bookings.dto';
 
 @ApiTags('bookings')
 @Controller('bookings')
 export class BookingsController {
   constructor(private readonly bookingsService: BookingsService) {}
+
+  @Post('order')
+  @ApiOperation({ summary: 'Create a complete booking order' })
+  @ApiResponse({ status: 201, description: 'Booking order created successfully' })
+  @ApiResponse({ status: 400, description: 'Bad request' })
+  createOrder(@Body() createBookingOrderDto: CreateBookingOrderDto) {
+    return this.bookingsService.createBookingFromOrder(createBookingOrderDto);
+  }
 
   @Post()
   @ApiOperation({ summary: 'Create a new booking' })

@@ -75,7 +75,7 @@ export class StoresService {
       queryBuilder.andWhere('store.isActive = :isActive', { isActive });
     }
 
-    queryBuilder.skip(skip).take(limit).orderBy('store.id', 'ASC');
+    queryBuilder.skip(skip).take(limit).orderBy('store.id', 'DESC');
 
     const [data, total] = await queryBuilder.getManyAndCount();
 

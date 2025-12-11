@@ -12,13 +12,17 @@ async function bootstrap() {
   app.setGlobalPrefix('api');
 
   // CORS
+  let CORS_ORIGINS = ['http://localhost:3000', 'http://localhost:3002'];
+  if ( process.env.CORS_ORIGIN ){
+    CORS_ORIGINS =  process.env.CORS_ORIGIN.split(",").map(it => it.trim())
+  }
   app.enableCors({
-    origin: process.env.CORS_ORIGIN || ['http://localhost:3000', 'http://localhost:3002'],
+    origin: CORS_ORIGINS,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
     credentials: true,
   });
 
-  // Global pipes
+  // Global pip
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,

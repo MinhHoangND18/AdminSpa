@@ -38,6 +38,7 @@ import {
   Badge,
   CircularProgress,
   Snackbar,
+  Backdrop
 } from "@mui/material";
 import {
   Add,
@@ -119,16 +120,16 @@ interface PaginatedStoreResponse {
 type DirectStoreArrayResponse = Store[];
 
 interface AxiosResponseWrapper {
-  data: unknown; 
+  data: unknown;
 }
 interface GenericListResponse<T> {
-    data: T[];
-    meta: {
-        total: number;
-        page: number;
-        limit: number;
-        totalPages: number;
-    };
+  data: T[];
+  meta: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
 }
 
 const isPaginatedStoreResponse = (data: unknown): data is PaginatedStoreResponse => {
@@ -294,7 +295,7 @@ const CustomerFormDialog: React.FC<CustomerFormDialogProps> = ({
 
     const fetchStores = async () => {
       try {
-  
+
         const response: unknown = await storesApi.getAll({
           limit: 100,
           isActive: true,
@@ -348,7 +349,7 @@ const CustomerFormDialog: React.FC<CustomerFormDialogProps> = ({
 
   useEffect(() => {
     setFormData(initialFormDataValue);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [customerData, dialogMode]);
 
   const createMutation = useMutation({
@@ -447,6 +448,7 @@ const CustomerFormDialog: React.FC<CustomerFormDialogProps> = ({
   }
 
   const currentCustomer = isEditMode || isViewMode ? customerData : undefined;
+
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
@@ -851,11 +853,11 @@ export default function CustomersPage() {
   const totalCustomers = paginatedCustomers?.data?.total ?? 0;
 
   const { data: customerStats, isLoading: isLoadingStats } =
-  useQuery<CustomerStats>({
-    queryKey: ["customerStats"],
-    queryFn: () => getCustomerStats(),
-  
-  });
+    useQuery<CustomerStats>({
+      queryKey: ["customerStats"],
+      queryFn: () => getCustomerStats(),
+
+    });
 
   const deleteMutation = useMutation({
     mutationFn: deleteCustomer,
@@ -969,18 +971,29 @@ export default function CustomersPage() {
     vip: customers.filter((c) => c.customerType === "vip").length,
     totalRevenue: customers.reduce((sum, c) => sum + Number(c.totalSpent), 0),
   };
+  const [loading, setLoading] = useState(false);
+  const isAnyLoading =
+  isLoadingCustomers ||
+  isLoadingStats ||
+  deleteMutation.isPending;
 
   return (
     <>
+      <Backdrop
+        sx={{ color: "#fff", zIndex: (theme) => theme.zIndex.drawer + 1 }}
+        open={isAnyLoading}
+      >
+        <CircularProgress color="inherit" />
+      </Backdrop>
       {/* Header */}
-      <Box sx={{ mb: 3 }}>
+      {/* <Box sx={{ mb: 3 }}>
         <Typography variant="h4" fontWeight="bold" gutterBottom>
           Customer Management
         </Typography>
         <Typography variant="body1" color="text.secondary">
           Manage your customer database and relationships
         </Typography>
-      </Box>
+      </Box> */}
 
       {/* Stats Cards */}
       <Grid container spacing={3} sx={{ mb: 3 }}>
@@ -1211,14 +1224,7 @@ export default function CustomersPage() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {isLoadingCustomers ? (
-                <TableRow>
-                  <TableCell colSpan={8} align="center" sx={{ py: 10 }}>
-                    <CircularProgress />
-                    <Typography>Loading customers...</Typography>
-                  </TableCell>
-                </TableRow>
-              ) : isErrorCustomers ? (
+              { isErrorCustomers ? (
                 <TableRow>
                   <TableCell colSpan={8} align="center" sx={{ py: 10 }}>
                     <Alert severity="error">Failed to load customers.</Alert>

@@ -4,7 +4,7 @@ SERVER_IP="139.59.126.11"
 SERVER_PORT="22"
 SERVER_USER="root"
 
-REMOTE_DIR=/var/www/spa/dashboard
+REMOTE_DIR=/var/www/spa/admin
 NODE_ENV="production"
 
 WORKING_DIR=$(pwd)

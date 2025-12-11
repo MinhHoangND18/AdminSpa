@@ -11,7 +11,11 @@ import {
   IsInt,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
-import { Gender, CustomerType, CustomerStatus } from '../customers/entities/customer.entity';
+import {
+  Gender,
+  CustomerType,
+  CustomerStatus,
+} from '../customers/entities/customer.entity';
 import { Type } from 'class-transformer';
 
 export class CreateCustomerDto {
@@ -95,7 +99,9 @@ export class CreateCustomerDto {
 export class UpdateCustomerDto extends PartialType(CreateCustomerDto) {}
 
 export class QueryCustomerDto {
-  @ApiPropertyOptional({ description: 'Tìm kiếm theo tên, số điện thoại, email' })
+  @ApiPropertyOptional({
+    description: 'Tìm kiếm theo tên, số điện thoại, email',
+  })
   @IsOptional()
   @IsString()
   search?: string;
@@ -132,11 +138,4 @@ export class QueryCustomerDto {
   @Type(() => Number)
   @IsNumber()
   limit?: number;
-}
-
-export class UpdateCustomerVisitDto {
-  @ApiProperty({ example: 100000, description: 'Số tiền chi tiêu trong lần visit' })
-  @IsNumber()
-  @Min(0)
-  amountSpent: number;
 }

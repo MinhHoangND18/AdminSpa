@@ -5,6 +5,7 @@ export interface User {
   id: number;
   username: string;
   email: string | null;
+  fullname: string | null;
   role: UserRole;
   staff_id: number | null;
   staff_name?: string;
@@ -21,6 +22,7 @@ export interface User {
 export interface UserFormData {
   username: string;
   email: string;
+  fullname: string;
   password: string;
   role: UserRole;
   staff_id: string;
@@ -50,8 +52,10 @@ export interface UserFilters {
 }
 
 export interface UserResponse {
-  data: User[];
-  total: number;
-  page: number;
-  limit: number;
+  data: {
+    data: User[];
+    total: number;
+    page: number;
+    limit: number;
+  };
 }

@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
-     Grid,
+    Grid,
     Card,
     CardContent,
     Typography,
@@ -43,7 +43,10 @@ import {
     ListItem,
     ListItemText,
     ListItemIcon,
-} from '@mui/material';
+    CircularProgress,
+    Autocomplete,
+    Backdrop
+} from "@mui/material";
 import {
     Add,
     Search,
@@ -71,80 +74,93 @@ import {
     Print,
     Share,
     ContentCopy,
-} from '@mui/icons-material';
+} from "@mui/icons-material";
 
-// Colors
-const PRIMARY_COLOR = '#14b8a6';
-const PRIMARY_DARK = '#0f766e';
-const SUCCESS_COLOR = '#10b981';
-const ERROR_COLOR = '#ef4444';
-const WARNING_COLOR = '#f59e0b';
-const INFO_COLOR = '#3b82f6';
-const PURPLE_COLOR = '#a855f7';
+import {
+    Invoice as InvoiceType,
+    DiscountType as DiscountTypeEnum,
+    PaymentStatus as PaymentStatusEnum,
+    CreateInvoiceDto,
+    UpdateInvoiceDto,
+    QueryInvoiceDto,
+} from "@/types/invoice";
+import {
+    InvoiceItem as InvoiceItemType,
+    ItemType as ItemTypeEnum,
+    CreateInvoiceItemDto,
+} from "@/types/invoice-item";
+import {
+    getInvoices,
+    createInvoice,
+    updateInvoice,
+    deleteInvoice,
+} from "@/lib/api/invoices";
+import {
+    createInvoiceItems,
+    getItemsByInvoiceId,
+    deleteInvoiceItemsByInvoiceId,
+} from "@/lib/api/invoice-items";
+import { getCustomers } from "@/lib/api/customers";
+import { storesApi } from "@/lib/api/stores";
+import { getBookings } from "@/lib/api/bookings";
+import { getStaff } from "@/lib/api/staffs";
+import { getProducts } from "@/lib/api/products";
+import { getServices } from "@/lib/api/services";
+import { Customer as CustomerType } from "@/types/customer";
+import { Store as StoreType } from "@/types/store";
+import { Booking as BookingType } from "@/types/booking";
+import { Staff as StaffType } from "@/types/staff";
+import { Product as ProductType } from "@/types/product";
+import { Service as ServiceType } from "@/types/service";
 
-// Types
-type DiscountType = 'amount' | 'percent';
-type PaymentStatus = 'pending' | 'paid';
-type ItemType = 'service' | 'product' | 'package';
 
-interface Customer {
-    id: number;
-    full_name: string;
-    phone: string;
-    email: string | null;
+interface ApiResponseWrapper<T> {
+    data?: {
+        data: T[];
+    };
 }
 
-interface Store {
-    id: number;
-    name: string;
+interface ApiErrorResponse {
+    response?: {
+        data?: {
+            message?: string | string[];
+        };
+    };
 }
 
-interface Booking {
-    id: number;
-    maBK: string;
-    customer_id: number;
-    store_id: number;
-}
+const PRIMARY_COLOR = "#14b8a6";
+const PRIMARY_DARK = "#0f766e";
+const SUCCESS_COLOR = "#10b981";
+const ERROR_COLOR = "#ef4444";
+const WARNING_COLOR = "#f59e0b";
+const INFO_COLOR = "#3b82f6";
+const PURPLE_COLOR = "#a855f7";
 
-interface Staff {
-    id: number;
-    name: string;
-}
+type DiscountType = "amount" | "percent";
+type PaymentStatus = "pending" | "paid";
+type ItemType = "service" | "product" | "package";
 
-interface InvoiceItem {
-    id: number;
-    invoice_id: number;
-    item_type: ItemType;
-    item_id: number;
-    item_name: string;
-    staff_id: number | null;
+interface InvoiceItem extends InvoiceItemType {
     staff_name?: string;
-    quantity: number;
-    unit_price: number;
-    discount: number;
-    total_price: number;
 }
 
-interface Invoice {
-    id: number;
-    voucher: string;
+interface Invoice extends InvoiceType {
     booking_id: number | null;
-    booking?: Booking;
     customer_id: number;
-    customer?: Customer;
     store_id: number;
-    store?: Store;
-    subtotal: number;
     discount_amount: number;
     discount_type: DiscountType | null;
     tax_amount: number;
     total_amount: number;
     paid_amount: number;
     payment_status: PaymentStatus;
-    notes: string | null;
     created_by: number | null;
     created_at: string;
     updated_at: string;
+
+    customer?: CustomerType;
+    store?: StoreType;
+    booking?: BookingType;
     items?: InvoiceItem[];
 }
 
@@ -153,8 +169,7 @@ interface InvoiceFormData {
     store_id: string;
     booking_id: string;
     discount_amount: string;
-    discount_type: DiscountType | '';
-    tax_amount: string;
+    discount_type: DiscountType | "";
     notes: string;
     payment_status: PaymentStatus;
 }
@@ -169,183 +184,26 @@ interface InvoiceItemFormData {
     discount: string;
 }
 
-// Mock Data
-const mockCustomers: Customer[] = [
-    { id: 1, full_name: 'Nguyen Thi Lan', phone: '+84 901 234 567', email: 'lan.nguyen@email.com' },
-    { id: 2, full_name: 'Tran Van Minh', phone: '+84 902 345 678', email: 'minh.tran@email.com' },
-    { id: 3, full_name: 'Le Thi Hoa', phone: '+84 903 456 789', email: null },
-];
+interface SelectableItem {
+    id: number;
+    name: string;
+    price: number;
+    discount: number;
+    type: "product" | "service" | "package";
+}
 
-const mockStores: Store[] = [
-    { id: 1, name: 'Spa Harmony Downtown' },
-    { id: 2, name: 'Spa Serenity Garden' },
-    { id: 3, name: 'Spa Wellness Center' },
-];
-
-const mockBookings: Booking[] = [
-    { id: 1, maBK: 'BK001', customer_id: 1, store_id: 1 },
-    { id: 2, maBK: 'BK002', customer_id: 2, store_id: 1 },
-    { id: 3, maBK: 'BK003', customer_id: 3, store_id: 2 },
-];
-
-const mockStaff: Staff[] = [
-    { id: 1, name: 'Tran Thi Mai' },
-    { id: 2, name: 'Le Van Hung' },
-    { id: 3, name: 'Pham Thi Thu' },
-];
-
-const mockServices = [
-    { id: 1, name: 'Swedish Massage', price: 850000 },
-    { id: 2, name: 'Deep Tissue Massage', price: 1200000 },
-    { id: 3, name: 'Hydrating Facial', price: 650000 },
-];
-
-const mockProducts = [
-    { id: 1, name: 'Face Cream', price: 350000 },
-    { id: 2, name: 'Body Lotion', price: 280000 },
-    { id: 3, name: 'Essential Oil Set', price: 520000 },
-];
-
-const mockInvoices: Invoice[] = [
-    {
-        id: 1,
-        voucher: 'INV-2024-001',
-        booking_id: 1,
-        booking: mockBookings[0],
-        customer_id: 1,
-        customer: mockCustomers[0],
-        store_id: 1,
-        store: mockStores[0],
-        subtotal: 2050000,
-        discount_amount: 100000,
-        discount_type: 'amount',
-        tax_amount: 205000,
-        total_amount: 2155000,
-        paid_amount: 2155000,
-        payment_status: 'paid',
-        notes: 'VIP customer discount applied',
-        created_by: 1,
-        created_at: '2024-11-15T10:00:00',
-        updated_at: '2024-11-15T10:30:00',
-        items: [
-            {
-                id: 1,
-                invoice_id: 1,
-                item_type: 'service',
-                item_id: 1,
-                item_name: 'Swedish Massage',
-                staff_id: 1,
-                staff_name: 'Tran Thi Mai',
-                quantity: 1,
-                unit_price: 850000,
-                discount: 0,
-                total_price: 850000,
-            },
-            {
-                id: 2,
-                invoice_id: 1,
-                item_type: 'service',
-                item_id: 2,
-                item_name: 'Deep Tissue Massage',
-                staff_id: 2,
-                staff_name: 'Le Van Hung',
-                quantity: 1,
-                unit_price: 1200000,
-                discount: 100000,
-                total_price: 1100000,
-            },
-        ],
-    },
-    {
-        id: 2,
-        voucher: 'INV-2024-002',
-        booking_id: 2,
-        booking: mockBookings[1],
-        customer_id: 2,
-        customer: mockCustomers[1],
-        store_id: 1,
-        store: mockStores[0],
-        subtotal: 650000,
-        discount_amount: 0,
-        discount_type: null,
-        tax_amount: 65000,
-        total_amount: 715000,
-        paid_amount: 0,
-        payment_status: 'pending',
-        notes: null,
-        created_by: 1,
-        created_at: '2024-11-16T14:00:00',
-        updated_at: '2024-11-16T14:00:00',
-        items: [
-            {
-                id: 3,
-                invoice_id: 2,
-                item_type: 'service',
-                item_id: 3,
-                item_name: 'Hydrating Facial',
-                staff_id: 3,
-                staff_name: 'Pham Thi Thu',
-                quantity: 1,
-                unit_price: 650000,
-                discount: 0,
-                total_price: 650000,
-            },
-        ],
-    },
-    {
-        id: 3,
-        voucher: 'INV-2024-003',
-        booking_id: null,
-        customer_id: 3,
-        customer: mockCustomers[2],
-        store_id: 2,
-        store: mockStores[1],
-        subtotal: 870000,
-        discount_amount: 50,
-        discount_type: 'percent',
-        tax_amount: 43500,
-        total_amount: 456750,
-        paid_amount: 456750,
-        payment_status: 'paid',
-        notes: 'First-time customer 50% discount',
-        created_by: 2,
-        created_at: '2024-11-17T09:30:00',
-        updated_at: '2024-11-17T09:45:00',
-        items: [
-            {
-                id: 4,
-                invoice_id: 3,
-                item_type: 'service',
-                item_id: 1,
-                item_name: 'Swedish Massage',
-                staff_id: 1,
-                staff_name: 'Tran Thi Mai',
-                quantity: 1,
-                unit_price: 850000,
-                discount: 425000,
-                total_price: 425000,
-            },
-            {
-                id: 5,
-                invoice_id: 3,
-                item_type: 'product',
-                item_id: 1,
-                item_name: 'Face Cream',
-                staff_id: null,
-                quantity: 1,
-                unit_price: 350000,
-                discount: 0,
-                total_price: 350000,
-            },
-        ],
-    },
-];
-
+interface FetchError extends Error {
+    response?: {
+        data?: {
+            message?: string | string[];
+        };
+    };
+}
 const getPaymentStatusColor = (status: PaymentStatus) => {
     switch (status) {
-        case 'paid':
+        case "paid":
             return SUCCESS_COLOR;
-        case 'pending':
+        case "pending":
             return WARNING_COLOR;
         default:
             return PRIMARY_COLOR;
@@ -354,10 +212,10 @@ const getPaymentStatusColor = (status: PaymentStatus) => {
 
 const getPaymentStatusLabel = (status: PaymentStatus) => {
     switch (status) {
-        case 'paid':
-            return 'Paid';
-        case 'pending':
-            return 'Pending';
+        case "paid":
+            return "Paid";
+        case "pending":
+            return "Pending";
         default:
             return status;
     }
@@ -365,11 +223,11 @@ const getPaymentStatusLabel = (status: PaymentStatus) => {
 
 const getItemTypeIcon = (type: ItemType) => {
     switch (type) {
-        case 'service':
+        case "service":
             return <Spa />;
-        case 'product':
+        case "product":
             return <ShoppingBag />;
-        case 'package':
+        case "package":
             return <Inventory />;
         default:
             return <Assignment />;
@@ -378,11 +236,11 @@ const getItemTypeIcon = (type: ItemType) => {
 
 const getItemTypeColor = (type: ItemType) => {
     switch (type) {
-        case 'service':
+        case "service":
             return PRIMARY_COLOR;
-        case 'product':
+        case "product":
             return INFO_COLOR;
-        case 'package':
+        case "package":
             return PURPLE_COLOR;
         default:
             return PRIMARY_COLOR;
@@ -390,9 +248,9 @@ const getItemTypeColor = (type: ItemType) => {
 };
 
 const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('vi-VN', {
-        style: 'currency',
-        currency: 'VND',
+    return new Intl.NumberFormat("vi-VN", {
+        style: "currency",
+        currency: "VND",
     }).format(amount);
 };
 
@@ -401,73 +259,329 @@ const generateVoucher = () => {
     return `INV-${timestamp}`;
 };
 
+function useDebounce<T>(value: T, delay: number): T {
+    const [debouncedValue, setDebouncedValue] = useState<T>(value);
+
+    useEffect(() => {
+        const handler = setTimeout(() => {
+            setDebouncedValue(value);
+        }, delay);
+
+        return () => {
+            clearTimeout(handler);
+        };
+    }, [value, delay]);
+
+    return debouncedValue;
+}
+
 export default function InvoicesPage() {
-    const [invoices, setInvoices] = useState<Invoice[]>(mockInvoices);
-    const [searchQuery, setSearchQuery] = useState('');
-    const [filterStatus, setFilterStatus] = useState<PaymentStatus | 'all'>('all');
-    const [filterStore, setFilterStore] = useState<number | 'all'>('all');
+    const [invoices, setInvoices] = useState<Invoice[]>([]);
+    const [totalItems, setTotalItems] = useState(0);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [isItemsLoading, setIsItemsLoading] = useState(false);
+    const [itemsForView, setItemsForView] = useState<InvoiceItem[]>([]);
+
+    const [customers, setCustomers] = useState<CustomerType[]>([]);
+    const [stores, setStores] = useState<StoreType[]>([]);
+    const [bookings, setBookings] = useState<BookingType[]>([]);
+    const [staff, setStaff] = useState<StaffType[]>([]);
+    const [products, setProducts] = useState<ProductType[]>([]);
+    const [services, setServices] = useState<ServiceType[]>([]);
+
+    const [searchQuery, setSearchQuery] = useState("");
+    const debouncedSearchQuery = useDebounce(searchQuery, 500);
+    const [filterStatus, setFilterStatus] = useState<PaymentStatus | "all">(
+        "all"
+    );
+    const [filterStore, setFilterStore] = useState<number | "all">("all");
     const [page, setPage] = useState(0);
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
     const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
     const [openDialog, setOpenDialog] = useState(false);
     const [openItemsDialog, setOpenItemsDialog] = useState(false);
-    const [dialogMode, setDialogMode] = useState<'add' | 'edit' | 'view'>('add');
+    const [dialogMode, setDialogMode] = useState<"add" | "edit" | "view">("add");
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+    const [isFormDataLoading, setIsFormDataLoading] = useState(false);
+    const isMountedRef = useRef(true);
+    const abortControllerRef = useRef<AbortController | null>(null);
+    const [isInitialLoad, setIsInitialLoad] = useState(true);
+    const [loading, setLoading] = useState(false);
 
-    const initialFormData: InvoiceFormData = {
-        customer_id: '',
-        store_id: '',
-        booking_id: '',
-        discount_amount: '0',
-        discount_type: '',
-        tax_amount: '0',
-        notes: '',
-        payment_status: 'pending',
-    };
 
-    const initialItemFormData: InvoiceItemFormData = {
-        item_type: 'service',
-        item_id: '',
-        item_name: '',
-        staff_id: '',
-        quantity: '1',
-        unit_price: '0',
-        discount: '0',
-    };
+    const initialFormData: InvoiceFormData = useMemo(
+        () => ({
+            customer_id: "",
+            store_id: "",
+            booking_id: "",
+            discount_amount: "0",
+            discount_type: "",
+            notes: "",
+            payment_status: "pending",
+        }),
+        []
+    );
+
+    const initialItemFormData: InvoiceItemFormData = useMemo(
+        () => ({
+            item_type: "service",
+            item_id: "",
+            item_name: "",
+            staff_id: "",
+            quantity: "1",
+            unit_price: "0",
+            discount: "0",
+        }),
+        []
+    );
+    useEffect(() => {
+        isMountedRef.current = true;
+
+        return () => {
+            isMountedRef.current = false;
+            // Cancel mọi request đang pending khi unmount
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
+            }
+        };
+    }, []);
 
     const [formData, setFormData] = useState<InvoiceFormData>(initialFormData);
     const [items, setItems] = useState<InvoiceItemFormData[]>([]);
-    const [currentItem, setCurrentItem] = useState<InvoiceItemFormData>(initialItemFormData);
+    const [currentItem, setCurrentItem] =
+        useState<InvoiceItemFormData>(initialItemFormData);
 
-    // Filter and search
-    const filteredInvoices = invoices.filter((invoice) => {
-        const matchesSearch =
-            invoice.voucher.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            invoice.customer?.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            invoice.customer?.phone.includes(searchQuery);
-        const matchesStatus = filterStatus === 'all' || invoice.payment_status === filterStatus;
-        const matchesStore = filterStore === 'all' || invoice.store_id === filterStore;
-
-        return matchesSearch && matchesStatus && matchesStore;
-    });
-
-    // Pagination
-    const paginatedInvoices = filteredInvoices.slice(
-        page * rowsPerPage,
-        page * rowsPerPage + rowsPerPage
-    );
-
-    // Stats
-    const stats = {
-        total: invoices.length,
-        paid: invoices.filter((i) => i.payment_status === 'paid').length,
-        pending: invoices.filter((i) => i.payment_status === 'pending').length,
-        totalRevenue: invoices.reduce((sum, i) => sum + i.total_amount, 0),
-        collectedRevenue: invoices.reduce((sum, i) => sum + i.paid_amount, 0),
+    const fetchCustomers = async () => {
+        try {
+            const data = await getCustomers({ limit: 1000 }) as unknown as ApiResponseWrapper<CustomerType>;
+            setCustomers(data?.data?.data ?? []);
+        } catch (err) {
+            console.error("Failed to fetch customers:", err);
+        }
     };
 
-    const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, invoice: Invoice) => {
+    const fetchStores = async () => {
+        try {
+            const data = await storesApi.getAll({ limit: 1000 }) as unknown as ApiResponseWrapper<StoreType>;
+            setStores(data?.data?.data ?? []);
+        } catch (err) {
+            console.error("Failed to fetch stores:", err);
+        }
+    };
+
+    const fetchBookings = async () => {
+        try {
+            const response = await getBookings({ limit: 1000 });
+            const bookingsData = response?.data ?? [];
+            console.log("Extracted bookings data (count):", bookingsData.length);
+            setBookings(bookingsData);
+        } catch (err) {
+            console.error("Failed to fetch bookings:", err);
+        }
+    };
+
+    const fetchStaff = async () => {
+        try {
+            const data = await getStaff({ limit: 1000 }) as unknown as ApiResponseWrapper<StaffType>;
+            setStaff(data?.data?.data ?? []);
+        } catch (err) {
+            console.error("Failed to fetch staff:", err);
+        }
+    };
+
+    const fetchProducts = async () => {
+        try {
+            const data = await getProducts({ limit: 1000 });
+            setProducts(Array.isArray(data) ? data : []);
+        } catch (err) {
+            console.error("Failed to fetch products:", err);
+        }
+    };
+
+    const fetchServices = async () => {
+        try {
+            const data = await getServices({ limit: 1000 });
+            const servicesData = data?.data ?? [];
+            setServices(servicesData);
+        } catch (err) {
+            console.error("Failed to fetch services:", err);
+        }
+    };
+
+    useEffect(() => {
+        const loadInitialData = async () => {
+            if (!isMountedRef.current) return;
+
+            setIsLoading(true);
+
+            try {
+                // Load song song các data cơ bản trước
+                await Promise.all([
+                    fetchCustomers(),
+                    fetchStores(),
+                    fetchStaff(),
+                ]);
+
+                // Load bookings sau (ít quan trọng hơn)
+                if (isMountedRef.current) {
+                    fetchBookings();
+                }
+            } catch (err) {
+                console.error("Failed to load initial data:", err);
+            } finally {
+                if (isMountedRef.current) {
+                    setIsInitialLoad(false);
+                }
+            }
+        };
+
+        loadInitialData();
+    }, []);
+
+    const fetchInvoices = useCallback(async () => {
+        if (customers.length === 0 || stores.length === 0) {
+            return;
+        }
+
+        setIsLoading(true);
+        setError(null);
+        try {
+            const params: QueryInvoiceDto = {
+                page: page + 1,
+                limit: rowsPerPage,
+                paymentStatus: filterStatus === "all" ? undefined : (filterStatus as PaymentStatusEnum),
+                storeId: filterStore === "all" ? undefined : filterStore,
+               
+            };
+
+            const data = await getInvoices(params);
+
+            const processedInvoices: Invoice[] = data.data.map((apiInvoice) => ({
+                ...apiInvoice,
+                booking_id: apiInvoice.bookingId,
+                customer_id: apiInvoice.customerId,
+                store_id: apiInvoice.storeId,
+                discount_amount: apiInvoice.discountAmount,
+                discount_type: apiInvoice.discountType as DiscountType | null,
+                tax_amount: apiInvoice.taxAmount,
+                total_amount: apiInvoice.totalAmount,
+                paid_amount: apiInvoice.paidAmount,
+                payment_status: apiInvoice.paymentStatus as PaymentStatus,
+                created_by: apiInvoice.createdBy,
+                created_at: apiInvoice.createdAt,
+                updated_at: apiInvoice.updatedAt,
+                customer: customers.find((c) => c.id === apiInvoice.customerId),
+                store: stores.find((s) => s.id === apiInvoice.storeId),
+                booking: bookings.find((b) => b.id === apiInvoice.bookingId),
+            }));
+
+            setInvoices(processedInvoices);
+            setTotalItems(processedInvoices.length);
+        } catch (err) {
+            console.error("Failed to fetch invoices:", err);
+            setError("Failed to load invoices. Please try again.");
+        } finally {
+            setIsLoading(false);
+        }
+    }, [page, rowsPerPage, filterStatus, filterStore, bookings, customers, stores]);
+
+
+    const handleBookingSelect = (bookingId: string) => {
+        setFormData((prev) => ({ ...prev, booking_id: bookingId }));
+
+        if (bookingId) {
+            const selectedBooking = bookings.find(
+                (b) => b.id.toString() === bookingId
+            );
+
+            if (selectedBooking) {
+                const customer = customers.find(
+                    (c) => c.id === selectedBooking.customerId
+                );
+
+                setFormData((prev) => ({
+                    ...prev,
+                    customer_id: selectedBooking.customerId.toString(),
+                    store_id: selectedBooking.storeId.toString(),
+
+                }));
+            }
+        } else {
+            setFormData((prev) => ({
+                ...prev,
+                customer_id: initialFormData.customer_id,
+                store_id: initialFormData.store_id,
+            }));
+        }
+    };
+    useEffect(() => {
+        if (!isInitialLoad && customers.length > 0 && stores.length > 0) {
+            fetchInvoices();
+        }
+    }, [isInitialLoad, customers.length, stores.length, page, rowsPerPage, filterStatus, filterStore]);
+
+    // useEffect(() => {
+    //     if (bookings.length > 0 && invoices.length > 0) {
+    //         // Re-map invoices với bookings data
+    //         const updatedInvoices = invoices.map(invoice => ({
+    //             ...invoice,
+    //             booking: bookings.find((b) => b.id === invoice.booking_id),
+    //         }));
+    //         setInvoices(updatedInvoices);
+    //     }
+    // }, [bookings, invoices]);
+
+    const filteredInvoices = useMemo(() => {
+        if (!debouncedSearchQuery) {
+            return invoices;
+        }
+        const lowercasedQuery = debouncedSearchQuery.toLowerCase();
+        return invoices.filter((invoice) => {
+            const customerName = invoice.customer?.fullName?.toLowerCase() || "";
+            const customerPhone = invoice.customer?.phone?.toLowerCase() || "";
+            const voucher = invoice.voucher?.toLowerCase() || "";
+
+            return (
+                customerName.includes(lowercasedQuery) ||
+                customerPhone.includes(lowercasedQuery) ||
+                voucher.includes(lowercasedQuery)
+            );
+        });
+    }, [invoices, debouncedSearchQuery]);
+
+    const paginatedInvoices = useMemo(
+        () =>
+            filteredInvoices.slice(
+                page * rowsPerPage,
+                page * rowsPerPage + rowsPerPage
+            ),
+        [filteredInvoices, page, rowsPerPage]
+    );
+
+    const stats = useMemo(
+        () => ({
+            total: filteredInvoices.length,
+            paid: filteredInvoices.filter((i) => i.payment_status === "paid").length,
+            pending: filteredInvoices.filter((i) => i.payment_status === "pending")
+                .length,
+            totalRevenue: filteredInvoices.reduce(
+                (sum, i) => sum + (Number(i.total_amount) || 0),
+                0
+            ),
+            collectedRevenue: filteredInvoices.reduce(
+                (sum, i) => sum + (Number(i.paid_amount) || 0),
+                0
+            ),
+        }),
+        [filteredInvoices]
+    );
+
+    const handleMenuOpen = (
+        event: React.MouseEvent<HTMLElement>,
+        invoice: Invoice
+    ) => {
         setAnchorEl(event.currentTarget);
         setSelectedInvoice(invoice);
     };
@@ -476,44 +590,99 @@ export default function InvoicesPage() {
         setAnchorEl(null);
     };
 
-    const handleAddNew = () => {
-        setDialogMode('add');
+    const handleAddNew = async () => {
+        setDialogMode("add");
         setFormData(initialFormData);
         setItems([]);
         setOpenDialog(true);
+
+        // Load services/products nếu chưa có
+        if (services.length === 0 || products.length === 0) {
+            setIsFormDataLoading(true);
+            await Promise.all([
+                services.length === 0 ? fetchServices() : Promise.resolve(),
+                products.length === 0 ? fetchProducts() : Promise.resolve(),
+            ]);
+            setIsFormDataLoading(false);
+        }
     };
 
-    const handleEdit = () => {
-        if (selectedInvoice) {
-            setDialogMode('edit');
-            setFormData({
-                customer_id: selectedInvoice.customer_id.toString(),
-                store_id: selectedInvoice.store_id.toString(),
-                booking_id: selectedInvoice.booking_id?.toString() || '',
-                discount_amount: selectedInvoice.discount_amount.toString(),
-                discount_type: selectedInvoice.discount_type || '',
-                tax_amount: selectedInvoice.tax_amount.toString(),
-                notes: selectedInvoice.notes || '',
-                payment_status: selectedInvoice.payment_status,
-            });
-            setOpenDialog(true);
+    const fetchInvoiceItemsAndOpenDialog = async (mode: "view" | "edit" | "view_items") => {
+        if (!selectedInvoice) return;
+
+        setIsItemsLoading(true);
+        setItemsForView([]);
+
+        try {
+            const items = await getItemsByInvoiceId(selectedInvoice.id);
+
+            const processedItems: InvoiceItem[] = items.map((apiItem) => ({
+                ...apiItem,
+                staff_name: staff.find((s) => s.id === apiItem.staffId)?.full_name,
+            }));
+
+            setItemsForView(processedItems);
+
+            if (mode === "view") {
+                setDialogMode("view");
+                setOpenDialog(true);
+            } else if (mode === "view_items") {
+                setOpenItemsDialog(true);
+            } else if (mode === "edit") {
+                setFormData({
+                    customer_id: selectedInvoice.customer_id.toString(),
+                    store_id: selectedInvoice.store_id.toString(),
+                    booking_id: selectedInvoice.booking_id?.toString() || "",
+                    discount_amount: selectedInvoice.discount_amount.toString(),
+                    discount_type: (selectedInvoice.discount_type as DiscountType) || "",
+                    // tax_amount: selectedInvoice.tax_amount.toString(),
+                    notes: selectedInvoice.notes || "",
+                    payment_status: selectedInvoice.payment_status,
+                });
+
+                const formItems: InvoiceItemFormData[] = processedItems.map((item) => ({
+                    item_type: item.itemType as ItemType,
+                    item_id: item.itemId.toString(),
+                    item_name: item.itemName,
+                    staff_id: item.staffId?.toString() || "",
+                    quantity: item.quantity.toString(),
+                    unit_price: item.unitPrice.toString(),
+                    discount: item.discount.toString(),
+                }));
+                setItems(formItems);
+
+                setDialogMode("edit");
+                setOpenDialog(true);
+            }
+        } catch (err) {
+            console.error("Failed to fetch invoice items:", err);
+            alert("Failed to load invoice items.");
+        } finally {
+            setIsItemsLoading(false);
         }
         handleMenuClose();
+    };
+
+    const handleEdit = async () => {
+        // Load services/products nếu chưa có
+        if (services.length === 0 || products.length === 0) {
+            setIsFormDataLoading(true);
+            await Promise.all([
+                services.length === 0 ? fetchServices() : Promise.resolve(),
+                products.length === 0 ? fetchProducts() : Promise.resolve(),
+            ]);
+            setIsFormDataLoading(false);
+        }
+
+        fetchInvoiceItemsAndOpenDialog("edit");
     };
 
     const handleView = () => {
-        if (selectedInvoice) {
-            setDialogMode('view');
-            setOpenDialog(true);
-        }
-        handleMenuClose();
+        fetchInvoiceItemsAndOpenDialog("view");
     };
 
     const handleViewItems = () => {
-        if (selectedInvoice) {
-            setOpenItemsDialog(true);
-        }
-        handleMenuClose();
+        fetchInvoiceItemsAndOpenDialog("view_items");
     };
 
     const handleDelete = () => {
@@ -521,9 +690,15 @@ export default function InvoicesPage() {
         handleMenuClose();
     };
 
-    const confirmDelete = () => {
+    const confirmDelete = async () => {
         if (selectedInvoice) {
-            setInvoices(invoices.filter((i) => i.id !== selectedInvoice.id));
+            try {
+                await deleteInvoice(selectedInvoice.id);
+                fetchInvoices();
+            } catch (err) {
+                console.error("Failed to delete invoice:", err);
+                alert("Failed to delete invoice. Please try again.");
+            }
             setDeleteConfirmOpen(false);
             setSelectedInvoice(null);
         }
@@ -533,23 +708,30 @@ export default function InvoicesPage() {
         setOpenDialog(false);
         setFormData(initialFormData);
         setItems([]);
+        setSelectedInvoice(null);
     };
 
     const handleItemsDialogClose = () => {
         setOpenItemsDialog(false);
     };
 
-    const handleFormChange = (field: keyof InvoiceFormData) => (
-        event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> 
-    ) => {
-        setFormData({ ...formData, [field]: event.target.value });
-    };
+    const handleFormChange =
+        (field: keyof InvoiceFormData) =>
+            (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+                setFormData({
+                    ...formData,
+                    [field]: event.target.value as InvoiceFormData[typeof field]
+                });
+            };
 
-    const handleItemChange = (field: keyof InvoiceItemFormData) => (
-        event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-    ) => {
-        setCurrentItem({ ...currentItem, [field]: event.target.value });
-    };
+    const handleItemChange =
+        (field: keyof InvoiceItemFormData) =>
+            (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+                setCurrentItem({
+                    ...currentItem,
+                    [field]: event.target.value as InvoiceItemFormData[typeof field]
+                });
+            };
 
     const addItem = () => {
         if (currentItem.item_name && parseFloat(currentItem.unit_price) > 0) {
@@ -570,147 +752,321 @@ export default function InvoicesPage() {
             return sum + (unitPrice * quantity - discount);
         }, 0);
 
-        const discountAmount = parseFloat(formData.discount_amount) || 0;
-        const taxAmount = parseFloat(formData.tax_amount) || 0;
+        const inputDiscountAmount = parseFloat(formData.discount_amount) || 0;
 
-        let total = subtotal - discountAmount + taxAmount;
+        // --- THAY ĐỔI TÍNH TOÁN THUẾ Ở ĐÂY ---
+        const TAX_RATE = 0.08; // 8%
+        let finalDiscountAmount = inputDiscountAmount;
+        let amountAfterDiscount = subtotal;
 
-        if (formData.discount_type === 'percent' && discountAmount > 0) {
-            total = subtotal * (1 - discountAmount / 100) + taxAmount;
+        if (formData.discount_type === "percent" && inputDiscountAmount > 0) {
+            finalDiscountAmount = subtotal * (inputDiscountAmount / 100);
+            amountAfterDiscount = subtotal - finalDiscountAmount;
+        } else {
+            amountAfterDiscount = subtotal - finalDiscountAmount;
         }
+
+        // Tính thuế 8% trên Subtotal sau khi trừ Discount (nếu có)
+        const calculatedTaxAmount = amountAfterDiscount * TAX_RATE;
+
+        const total = amountAfterDiscount + calculatedTaxAmount;
+        // ----------------------------------------
 
         return {
             subtotal,
+            discountAmount: finalDiscountAmount,
+            taxAmount: calculatedTaxAmount, // Thêm taxAmount đã tính toán
             total: Math.max(0, total),
         };
     };
 
-    const handleSubmit = () => {
-        const { subtotal, total } = calculateTotals();
+    const handleSubmit = async () => {
+        const {
+            subtotal: finalSubtotal,
+            total: finalTotal,
+            discountAmount: finalDiscountAmount,
+        } = calculateTotals();
 
-        if (dialogMode === 'add') {
-            const newInvoice: Invoice = {
-                id: invoices.length + 1,
-                voucher: generateVoucher(),
-                booking_id: formData.booking_id ? parseInt(formData.booking_id) : null,
-                booking: mockBookings.find(b => b.id === parseInt(formData.booking_id)),
-                customer_id: parseInt(formData.customer_id),
-                customer: mockCustomers.find(c => c.id === parseInt(formData.customer_id)),
-                store_id: parseInt(formData.store_id),
-                store: mockStores.find(s => s.id === parseInt(formData.store_id)),
-                subtotal,
-                discount_amount: parseFloat(formData.discount_amount) || 0,
-                discount_type: formData.discount_type as DiscountType | null,
-                tax_amount: parseFloat(formData.tax_amount) || 0,
-                total_amount: total,
-                paid_amount: formData.payment_status === 'paid' ? total : 0,
-                payment_status: formData.payment_status,
-                notes: formData.notes || null,
-                created_by: 1,
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-                items: items.map((item, index) => ({
-                    id: index + 1,
-                    invoice_id: invoices.length + 1,
-                    item_type: item.item_type,
-                    item_id: parseInt(item.item_id),
-                    item_name: item.item_name,
-                    staff_id: item.staff_id ? parseInt(item.staff_id) : null,
-                    staff_name: mockStaff.find(s => s.id === parseInt(item.staff_id))?.name,
-                    quantity: parseInt(item.quantity) || 1,
-                    unit_price: parseFloat(item.unit_price) || 0,
-                    discount: parseFloat(item.discount) || 0,
-                    total_price: (parseFloat(item.unit_price) || 0) * (parseInt(item.quantity) || 1) - (parseFloat(item.discount) || 0),
-                })),
-            };
-            setInvoices([...invoices, newInvoice]);
-        } else if (dialogMode === 'edit' && selectedInvoice) {
-            setInvoices(
-                invoices.map((i) =>
-                    i.id === selectedInvoice.id
-                        ? {
-                            ...i,
-                            customer_id: parseInt(formData.customer_id),
-                            customer: mockCustomers.find(c => c.id === parseInt(formData.customer_id)),
-                            store_id: parseInt(formData.store_id),
-                            store: mockStores.find(s => s.id === parseInt(formData.store_id)),
-                            booking_id: formData.booking_id ? parseInt(formData.booking_id) : null,
-                            booking: mockBookings.find(b => b.id === parseInt(formData.booking_id)),
-                            subtotal,
-                            discount_amount: parseFloat(formData.discount_amount) || 0,
-                            discount_type: formData.discount_type as DiscountType | null,
-                            tax_amount: parseFloat(formData.tax_amount) || 0,
-                            total_amount: total,
-                            paid_amount: formData.payment_status === 'paid' ? total : 0,
-                            payment_status: formData.payment_status,
-                            notes: formData.notes || null,
-                            updated_at: new Date().toISOString(),
-                        }
-                        : i
-                )
-            );
+        try {
+            if (dialogMode === "add") {
+                const itemsToSubmit = items.map((item) => {
+                    const quantity = parseInt(item.quantity) || 1;
+                    const unitPrice = parseFloat(item.unit_price) || 0;
+                    const discount = parseFloat(item.discount) || 0;
+                    return {
+                        itemType: item.item_type as ItemTypeEnum,
+                        itemId: parseInt(item.item_id) || 0,
+                        itemName: item.item_name,
+                        staffId: item.staff_id ? parseInt(item.staff_id) : undefined,
+                        quantity: quantity,
+                        unitPrice: unitPrice,
+                        discount: discount,
+                        totalPrice: unitPrice * quantity - discount,
+                    };
+                });
+
+                const createData: CreateInvoiceDto = {
+                    voucher: generateVoucher(),
+                    customerId: parseInt(formData.customer_id),
+                    storeId: parseInt(formData.store_id),
+                    subtotal: finalSubtotal,
+                    totalAmount: finalTotal,
+                    items: itemsToSubmit,
+                    bookingId: formData.booking_id ? parseInt(formData.booking_id) : undefined,
+                    discountAmount: finalDiscountAmount,
+                    discountType: (formData.discount_type as DiscountTypeEnum) || undefined,
+                    taxAmount: calculatedTaxAmount,
+                    paidAmount: formData.payment_status === "paid" ? finalTotal : 0,
+                    paymentStatus: formData.payment_status as PaymentStatusEnum,
+                    notes: formData.notes || undefined,
+                    createdBy: 1,
+                };
+
+                await createInvoice(createData);
+
+            } else if (dialogMode === "edit" && selectedInvoice) {
+                const updateData: UpdateInvoiceDto = {
+                    voucher: selectedInvoice.voucher,
+                    customerId: parseInt(formData.customer_id),
+                    storeId: parseInt(formData.store_id),
+                    bookingId: formData.booking_id ? parseInt(formData.booking_id) : null,
+                    subtotal: finalSubtotal,
+                    discountAmount: finalDiscountAmount,
+                    discountType: (formData.discount_type as DiscountTypeEnum) || null,
+                    taxAmount: calculatedTaxAmount,
+                    totalAmount: finalTotal,
+                    paidAmount: formData.payment_status === "paid" ? finalTotal : 0,
+                    paymentStatus: formData.payment_status as PaymentStatusEnum,
+                    notes: formData.notes || null,
+                };
+
+                await updateInvoice(selectedInvoice.id, updateData);
+
+                await deleteInvoiceItemsByInvoiceId(selectedInvoice.id);
+                if (items.length > 0) {
+                    const invoiceItems: CreateInvoiceItemDto[] = items.map((item) => {
+                        const quantity = parseInt(item.quantity) || 1;
+                        const unitPrice = parseFloat(item.unit_price) || 0;
+                        const discount = parseFloat(item.discount) || 0;
+
+                        return {
+                            invoiceId: selectedInvoice.id,
+                            itemType: item.item_type as ItemTypeEnum,
+                            itemId: parseInt(item.item_id) || 0,
+                            itemName: item.item_name,
+                            staffId: item.staff_id ? parseInt(item.staff_id) : undefined,
+                            quantity: quantity,
+                            unitPrice: unitPrice,
+                            discount: discount,
+                            totalPrice: unitPrice * quantity - discount,
+                        };
+                    });
+                    await createInvoiceItems(invoiceItems);
+                }
+            }
+
+            fetchInvoices();
+            handleDialogClose();
+        } catch (err) {
+            console.error("Failed to submit invoice:", err);
+            let errorMessage = "An error occurred while submitting the invoice. Please check the data and try again.";
+
+            const fetchError = err as FetchError;
+            if (fetchError.response?.data?.message) {
+                const backendMessage = fetchError.response.data.message;
+                if (Array.isArray(backendMessage)) {
+                    errorMessage += "\n\nServer errors:\n- " + backendMessage.join("\n- ");
+                } else {
+                    errorMessage += "\n\nServer error: " + backendMessage;
+                }
+            }
+
+            alert(errorMessage);
         }
-        handleDialogClose();
+    };
+
+    const markAsPaid = async () => {
+        if (selectedInvoice) {
+            try {
+                const updateData: UpdateInvoiceDto = {
+                    paymentStatus: PaymentStatusEnum.PAID,
+                    paidAmount: selectedInvoice.total_amount,
+                };
+                await updateInvoice(selectedInvoice.id, updateData);
+                fetchInvoices();
+            } catch (err) {
+                console.error("Failed to mark as paid:", err);
+                alert("Failed to update payment status.");
+            }
+            handleMenuClose();
+        }
     };
 
     const handleChangePage = (event: unknown, newPage: number) => {
         setPage(newPage);
     };
 
-    const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const handleChangeRowsPerPage = (
+        event: React.ChangeEvent<HTMLInputElement>
+    ) => {
         setRowsPerPage(parseInt(event.target.value, 10));
         setPage(0);
     };
 
-    const markAsPaid = () => {
-        if (selectedInvoice) {
-            setInvoices(
-                invoices.map((i) =>
-                    i.id === selectedInvoice.id
-                        ? {
-                            ...i,
-                            payment_status: 'paid',
-                            paid_amount: i.total_amount,
-                            updated_at: new Date().toISOString(),
-                        }
-                        : i
-                )
-            );
-            handleMenuClose();
-        }
-    };
+    const {
+        subtotal,
+        total,
+        discountAmount: calculatedDiscountAmount,
+        taxAmount: calculatedTaxAmount,
+    } = calculateTotals();
 
-    const { subtotal, total } = calculateTotals();
+    const invoiceToView: Invoice | null = selectedInvoice
+        ? {
+            ...selectedInvoice,
+            items: itemsForView.length > 0 ? itemsForView : selectedInvoice.items,
+            tax_amount: selectedInvoice.tax_amount,
+        }
+        : null;
+
+    useEffect(() => {
+        setCurrentItem((prev) => ({
+            ...prev,
+            item_id: "",
+            item_name: "",
+            unit_price: "0",
+            discount: "0",
+        }));
+    }, [currentItem.item_type]);
+
+    const selectableItems = useMemo((): SelectableItem[] => {
+        // console.log('🔍 selectableItems recalculating:', {
+        //     item_type: currentItem.item_type,
+        //     products: products.length,
+        //     services: services.length
+        // });
+
+        if (currentItem.item_type === "product") {
+            const items = (products || []).map((product) => ({
+                id: product.id,
+                name: product.name,
+                price: product.price,
+                discount: product.discount || 0,
+                type: "product" as const,
+            }));
+            // console.log('📦 Products items:', items);
+            return items;
+        }
+        if (currentItem.item_type === "service") {
+            const items = (services || [])
+                .filter((service) => !service.isCombo)
+                .map((service) => ({
+                    id: service.id,
+                    name: service.name,
+                    price: service.price,
+                    discount: service.discountPrice
+                        ? service.price - service.discountPrice
+                        : 0,
+                    type: "service" as const,
+                }));
+            // console.log('🛠️ Service items:', items);
+            return items;
+        }
+        if (currentItem.item_type === "package") {
+            const items = (services || [])
+                .filter((service) => service.isCombo)
+                .map((service) => ({
+                    id: service.id,
+                    name: service.name,
+                    price: service.price,
+                    discount: service.discountPrice
+                        ? service.price - service.discountPrice
+                        : 0,
+                    type: "package" as const,
+                }));
+            // console.log('📦 Package items:', items);
+            return items;
+        }
+        return [];
+    }, [products, services, currentItem.item_type]);
+
+    const handleItemSelection = (item: SelectableItem | null) => {
+        if (!item) {
+            setCurrentItem((prev) => ({
+                ...prev,
+                item_id: "",
+                item_name: "",
+                unit_price: "0",
+                discount: "0",
+            }));
+            return;
+        }
+
+        setCurrentItem((prev) => ({
+            ...prev,
+            item_id: item.id.toString(),
+            item_name: item.name,
+            unit_price: item.price.toString(),
+            discount: item.discount.toString(),
+        }));
+    };
+    const isAnyLoading =
+  isLoading ||           // Tải danh sách hóa đơn
+  isInitialLoad ||       // Tải dữ liệu ban đầu (Customers, Stores, Staff)
+  isFormDataLoading ||   // Tải dữ liệu form (Products, Services)
+  isItemsLoading ||      // Tải chi tiết mục hóa đơn (khi View/Edit)
+  false;
 
     return (
-        <>
-            {/* Header */}
-            <Box sx={{ mb: 3 }}>
+        <>                                                                                      
+            {/* <Box sx={{ mb: 3 }}>
                 <Typography variant="h4" fontWeight="bold" gutterBottom>
                     Invoice Management
                 </Typography>
                 <Typography variant="body1" color="text.secondary">
                     Manage customer invoices and payments
                 </Typography>
-            </Box>
-
+            </Box> */}
+            <Backdrop
+                sx={{ color: "#fff", zIndex: (theme) => theme.zIndex.drawer + 1 }}
+                open={isAnyLoading}
+            >
+                <CircularProgress color="inherit" />
+            </Backdrop>
             {/* Stats Cards */}
             <Grid container spacing={3} sx={{ mb: 3 }}>
                 <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
                     <Card>
                         <CardContent>
-                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <Box
+                                sx={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "space-between",
+                                }}
+                            >
                                 <Box>
-                                    <Typography color="text.secondary" variant="body2" gutterBottom>
+                                    <Typography
+                                        color="text.secondary"
+                                        variant="body2"
+                                        gutterBottom
+                                    >
                                         Total Invoices
                                     </Typography>
                                     <Typography variant="h4" fontWeight="bold">
-                                        {stats.total}
+                                        {totalItems}
                                     </Typography>
                                 </Box>
-                                <Avatar sx={{ bgcolor: alpha(PRIMARY_COLOR, 0.1), width: 56, height: 56 }}>
+                                <Avatar
+                                    sx={{
+                                        bgcolor: alpha(PRIMARY_COLOR, 0.1),
+                                        width: 56,
+                                        height: 56,
+                                    }}
+                                >
                                     <Receipt sx={{ color: PRIMARY_COLOR, fontSize: 28 }} />
                                 </Avatar>
+
+
                             </Box>
                         </CardContent>
                     </Card>
@@ -718,16 +1074,36 @@ export default function InvoicesPage() {
                 <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
                     <Card>
                         <CardContent>
-                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <Box
+                                sx={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "space-between",
+                                }}
+                            >
                                 <Box>
-                                    <Typography color="text.secondary" variant="body2" gutterBottom>
+                                    <Typography
+                                        color="text.secondary"
+                                        variant="body2"
+                                        gutterBottom
+                                    >
                                         Paid Invoices
                                     </Typography>
-                                    <Typography variant="h4" fontWeight="bold" color={SUCCESS_COLOR}>
+                                    <Typography
+                                        variant="h4"
+                                        fontWeight="bold"
+                                        color={SUCCESS_COLOR}
+                                    >
                                         {stats.paid}
                                     </Typography>
                                 </Box>
-                                <Avatar sx={{ bgcolor: alpha(SUCCESS_COLOR, 0.1), width: 56, height: 56 }}>
+                                <Avatar
+                                    sx={{
+                                        bgcolor: alpha(SUCCESS_COLOR, 0.1),
+                                        width: 56,
+                                        height: 56,
+                                    }}
+                                >
                                     <CheckCircle sx={{ color: SUCCESS_COLOR, fontSize: 28 }} />
                                 </Avatar>
                             </Box>
@@ -737,16 +1113,36 @@ export default function InvoicesPage() {
                 <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
                     <Card>
                         <CardContent>
-                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <Box
+                                sx={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "space-between",
+                                }}
+                            >
                                 <Box>
-                                    <Typography color="text.secondary" variant="body2" gutterBottom>
+                                    <Typography
+                                        color="text.secondary"
+                                        variant="body2"
+                                        gutterBottom
+                                    >
                                         Pending Payments
                                     </Typography>
-                                    <Typography variant="h4" fontWeight="bold" color={WARNING_COLOR}>
+                                    <Typography
+                                        variant="h4"
+                                        fontWeight="bold"
+                                        color={WARNING_COLOR}
+                                    >
                                         {stats.pending}
                                     </Typography>
                                 </Box>
-                                <Avatar sx={{ bgcolor: alpha(WARNING_COLOR, 0.1), width: 56, height: 56 }}>
+                                <Avatar
+                                    sx={{
+                                        bgcolor: alpha(WARNING_COLOR, 0.1),
+                                        width: 56,
+                                        height: 56,
+                                    }}
+                                >
                                     <Pending sx={{ color: WARNING_COLOR, fontSize: 28 }} />
                                 </Avatar>
                             </Box>
@@ -756,16 +1152,32 @@ export default function InvoicesPage() {
                 <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
                     <Card>
                         <CardContent>
-                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <Box
+                                sx={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "space-between",
+                                }}
+                            >
                                 <Box>
-                                    <Typography color="text.secondary" variant="body2" gutterBottom>
+                                    <Typography
+                                        color="text.secondary"
+                                        variant="body2"
+                                        gutterBottom
+                                    >
                                         Total Revenue
                                     </Typography>
                                     <Typography variant="h4" fontWeight="bold">
                                         {formatCurrency(stats.totalRevenue)}
                                     </Typography>
                                 </Box>
-                                <Avatar sx={{ bgcolor: alpha(INFO_COLOR, 0.1), width: 56, height: 56 }}>
+                                <Avatar
+                                    sx={{
+                                        bgcolor: alpha(INFO_COLOR, 0.1),
+                                        width: 56,
+                                        height: 56,
+                                    }}
+                                >
                                     <TrendingUp sx={{ color: INFO_COLOR, fontSize: 28 }} />
                                 </Avatar>
                             </Box>
@@ -777,7 +1189,14 @@ export default function InvoicesPage() {
             {/* Actions Bar */}
             <Card sx={{ mb: 3 }}>
                 <CardContent>
-                    <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <Box
+                        sx={{
+                            display: "flex",
+                            gap: 2,
+                            flexWrap: "wrap",
+                            alignItems: "center",
+                        }}
+                    >
                         <TextField
                             placeholder="Search by voucher, customer name, phone..."
                             value={searchQuery}
@@ -796,7 +1215,9 @@ export default function InvoicesPage() {
                             <Select
                                 value={filterStatus}
                                 label="Payment Status"
-                                onChange={(e) => setFilterStatus(e.target.value as PaymentStatus | 'all')}
+                                onChange={(e) =>
+                                    setFilterStatus(e.target.value as PaymentStatus | "all")
+                                }
                             >
                                 <MenuItem value="all">All Status</MenuItem>
                                 <MenuItem value="paid">Paid</MenuItem>
@@ -808,10 +1229,12 @@ export default function InvoicesPage() {
                             <Select
                                 value={filterStore}
                                 label="Store"
-                                onChange={(e) => setFilterStore(e.target.value as number | 'all')}
+                                onChange={(e) =>
+                                    setFilterStore(e.target.value as number | "all")
+                                }
                             >
                                 <MenuItem value="all">All Stores</MenuItem>
-                                {mockStores.map((store) => (
+                                {stores.map((store) => (
                                     <MenuItem key={store.id} value={store.id}>
                                         {store.name}
                                     </MenuItem>
@@ -823,9 +1246,10 @@ export default function InvoicesPage() {
                             startIcon={<Add />}
                             onClick={handleAddNew}
                             sx={{
+                                height: 55,
                                 bgcolor: PRIMARY_COLOR,
-                                '&:hover': { bgcolor: PRIMARY_DARK },
-                                textTransform: 'none',
+                                "&:hover": { bgcolor: PRIMARY_DARK },
+                                textTransform: "none",
                                 fontWeight: 600,
                             }}
                         >
@@ -846,7 +1270,7 @@ export default function InvoicesPage() {
                                 <TableCell sx={{ fontWeight: 700 }}>Store</TableCell>
                                 <TableCell sx={{ fontWeight: 700 }}>Booking</TableCell>
                                 <TableCell sx={{ fontWeight: 700 }}>Subtotal</TableCell>
-                                <TableCell sx={{ fontWeight: 700 }}>Discount</TableCell>
+                                {/* <TableCell sx={{ fontWeight: 700 }}>Discount</TableCell> */}
                                 <TableCell sx={{ fontWeight: 700 }}>Tax</TableCell>
                                 <TableCell sx={{ fontWeight: 700 }}>Total</TableCell>
                                 <TableCell sx={{ fontWeight: 700 }}>Paid</TableCell>
@@ -857,16 +1281,20 @@ export default function InvoicesPage() {
                             </TableRow>
                         </TableHead>
                         <TableBody>
-                            {paginatedInvoices.length > 0 ? (
+                            { paginatedInvoices.length > 0 ? (
                                 paginatedInvoices.map((invoice) => (
                                     <TableRow
                                         key={invoice.id}
                                         sx={{
-                                            '&:hover': { bgcolor: alpha(PRIMARY_COLOR, 0.02) },
+                                            "&:hover": { bgcolor: alpha(PRIMARY_COLOR, 0.02) },
                                         }}
                                     >
                                         <TableCell>
-                                            <Typography variant="body2" fontWeight="600" color={PRIMARY_COLOR}>
+                                            <Typography
+                                                variant="body2"
+                                                fontWeight="600"
+                                                color={PRIMARY_COLOR}
+                                            >
                                                 {invoice.voucher}
                                             </Typography>
                                             <Typography variant="caption" color="text.secondary">
@@ -874,40 +1302,38 @@ export default function InvoicesPage() {
                                             </Typography>
                                         </TableCell>
                                         <TableCell>
-                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                                                {/* <Avatar
-                                                    sx={{
-                                                        bgcolor: alpha(PRIMARY_COLOR, 0.1),
-                                                        color: PRIMARY_COLOR,
-                                                        width: 36,
-                                                        height: 36,
-                                                        fontSize: 14,
-                                                        fontWeight: 600,
-                                                    }}
-                                                >
-                                                    {invoice.customer?.full_name.charAt(0)}
-                                                </Avatar> */}
+                                            <Box
+                                                sx={{ display: "flex", alignItems: "center", gap: 1.5 }}
+                                            >
                                                 <Box>
                                                     <Typography variant="body2" fontWeight="600">
-                                                        {invoice.customer?.full_name}
+                                                        {invoice.customer?.fullName ||
+                                                            `ID: ${invoice.customer_id}`}
                                                     </Typography>
                                                     <Typography variant="caption" color="text.secondary">
-                                                        {invoice.customer?.phone}
+                                                        {invoice.customer?.phone || "N/A"}
                                                     </Typography>
                                                 </Box>
                                             </Box>
                                         </TableCell>
                                         <TableCell>
                                             <Typography variant="body2">
-                                                {invoice.store?.name}
+                                                {invoice.store?.name || `ID: ${invoice.store_id}`}
                                             </Typography>
                                         </TableCell>
                                         <TableCell>
                                             {invoice.booking ? (
                                                 <Chip
-                                                    label={invoice.booking.id}
+                                                    label={`BK${invoice.booking.id}`}
                                                     size="small"
                                                     variant="outlined"
+                                                />
+                                            ) : invoice.booking_id ? (
+                                                <Chip
+                                                    label={`BK${invoice.booking_id}`}
+                                                    size="small"
+                                                    variant="outlined"
+                                                    color="warning"
                                                 />
                                             ) : (
                                                 <Typography variant="body2" color="text.secondary">
@@ -920,15 +1346,29 @@ export default function InvoicesPage() {
                                                 {formatCurrency(invoice.subtotal)}
                                             </Typography>
                                         </TableCell>
-                                        <TableCell>
+                                        {/* <TableCell>
                                             {invoice.discount_amount > 0 ? (
                                                 <Box>
-                                                    <Typography variant="body2" color={SUCCESS_COLOR} fontWeight="600">
+                                                    <Typography
+                                                        variant="body2"
+                                                        color={SUCCESS_COLOR}
+                                                        fontWeight="600"
+                                                    >
                                                         -{formatCurrency(invoice.discount_amount)}
                                                     </Typography>
-                                                    {invoice.discount_type === 'percent' && (
-                                                        <Typography variant="caption" color="text.secondary">
-                                                            ({invoice.discount_amount}%)
+                                                    {invoice.discount_type === "percent" && (
+                                                        <Typography
+                                                            variant="caption"
+                                                            color="text.secondary"
+                                                        >
+                                                            (
+                                                            {((parseFloat(
+                                                                invoice.discount_amount.toString()
+                                                            ) || 0) *
+                                                                100) /
+                                                                (parseFloat(invoice.subtotal.toString()) ||
+                                                                    100)}
+                                                            %)
                                                         </Typography>
                                                     )}
                                                 </Box>
@@ -937,14 +1377,18 @@ export default function InvoicesPage() {
                                                     No discount
                                                 </Typography>
                                             )}
-                                        </TableCell>
+                                        </TableCell> */}
                                         <TableCell>
                                             <Typography variant="body2">
                                                 {formatCurrency(invoice.tax_amount)}
                                             </Typography>
                                         </TableCell>
                                         <TableCell>
-                                            <Typography variant="body2" fontWeight="600" color={PRIMARY_COLOR}>
+                                            <Typography
+                                                variant="body2"
+                                                fontWeight="600"
+                                                color={PRIMARY_COLOR}
+                                            >
                                                 {formatCurrency(invoice.total_amount)}
                                             </Typography>
                                         </TableCell>
@@ -958,14 +1402,20 @@ export default function InvoicesPage() {
                                                 label={getPaymentStatusLabel(invoice.payment_status)}
                                                 size="small"
                                                 sx={{
-                                                    bgcolor: alpha(getPaymentStatusColor(invoice.payment_status), 0.1),
+                                                    bgcolor: alpha(
+                                                        getPaymentStatusColor(invoice.payment_status),
+                                                        0.1
+                                                    ),
                                                     color: getPaymentStatusColor(invoice.payment_status),
                                                     fontWeight: 600,
                                                 }}
                                             />
                                         </TableCell>
                                         <TableCell align="center">
-                                            <IconButton size="small" onClick={(e) => handleMenuOpen(e, invoice)}>
+                                            <IconButton
+                                                size="small"
+                                                onClick={(e) => handleMenuOpen(e, invoice)}
+                                            >
                                                 <MoreVert />
                                             </IconButton>
                                         </TableCell>
@@ -974,15 +1424,23 @@ export default function InvoicesPage() {
                             ) : (
                                 <TableRow>
                                     <TableCell colSpan={11}>
-                                        <Box sx={{ textAlign: 'center', py: 6 }}>
-                                            <Receipt sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }} />
-                                            <Typography variant="h6" color="text.secondary" gutterBottom>
+                                        <Box sx={{ textAlign: "center", py: 6 }}>
+                                            <Receipt
+                                                sx={{ fontSize: 64, color: "text.disabled", mb: 2 }}
+                                            />
+                                            <Typography
+                                                variant="h6"
+                                                color="text.secondary"
+                                                gutterBottom
+                                            >
                                                 No invoices found
                                             </Typography>
                                             <Typography variant="body2" color="text.secondary">
-                                                {searchQuery || filterStatus !== 'all' || filterStore !== 'all'
-                                                    ? 'Try adjusting your search or filters'
-                                                    : 'Get started by creating your first invoice'}
+                                                {searchQuery ||
+                                                    filterStatus !== "all" ||
+                                                    filterStore !== "all"
+                                                    ? "Try adjusting your search or filters"
+                                                    : "Get started by creating your first invoice"}
                                             </Typography>
                                         </Box>
                                     </TableCell>
@@ -1002,12 +1460,16 @@ export default function InvoicesPage() {
                 />
             </Card>
 
-            {/* Menu */}
-            <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleMenuClose}>
-                <MenuItem onClick={handleView}>
+            {/* Menu for invoice actions */}
+            <Menu
+                anchorEl={anchorEl}
+                open={Boolean(anchorEl)}
+                onClose={handleMenuClose}
+            >
+                {/* <MenuItem onClick={handleView}>
                     <Visibility sx={{ mr: 1, fontSize: 20 }} />
                     View Details
-                </MenuItem>
+                </MenuItem> */}
                 <MenuItem onClick={handleViewItems}>
                     <Inventory sx={{ mr: 1, fontSize: 20 }} />
                     View Items
@@ -1017,7 +1479,7 @@ export default function InvoicesPage() {
                     Edit
                 </MenuItem>
                 <Divider />
-                {selectedInvoice?.payment_status === 'pending' && (
+                {selectedInvoice?.payment_status === "pending" && (
                     <MenuItem onClick={markAsPaid}>
                         <Payment sx={{ mr: 1, fontSize: 20, color: SUCCESS_COLOR }} />
                         Mark as Paid
@@ -1038,20 +1500,27 @@ export default function InvoicesPage() {
                 </MenuItem>
             </Menu>
 
-            {/* Add/Edit Dialog */}
-            <Dialog open={openDialog} onClose={handleDialogClose} maxWidth="lg" fullWidth>
+            {/* Create/Edit Dialog */}
+            <Dialog
+                open={openDialog}
+                onClose={handleDialogClose}
+                maxWidth="lg"
+                fullWidth
+            >
                 <DialogTitle>
-                    {dialogMode === 'add'
-                        ? 'Create New Invoice'
-                        : dialogMode === 'edit'
-                            ? 'Edit Invoice'
-                            : 'Invoice Details'}
+                    {dialogMode === "add"
+                        ? "Create New Invoice"
+                        : dialogMode === "edit"
+                            ? "Edit Invoice"
+                            : "Invoice Details"}
                 </DialogTitle>
                 <DialogContent dividers>
-                    {dialogMode === 'view' && selectedInvoice ? (
+                    { dialogMode === "view" && invoiceToView ? (
                         <Grid container spacing={3} sx={{ mt: 0.5 }}>
                             <Grid size={{ xs: 12 }}>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
+                                <Box
+                                    sx={{ display: "flex", alignItems: "center", gap: 2, mb: 3 }}
+                                >
                                     <Avatar
                                         sx={{
                                             bgcolor: alpha(PRIMARY_COLOR, 0.1),
@@ -1064,19 +1533,26 @@ export default function InvoicesPage() {
                                     </Avatar>
                                     <Box>
                                         <Typography variant="h5" fontWeight="bold">
-                                            {selectedInvoice.voucher}
+                                            {invoiceToView.voucher}
                                         </Typography>
-                                        <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
+                                        <Box sx={{ display: "flex", gap: 1, mt: 1 }}>
                                             <Chip
-                                                label={getPaymentStatusLabel(selectedInvoice.payment_status)}
+                                                label={getPaymentStatusLabel(
+                                                    invoiceToView.payment_status
+                                                )}
                                                 size="small"
                                                 sx={{
-                                                    bgcolor: alpha(getPaymentStatusColor(selectedInvoice.payment_status), 0.1),
-                                                    color: getPaymentStatusColor(selectedInvoice.payment_status),
+                                                    bgcolor: alpha(
+                                                        getPaymentStatusColor(invoiceToView.payment_status),
+                                                        0.1
+                                                    ),
+                                                    color: getPaymentStatusColor(
+                                                        invoiceToView.payment_status
+                                                    ),
                                                 }}
                                             />
                                             <Chip
-                                                label={selectedInvoice.store?.name || ''}
+                                                label={invoiceToView.store?.name || ""}
                                                 size="small"
                                                 variant="outlined"
                                             />
@@ -1090,7 +1566,8 @@ export default function InvoicesPage() {
                                     Customer
                                 </Typography>
                                 <Typography variant="body1" fontWeight="600">
-                                    {selectedInvoice.customer?.full_name}
+                                    {invoiceToView.customer?.fullName ||
+                                        `ID: ${invoiceToView.customer_id}`}
                                 </Typography>
                             </Grid>
                             <Grid size={{ xs: 12, sm: 6 }}>
@@ -1098,7 +1575,7 @@ export default function InvoicesPage() {
                                     Phone
                                 </Typography>
                                 <Typography variant="body1">
-                                    {selectedInvoice.customer?.phone}
+                                    {invoiceToView.customer?.phone || "N/A"}
                                 </Typography>
                             </Grid>
                             <Grid size={{ xs: 12, sm: 6 }}>
@@ -1106,7 +1583,7 @@ export default function InvoicesPage() {
                                     Store
                                 </Typography>
                                 <Typography variant="body1" fontWeight="600">
-                                    {selectedInvoice.store?.name}
+                                    {invoiceToView.store?.name || `ID: ${invoiceToView.store_id}`}
                                 </Typography>
                             </Grid>
                             <Grid size={{ xs: 12, sm: 6 }}>
@@ -1114,11 +1591,12 @@ export default function InvoicesPage() {
                                     Booking
                                 </Typography>
                                 <Typography variant="body1">
-                                    {selectedInvoice.booking ? selectedInvoice.booking.maBK : 'No booking'}
+                                    {invoiceToView.booking
+                                        ? invoiceToView.voucher
+                                        : "No booking"}
                                 </Typography>
                             </Grid>
 
-                            {/* Invoice Items */}
                             <Grid size={{ xs: 12 }}>
                                 <Typography variant="h6" sx={{ mb: 2, mt: 2 }}>
                                     Invoice Items
@@ -1137,50 +1615,67 @@ export default function InvoicesPage() {
                                             </TableRow>
                                         </TableHead>
                                         <TableBody>
-                                            {selectedInvoice.items?.map((item) => (
+                                            {invoiceToView.items?.map((item) => (
                                                 <TableRow key={item.id}>
                                                     <TableCell>
-                                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                                            <Avatar sx={{
-                                                                bgcolor: alpha(getItemTypeColor(item.item_type), 0.1),
-                                                                color: getItemTypeColor(item.item_type),
-                                                                width: 32,
-                                                                height: 32
-                                                            }}>
-                                                                {getItemTypeIcon(item.item_type)}
+                                                        <Box
+                                                            sx={{
+                                                                display: "flex",
+                                                                alignItems: "center",
+                                                                gap: 1,
+                                                            }}
+                                                        >
+                                                            <Avatar
+                                                                sx={{
+                                                                    bgcolor: alpha(
+                                                                        getItemTypeColor(item.itemType as ItemType),
+                                                                        0.1
+                                                                    ),
+                                                                    color: getItemTypeColor(
+                                                                        item.itemType as ItemType
+                                                                    ),
+                                                                    width: 32,
+                                                                    height: 32,
+                                                                }}
+                                                            >
+                                                                {getItemTypeIcon(item.itemType as ItemType)}
                                                             </Avatar>
                                                             <Box>
                                                                 <Typography variant="body2" fontWeight="600">
-                                                                    {item.item_name}
+                                                                    {item.itemName}
                                                                 </Typography>
                                                             </Box>
                                                         </Box>
                                                     </TableCell>
                                                     <TableCell>
                                                         <Chip
-                                                            label={item.item_type}
+                                                            label={item.itemType}
                                                             size="small"
                                                             sx={{
-                                                                bgcolor: alpha(getItemTypeColor(item.item_type), 0.1),
-                                                                color: getItemTypeColor(item.item_type),
-                                                                textTransform: 'capitalize'
+                                                                bgcolor: alpha(
+                                                                    getItemTypeColor(item.itemType as ItemType),
+                                                                    0.1
+                                                                ),
+                                                                color: getItemTypeColor(
+                                                                    item.itemType as ItemType
+                                                                ),
+                                                                textTransform: "capitalize",
                                                             }}
                                                         />
                                                     </TableCell>
-                                                    <TableCell>
-                                                        {item.staff_name || '-'}
-                                                    </TableCell>
+                                                    <TableCell>{item.staff_name || "-"}</TableCell>
+                                                    <TableCell align="right">{item.quantity}</TableCell>
                                                     <TableCell align="right">
-                                                        {item.quantity}
+                                                        {formatCurrency(item.unitPrice)}
                                                     </TableCell>
-                                                    <TableCell align="right">
-                                                        {formatCurrency(item.unit_price)}
-                                                    </TableCell>
-                                                    <TableCell align="right" sx={{ color: SUCCESS_COLOR }}>
+                                                    <TableCell
+                                                        align="right"
+                                                        sx={{ color: SUCCESS_COLOR }}
+                                                    >
                                                         -{formatCurrency(item.discount)}
                                                     </TableCell>
                                                     <TableCell align="right" sx={{ fontWeight: 600 }}>
-                                                        {formatCurrency(item.total_price)}
+                                                        {formatCurrency(item.totalPrice)}
                                                     </TableCell>
                                                 </TableRow>
                                             ))}
@@ -1189,40 +1684,81 @@ export default function InvoicesPage() {
                                 </TableContainer>
                             </Grid>
 
-                            {/* Summary */}
                             <Grid size={{ xs: 12 }}>
-                                <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
+                                <Box
+                                    sx={{ display: "flex", justifyContent: "flex-end", mt: 2 }}
+                                >
                                     <Box sx={{ minWidth: 300 }}>
                                         <Stack spacing={1}>
-                                            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                            <Box
+                                                sx={{
+                                                    display: "flex",
+                                                    justifyContent: "space-between",
+                                                }}
+                                            >
                                                 <Typography>Subtotal:</Typography>
-                                                <Typography fontWeight="600">{formatCurrency(selectedInvoice.subtotal)}</Typography>
-                                            </Box>
-                                            {selectedInvoice.discount_amount > 0 && (
-                                                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                                                    <Typography color={SUCCESS_COLOR}>
-                                                        Discount {selectedInvoice.discount_type === 'percent' ? `(${selectedInvoice.discount_amount}%)` : ''}:
-                                                    </Typography>
-                                                    <Typography color={SUCCESS_COLOR} fontWeight="600">
-                                                        -{formatCurrency(selectedInvoice.discount_amount)}
-                                                    </Typography>
-                                                </Box>
-                                            )}
-                                            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                                                <Typography>Tax:</Typography>
-                                                <Typography fontWeight="600">{formatCurrency(selectedInvoice.tax_amount)}</Typography>
-                                            </Box>
-                                            <Divider />
-                                            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                                                <Typography variant="h6">Total Amount:</Typography>
-                                                <Typography variant="h6" color={PRIMARY_COLOR}>
-                                                    {formatCurrency(selectedInvoice.total_amount)}
+                                                <Typography fontWeight="600">
+                                                    {formatCurrency(invoiceToView.subtotal)}
                                                 </Typography>
                                             </Box>
-                                            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                            {/* {invoiceToView.discount_amount > 0 && (
+                                                <Box
+                                                    sx={{
+                                                        display: "flex",
+                                                        justifyContent: "space-between",
+                                                    }}
+                                                >
+                                                    <Typography color={SUCCESS_COLOR}>
+                                                        Discount{" "}
+                                                        {invoiceToView.discount_type === "percent"
+                                                            ? `(${invoiceToView.discount_amount}%)`
+                                                            : ""}
+                                                        :
+                                                    </Typography>
+                                                    <Typography color={SUCCESS_COLOR} fontWeight="600">
+                                                        -{formatCurrency(invoiceToView.discount_amount)}
+                                                    </Typography>
+                                                </Box>
+                                            )} */}
+                                            <Box
+                                                sx={{
+                                                    display: "flex",
+                                                    justifyContent: "space-between",
+                                                }}
+                                            >
+                                                <Typography>Tax:</Typography>
+                                                <Typography fontWeight="600">
+                                                    {formatCurrency(invoiceToView.tax_amount)}
+                                                </Typography>
+                                            </Box>
+                                            <Divider />
+                                            <Box
+                                                sx={{
+                                                    display: "flex",
+                                                    justifyContent: "space-between",
+                                                }}
+                                            >
+                                                <Typography variant="h6">Total Amount:</Typography>
+                                                <Typography variant="h6" color={PRIMARY_COLOR}>
+                                                    {formatCurrency(invoiceToView.total_amount)}
+                                                </Typography>
+                                            </Box>
+                                            <Box
+                                                sx={{
+                                                    display: "flex",
+                                                    justifyContent: "space-between",
+                                                }}
+                                            >
                                                 <Typography>Paid Amount:</Typography>
-                                                <Typography fontWeight="600" color={selectedInvoice.payment_status === 'paid' ? SUCCESS_COLOR : WARNING_COLOR}>
-                                                    {formatCurrency(selectedInvoice.paid_amount)}
+                                                <Typography
+                                                    fontWeight="600"
+                                                    color={
+                                                        invoiceToView.payment_status === "paid"
+                                                            ? SUCCESS_COLOR
+                                                            : WARNING_COLOR
+                                                    }
+                                                >
+                                                    {formatCurrency(invoiceToView.paid_amount)}
                                                 </Typography>
                                             </Box>
                                         </Stack>
@@ -1230,13 +1766,13 @@ export default function InvoicesPage() {
                                 </Box>
                             </Grid>
 
-                            {selectedInvoice.notes && (
+                            {invoiceToView.notes && (
                                 <Grid size={{ xs: 12 }}>
                                     <Typography variant="caption" color="text.secondary">
                                         Notes
                                     </Typography>
-                                    <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
-                                        {selectedInvoice.notes}
+                                    <Typography variant="body1" sx={{ whiteSpace: "pre-wrap" }}>
+                                        {invoiceToView.notes}
                                     </Typography>
                                 </Grid>
                             )}
@@ -1246,7 +1782,7 @@ export default function InvoicesPage() {
                                     Created At
                                 </Typography>
                                 <Typography variant="body1">
-                                    {new Date(selectedInvoice.created_at).toLocaleString()}
+                                    {new Date(invoiceToView.created_at).toLocaleString()}
                                 </Typography>
                             </Grid>
                             <Grid size={{ xs: 12, sm: 6 }}>
@@ -1254,13 +1790,12 @@ export default function InvoicesPage() {
                                     Last Updated
                                 </Typography>
                                 <Typography variant="body1">
-                                    {new Date(selectedInvoice.updated_at).toLocaleString()}
+                                    {new Date(invoiceToView.updated_at).toLocaleString()}
                                 </Typography>
                             </Grid>
                         </Grid>
                     ) : (
                         <Grid container spacing={3} sx={{ mt: 0.5 }}>
-                            {/* Basic Information */}
                             <Grid size={{ xs: 12, sm: 6 }}>
                                 <FormControl fullWidth required>
                                     <InputLabel>Customer</InputLabel>
@@ -1271,9 +1806,9 @@ export default function InvoicesPage() {
                                             setFormData({ ...formData, customer_id: e.target.value })
                                         }
                                     >
-                                        {mockCustomers.map((customer) => (
+                                        {customers.map((customer) => (
                                             <MenuItem key={customer.id} value={customer.id}>
-                                                {customer.full_name} - {customer.phone}
+                                                {customer.fullName} - {customer.phone}
                                             </MenuItem>
                                         ))}
                                     </Select>
@@ -1289,7 +1824,7 @@ export default function InvoicesPage() {
                                             setFormData({ ...formData, store_id: e.target.value })
                                         }
                                     >
-                                        {mockStores.map((store) => (
+                                        {stores.map((store) => (
                                             <MenuItem key={store.id} value={store.id}>
                                                 {store.name}
                                             </MenuItem>
@@ -1298,23 +1833,22 @@ export default function InvoicesPage() {
                                 </FormControl>
                             </Grid>
                             <Grid size={{ xs: 12, sm: 6 }}>
-                                <FormControl fullWidth>
-                                    <InputLabel>Booking</InputLabel>
-                                    <Select
-                                        value={formData.booking_id}
-                                        label="Booking"
-                                        onChange={(e) =>
-                                            setFormData({ ...formData, booking_id: e.target.value })
-                                        }
-                                    >
-                                        <MenuItem value="">No Booking</MenuItem>
-                                        {mockBookings.map((booking) => (
-                                            <MenuItem key={booking.id} value={booking.id}>
-                                                {booking.maBK} - {mockCustomers.find(c => c.id === booking.customer_id)?.full_name}
-                                            </MenuItem>
-                                        ))}
-                                    </Select>
-                                </FormControl>
+                                <TextField
+                                    fullWidth
+                                    label="Booking"
+                                    value={
+                                        formData.booking_id
+                                            ? `BK #${formData.booking_id} - ${bookings.find((b) => b.id.toString() === formData.booking_id)?.customer?.fullName ||
+                                            customers.find((c) => c.id === bookings.find((b) => b.id.toString() === formData.booking_id)?.customerId)?.fullName ||
+                                            "Unknown Customer"
+                                            }`
+                                            : "No Booking"
+                                    }
+                                    InputProps={{
+                                        readOnly: true,
+                                    }}
+                                    helperText="Booking information"
+                                />
                             </Grid>
                             <Grid size={{ xs: 12, sm: 6 }}>
                                 <FormControl fullWidth>
@@ -1323,7 +1857,10 @@ export default function InvoicesPage() {
                                         value={formData.payment_status}
                                         label="Payment Status"
                                         onChange={(e) =>
-                                            setFormData({ ...formData, payment_status: e.target.value as PaymentStatus })
+                                            setFormData({
+                                                ...formData,
+                                                payment_status: e.target.value as PaymentStatus,
+                                            })
                                         }
                                     >
                                         <MenuItem value="pending">Pending</MenuItem>
@@ -1332,7 +1869,6 @@ export default function InvoicesPage() {
                                 </FormControl>
                             </Grid>
 
-                            {/* Add Items Section */}
                             <Grid size={{ xs: 12 }}>
                                 <Typography variant="h6" sx={{ mb: 2 }}>
                                     Add Items
@@ -1346,21 +1882,33 @@ export default function InvoicesPage() {
                                                     value={currentItem.item_type}
                                                     label="Item Type"
                                                     onChange={(e) =>
-                                                        setCurrentItem({ ...currentItem, item_type: e.target.value as ItemType })
+                                                        setCurrentItem({
+                                                            ...initialItemFormData,
+                                                            item_type: e.target.value as ItemType,
+                                                        })
                                                     }
                                                 >
                                                     <MenuItem value="service">Service</MenuItem>
-                                                    <MenuItem value="product">Product</MenuItem>
                                                     <MenuItem value="package">Package</MenuItem>
+                                                    <MenuItem value="product">Product</MenuItem>
                                                 </Select>
                                             </FormControl>
                                         </Grid>
                                         <Grid size={{ xs: 12, sm: 3 }}>
-                                            <TextField
-                                                fullWidth
-                                                label="Item Name"
-                                                value={currentItem.item_name}
-                                                onChange={handleItemChange('item_name')}
+                                            <Autocomplete
+                                                options={selectableItems}
+                                                getOptionLabel={(option) => option.name}
+                                                value={
+                                                    selectableItems.find(
+                                                        (item) => item.id.toString() === currentItem.item_id
+                                                    ) || null
+                                                }
+                                                onChange={(event, newValue) => {
+                                                    handleItemSelection(newValue);
+                                                }}
+                                                renderInput={(params) => (
+                                                    <TextField {...params} label="Item Name" />
+                                                )}
                                             />
                                         </Grid>
                                         <Grid size={{ xs: 12, sm: 2 }}>
@@ -1369,16 +1917,16 @@ export default function InvoicesPage() {
                                                 label="Quantity"
                                                 type="number"
                                                 value={currentItem.quantity}
-                                                onChange={handleItemChange('quantity')}
+                                                onChange={handleItemChange("quantity")}
                                             />
                                         </Grid>
                                         <Grid size={{ xs: 12, sm: 2 }}>
                                             <TextField
                                                 fullWidth
+                                                disabled
                                                 label="Unit Price"
                                                 type="number"
                                                 value={currentItem.unit_price}
-                                                onChange={handleItemChange('unit_price')}
                                                 InputProps={{
                                                     startAdornment: (
                                                         <InputAdornment position="start">₫</InputAdornment>
@@ -1389,10 +1937,10 @@ export default function InvoicesPage() {
                                         <Grid size={{ xs: 12, sm: 2 }}>
                                             <TextField
                                                 fullWidth
+                                                disabled
                                                 label="Discount"
                                                 type="number"
                                                 value={currentItem.discount}
-                                                onChange={handleItemChange('discount')}
                                                 InputProps={{
                                                     startAdornment: (
                                                         <InputAdornment position="start">₫</InputAdornment>
@@ -1407,13 +1955,16 @@ export default function InvoicesPage() {
                                                     value={currentItem.staff_id}
                                                     label="Staff"
                                                     onChange={(e) =>
-                                                        setCurrentItem({ ...currentItem, staff_id: e.target.value })
+                                                        setCurrentItem({
+                                                            ...currentItem,
+                                                            staff_id: e.target.value,
+                                                        })
                                                     }
                                                 >
                                                     <MenuItem value="">No Staff</MenuItem>
-                                                    {mockStaff.map((staff) => (
+                                                    {staff.map((staff) => (
                                                         <MenuItem key={staff.id} value={staff.id}>
-                                                            {staff.name}
+                                                            {staff.full_name}
                                                         </MenuItem>
                                                     ))}
                                                 </Select>
@@ -1424,8 +1975,12 @@ export default function InvoicesPage() {
                                                 fullWidth
                                                 variant="contained"
                                                 onClick={addItem}
-                                                sx={{ height: '56px' }}
-                                                disabled={!currentItem.item_name || parseFloat(currentItem.unit_price) <= 0}
+                                                sx={{ height: "56px" }}
+                                                disabled={
+                                                    !currentItem.item_name ||
+                                                    !currentItem.item_id ||
+                                                    parseFloat(currentItem.unit_price) <= 0
+                                                }
                                             >
                                                 Add Item
                                             </Button>
@@ -1433,7 +1988,6 @@ export default function InvoicesPage() {
                                     </Grid>
                                 </Paper>
 
-                                {/* Items List */}
                                 {items.length > 0 && (
                                     <TableContainer component={Paper} variant="outlined">
                                         <Table>
@@ -1449,6 +2003,7 @@ export default function InvoicesPage() {
                                                     <TableCell align="center">Actions</TableCell>
                                                 </TableRow>
                                             </TableHead>
+
                                             <TableBody>
                                                 {items.map((item, index) => (
                                                     <TableRow key={index}>
@@ -1462,26 +2017,36 @@ export default function InvoicesPage() {
                                                                 label={item.item_type}
                                                                 size="small"
                                                                 sx={{
-                                                                    bgcolor: alpha(getItemTypeColor(item.item_type), 0.1),
+                                                                    bgcolor: alpha(
+                                                                        getItemTypeColor(item.item_type),
+                                                                        0.1
+                                                                    ),
                                                                     color: getItemTypeColor(item.item_type),
-                                                                    textTransform: 'capitalize'
+                                                                    textTransform: "capitalize",
                                                                 }}
                                                             />
                                                         </TableCell>
                                                         <TableCell>
-                                                            {mockStaff.find(s => s.id === parseInt(item.staff_id))?.name || '-'}
+                                                            {staff.find(
+                                                                (s) => s.id === parseInt(item.staff_id)
+                                                            )?.full_name || "-"}
                                                         </TableCell>
-                                                        <TableCell align="right">
-                                                            {item.quantity}
-                                                        </TableCell>
+                                                        <TableCell align="right">{item.quantity}</TableCell>
                                                         <TableCell align="right">
                                                             {formatCurrency(parseFloat(item.unit_price))}
                                                         </TableCell>
-                                                        <TableCell align="right" sx={{ color: SUCCESS_COLOR }}>
+                                                        <TableCell
+                                                            align="right"
+                                                            sx={{ color: SUCCESS_COLOR }}
+                                                        >
                                                             -{formatCurrency(parseFloat(item.discount))}
                                                         </TableCell>
                                                         <TableCell align="right" sx={{ fontWeight: 600 }}>
-                                                            {formatCurrency(parseFloat(item.unit_price) * parseInt(item.quantity) - parseFloat(item.discount))}
+                                                            {formatCurrency(
+                                                                parseFloat(item.unit_price) *
+                                                                parseInt(item.quantity) -
+                                                                parseFloat(item.discount)
+                                                            )}
                                                         </TableCell>
                                                         <TableCell align="center">
                                                             <IconButton
@@ -1500,77 +2065,115 @@ export default function InvoicesPage() {
                                 )}
                             </Grid>
 
-                            {/* Discount and Tax */}
-                            <Grid size={{ xs: 12, sm: 4 }}>
-                                <TextField
-                                    fullWidth
-                                    label="Discount Amount"
-                                    type="number"
-                                    value={formData.discount_amount}
-                                    onChange={handleFormChange('discount_amount')}
-                                    InputProps={{
-                                        startAdornment: (
-                                            <InputAdornment position="start">₫</InputAdornment>
-                                        ),
-                                    }}
-                                />
-                            </Grid>
-                            <Grid size={{ xs: 12, sm: 4 }}>
-                                <FormControl fullWidth>
-                                    <InputLabel>Discount Type</InputLabel>
-                                    <Select
-                                        value={formData.discount_type}
-                                        label="Discount Type"
-                                        onChange={(e) =>
-                                            setFormData({ ...formData, discount_type: e.target.value as DiscountType })
-                                        }
-                                    >
-                                        <MenuItem value="">No Discount</MenuItem>
-                                        <MenuItem value="amount">Amount</MenuItem>
-                                        <MenuItem value="percent">Percentage</MenuItem>
-                                    </Select>
-                                </FormControl>
-                            </Grid>
-                            <Grid size={{ xs: 12, sm: 4 }}>
+                            {/* <Grid size={{ xs: 12, sm: 4 }}>
+                <TextField
+                  fullWidth
+                  label="Discount Amount"
+                  type="number"
+                  value={formData.discount_amount}
+                  onChange={handleFormChange("discount_amount")}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">₫</InputAdornment>
+                    ),
+                  }}
+                />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 4 }}>
+                <FormControl fullWidth>
+                  <InputLabel>Discount Type</InputLabel>
+                  <Select
+                    value={formData.discount_type}
+                    label="Discount Type"
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        discount_type: e.target.value as DiscountType,
+                      })
+                    }
+                  >
+                    <MenuItem value="">No Discount</MenuItem>
+                    <MenuItem value="amount">Amount</MenuItem>
+                    <MenuItem value="percent">Percentage</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid> */}
+                            {/* <Grid size={{ xs: 12, sm: 4 }}>
                                 <TextField
                                     fullWidth
                                     label="Tax Amount"
                                     type="number"
                                     value={formData.tax_amount}
-                                    onChange={handleFormChange('tax_amount')}
+                                    onChange={handleFormChange("tax_amount")}
                                     InputProps={{
                                         startAdornment: (
                                             <InputAdornment position="start">₫</InputAdornment>
                                         ),
                                     }}
                                 />
-                            </Grid>
+                            </Grid> */}
 
-                            {/* Summary */}
                             <Grid size={{ xs: 12 }}>
-                                <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
-                                    <Box sx={{ minWidth: 300, p: 2, bgcolor: alpha(PRIMARY_COLOR, 0.05), borderRadius: 1 }}>
+                                <Box
+                                    sx={{ display: "flex", justifyContent: "flex-end", mt: 2 }}
+                                >
+                                    <Box
+                                        sx={{
+                                            minWidth: 300,
+                                            p: 2,
+                                            bgcolor: alpha(PRIMARY_COLOR, 0.05),
+                                            borderRadius: 1,
+                                        }}
+                                    >
                                         <Stack spacing={1}>
-                                            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                            <Box
+                                                sx={{
+                                                    display: "flex",
+                                                    justifyContent: "space-between",
+                                                }}
+                                            >
                                                 <Typography>Subtotal:</Typography>
-                                                <Typography fontWeight="600">{formatCurrency(subtotal)}</Typography>
+                                                <Typography fontWeight="600">
+                                                    {formatCurrency(subtotal)}
+                                                </Typography>
                                             </Box>
-                                            {formData.discount_amount && parseFloat(formData.discount_amount) > 0 && (
-                                                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                            {calculatedDiscountAmount > 0 && (
+                                                <Box
+                                                    sx={{
+                                                        display: "flex",
+                                                        justifyContent: "space-between",
+                                                    }}
+                                                >
                                                     <Typography color={SUCCESS_COLOR}>
-                                                        Discount {formData.discount_type === 'percent' ? `(${formData.discount_amount}%)` : ''}:
+                                                        Discount{" "}
+                                                        {formData.discount_type === "percent"
+                                                            ? `(${formData.discount_amount}%)`
+                                                            : ""}
+                                                        :
                                                     </Typography>
                                                     <Typography color={SUCCESS_COLOR} fontWeight="600">
-                                                        -{formatCurrency(parseFloat(formData.discount_amount))}
+                                                        -{formatCurrency(calculatedDiscountAmount)}
                                                     </Typography>
                                                 </Box>
                                             )}
-                                            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                            <Box
+                                                sx={{
+                                                    display: "flex",
+                                                    justifyContent: "space-between",
+                                                }}
+                                            >
                                                 <Typography>Tax:</Typography>
-                                                <Typography fontWeight="600">{formatCurrency(parseFloat(formData.tax_amount))}</Typography>
+                                                <Typography fontWeight="600">
+                                                    {formatCurrency(calculatedTaxAmount)}
+                                                </Typography>
                                             </Box>
                                             <Divider />
-                                            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                            <Box
+                                                sx={{
+                                                    display: "flex",
+                                                    justifyContent: "space-between",
+                                                }}
+                                            >
                                                 <Typography variant="h6">Total Amount:</Typography>
                                                 <Typography variant="h6" color={PRIMARY_COLOR}>
                                                     {formatCurrency(total)}
@@ -1588,15 +2191,15 @@ export default function InvoicesPage() {
                                     multiline
                                     rows={3}
                                     value={formData.notes}
-                                    onChange={handleFormChange('notes')}
+                                    onChange={handleFormChange("notes")}
                                     placeholder="Add any notes or special instructions..."
                                 />
                             </Grid>
                         </Grid>
                     )}
                 </DialogContent>
-                <DialogActions>
-                    {dialogMode !== 'view' && (
+                <DialogActions sx={{ px: 4, py: 2 }}>
+                    {dialogMode !== "view" && (
                         <>
                             <Button onClick={handleDialogClose}>Cancel</Button>
                             <Button
@@ -1605,26 +2208,33 @@ export default function InvoicesPage() {
                                 disabled={items.length === 0}
                                 sx={{
                                     bgcolor: PRIMARY_COLOR,
-                                    '&:hover': { bgcolor: PRIMARY_DARK },
+                                    "&:hover": { bgcolor: PRIMARY_DARK },
                                 }}
                             >
-                                {dialogMode === 'add' ? 'Create Invoice' : 'Save Changes'}
+                                {dialogMode === "add" ? "Create Invoice" : "Save Changes"}
                             </Button>
                         </>
                     )}
-                    {dialogMode === 'view' && (
+                    {dialogMode === "view" && (
                         <Button onClick={handleDialogClose}>Close</Button>
                     )}
                 </DialogActions>
             </Dialog>
 
-            {/* View Items Dialog */}
-            <Dialog open={openItemsDialog} onClose={handleItemsDialogClose} maxWidth="md" fullWidth>
-                <DialogTitle>
-                    Invoice Items - {selectedInvoice?.voucher}
-                </DialogTitle>
+            <Dialog
+                open={openItemsDialog}
+                onClose={handleItemsDialogClose}
+                maxWidth="md"
+                fullWidth
+            >
+                <DialogTitle>Invoice Items - {selectedInvoice?.voucher}</DialogTitle>
                 <DialogContent dividers>
-                    {selectedInvoice?.items && selectedInvoice.items.length > 0 ? (
+                    {isItemsLoading ? (
+                        <Box sx={{ textAlign: "center", py: 4 }}>
+                            <CircularProgress size={24} />
+                            <Typography sx={{ ml: 2 }}>Loading Items...</Typography>
+                        </Box>
+                    ) : itemsForView.length > 0 ? (
                         <TableContainer>
                             <Table>
                                 <TableHead>
@@ -1639,50 +2249,58 @@ export default function InvoicesPage() {
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
-                                    {selectedInvoice.items.map((item) => (
+                                    {itemsForView.map((item) => (
                                         <TableRow key={item.id}>
                                             <TableCell>
-                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                                    <Avatar sx={{
-                                                        bgcolor: alpha(getItemTypeColor(item.item_type), 0.1),
-                                                        color: getItemTypeColor(item.item_type),
-                                                        width: 32,
-                                                        height: 32
-                                                    }}>
-                                                        {getItemTypeIcon(item.item_type)}
+                                                <Box
+                                                    sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                                                >
+                                                    <Avatar
+                                                        sx={{
+                                                            bgcolor: alpha(
+                                                                getItemTypeColor(item.itemType as ItemType),
+                                                                0.1
+                                                            ),
+                                                            color: getItemTypeColor(
+                                                                item.itemType as ItemType
+                                                            ),
+                                                            width: 32,
+                                                            height: 32,
+                                                        }}
+                                                    >
+                                                        {getItemTypeIcon(item.itemType as ItemType)}
                                                     </Avatar>
                                                     <Box>
                                                         <Typography variant="body2" fontWeight="600">
-                                                            {item.item_name}
+                                                            {item.itemName}
                                                         </Typography>
                                                     </Box>
                                                 </Box>
                                             </TableCell>
                                             <TableCell>
                                                 <Chip
-                                                    label={item.item_type}
+                                                    label={item.itemType}
                                                     size="small"
                                                     sx={{
-                                                        bgcolor: alpha(getItemTypeColor(item.item_type), 0.1),
-                                                        color: getItemTypeColor(item.item_type),
-                                                        textTransform: 'capitalize'
+                                                        bgcolor: alpha(
+                                                            getItemTypeColor(item.itemType as ItemType),
+                                                            0.1
+                                                        ),
+                                                        color: getItemTypeColor(item.itemType as ItemType),
+                                                        textTransform: "capitalize",
                                                     }}
                                                 />
                                             </TableCell>
-                                            <TableCell>
-                                                {item.staff_name || '-'}
-                                            </TableCell>
+                                            <TableCell>{item.staff_name || "-"}</TableCell>
+                                            <TableCell align="right">{item.quantity}</TableCell>
                                             <TableCell align="right">
-                                                {item.quantity}
-                                            </TableCell>
-                                            <TableCell align="right">
-                                                {formatCurrency(item.unit_price)}
+                                                {formatCurrency(item.unitPrice)}
                                             </TableCell>
                                             <TableCell align="right" sx={{ color: SUCCESS_COLOR }}>
                                                 -{formatCurrency(item.discount)}
                                             </TableCell>
                                             <TableCell align="right" sx={{ fontWeight: 600 }}>
-                                                {formatCurrency(item.total_price)}
+                                                {formatCurrency(item.totalPrice)}
                                             </TableCell>
                                         </TableRow>
                                     ))}
@@ -1690,8 +2308,8 @@ export default function InvoicesPage() {
                             </Table>
                         </TableContainer>
                     ) : (
-                        <Box sx={{ textAlign: 'center', py: 4 }}>
-                            <Inventory sx={{ fontSize: 48, color: 'text.disabled', mb: 2 }} />
+                        <Box sx={{ textAlign: "center", py: 4 }}>
+                            <Inventory sx={{ fontSize: 48, color: "text.disabled", mb: 2 }} />
                             <Typography variant="h6" color="text.secondary">
                                 No items found
                             </Typography>
@@ -1704,15 +2322,18 @@ export default function InvoicesPage() {
             </Dialog>
 
             {/* Delete Confirmation Dialog */}
-            <Dialog open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)}>
+            <Dialog
+                open={deleteConfirmOpen}
+                onClose={() => setDeleteConfirmOpen(false)}
+            >
                 <DialogTitle>Confirm Delete</DialogTitle>
                 <DialogContent>
                     <Alert severity="warning" sx={{ mb: 2 }}>
-                        Are you sure you want to delete invoice  {selectedInvoice?.voucher} ?
+                        Are you sure you want to delete invoice {selectedInvoice?.voucher} ?
                         This action cannot be undone.
                     </Alert>
                     {selectedInvoice && (
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 2 }}>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 2, mt: 2 }}>
                             <Avatar
                                 sx={{
                                     bgcolor: alpha(PRIMARY_COLOR, 0.1),
@@ -1728,7 +2349,8 @@ export default function InvoicesPage() {
                                     {selectedInvoice.voucher}
                                 </Typography>
                                 <Typography variant="body2" color="text.secondary">
-                                    {selectedInvoice.customer?.full_name} • {formatCurrency(selectedInvoice.total_amount)}
+                                    {selectedInvoice.customer?.fullName} •{" "}
+                                    {formatCurrency(selectedInvoice.total_amount)}
                                 </Typography>
                             </Box>
                         </Box>
@@ -1739,7 +2361,7 @@ export default function InvoicesPage() {
                     <Button
                         onClick={confirmDelete}
                         variant="contained"
-                        sx={{ bgcolor: ERROR_COLOR, '&:hover': { bgcolor: '#dc2626' } }}
+                        sx={{ bgcolor: ERROR_COLOR, "&:hover": { bgcolor: "#dc2626" } }}
                     >
                         Delete Invoice
                     </Button>

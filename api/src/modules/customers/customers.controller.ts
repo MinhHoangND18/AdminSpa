@@ -10,8 +10,6 @@ import {
   HttpCode,
   HttpStatus,
   ParseIntPipe,
-  Optional,
-  DefaultValuePipe,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -25,7 +23,6 @@ import {
   CreateCustomerDto,
   UpdateCustomerDto,
   QueryCustomerDto,
-  UpdateCustomerVisitDto,
 } from './customers.dto';
 
 @ApiTags('customers')
@@ -121,25 +118,6 @@ export class CustomersController {
     @Body() updateCustomerDto: UpdateCustomerDto,
   ) {
     return this.customersService.update(id, updateCustomerDto);
-  }
-
-  @Patch(':id/visit')
-  @ApiOperation({ summary: 'Cập nhật lịch sử visit của khách hàng' })
-  @ApiParam({ name: 'id', type: Number })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description:
-      'Cập nhật visit thành công. Tự động nâng hạng khách hàng nếu đủ điều kiện.',
-  })
-  @ApiResponse({
-    status: HttpStatus.NOT_FOUND,
-    description: 'Không tìm thấy khách hàng',
-  })
-  updateVisit(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() updateVisitDto: UpdateCustomerVisitDto,
-  ) {
-    return this.customersService.updateVisit(id, updateVisitDto);
   }
 
   @Delete(':id')

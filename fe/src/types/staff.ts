@@ -26,7 +26,6 @@ export interface Staff {
 }
 
 export interface StaffFormData {
-  code: string;
   full_name: string;
   phone: string;
   email?: string;

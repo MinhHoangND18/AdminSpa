@@ -33,6 +33,7 @@ import {
   TablePagination,
   CircularProgress,
   Snackbar,
+  Backdrop,
 } from "@mui/material";
 import {
   Add,
@@ -66,6 +67,8 @@ import {
   deleteStaff,
 } from "@/lib/api/staffs";
 
+import { useAuth } from "@/lib/hooks/useAuth";
+
 interface AxiosErrorResponse {
   response?: {
     data?: {
@@ -85,6 +88,7 @@ const isAxiosError = (error: unknown): error is AxiosErrorResponse => {
     typeof (error as AxiosErrorResponse).response === 'object'
   );
 };
+
 const PRIMARY_COLOR = "#14b8a6";
 const PRIMARY_DARK = "#0f766e";
 const SUCCESS_COLOR = "#10b981";
@@ -130,8 +134,10 @@ const getSalaryTypeLabel = (type: SalaryType) => {
   }
 };
 
-
 export default function StaffPage() {
+  const { user: currentUser } = useAuth();
+  const canManageStaff = currentUser?.role !== "staff";
+
   const [staff, setStaff] = useState<Staff[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -161,7 +167,7 @@ export default function StaffPage() {
           stores = response;
           console.log("Store list loaded. Count:", stores.length);
         } else {
-          // Trường hợp lỗi hoặc cấu trúc không như mong đợi
+
           console.warn("Could not parse store data structure:", response);
           stores = [];
         }
@@ -174,7 +180,6 @@ export default function StaffPage() {
     };
     fetchStores();
   }, []);
-
 
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
@@ -191,7 +196,6 @@ export default function StaffPage() {
   };
 
   const initialFormData: StaffFormDataType = {
-    code: "",
     full_name: "",
     phone: "",
     email: "",
@@ -239,6 +243,7 @@ export default function StaffPage() {
     }
   }, [page, rowsPerPage, searchQuery, filterStatus]);
 
+
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       fetchStaffData();
@@ -275,7 +280,7 @@ export default function StaffPage() {
     if (selectedStaff) {
       setDialogMode("edit");
       setFormData({
-        code: selectedStaff.code,
+
         full_name: selectedStaff.full_name,
         phone: selectedStaff.phone,
         email: selectedStaff.email || "",
@@ -302,7 +307,6 @@ export default function StaffPage() {
     if (selectedStaff) {
       setDialogMode("view");
       setFormData({
-        code: selectedStaff.code,
         full_name: selectedStaff.full_name,
         phone: selectedStaff.phone,
         email: selectedStaff.email || "",
@@ -337,6 +341,11 @@ export default function StaffPage() {
         fetchStaffData();
         setDeleteConfirmOpen(false);
         setSelectedStaff(null);
+        setSnackbar({
+          open: true,
+          message: "Staff member deleted successfully.",
+          severity: "success",
+        });
       } catch (error) {
         console.error("Failed to delete staff:", error);
       }
@@ -349,16 +358,15 @@ export default function StaffPage() {
   };
 
   const handleFormChange =
-    (field: keyof StaffFormDataType) =>
-      (
-        event:
-          | React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-          | { target: { value: string | number | StaffStatus | SalaryType | Gender | null | '' } }
-      ) => {
-        setFormData({ ...formData, [field]: event.target.value });
-      };
+      (field: keyof StaffFormDataType) =>
+        (
+          event:
+            | React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+            | { target: { value: string | number | StaffStatus | SalaryType | Gender | null | '' } }
+        ) => {
+          setFormData({ ...formData, [field]: event.target.value });
+        };
   const validateForm = (data: StaffFormDataType): string | null => {
-    if (!data.code?.trim()) return "Staff Code is required.";
     if (!data.full_name?.trim()) return "Full Name is required.";
     if (!data.phone?.trim()) return "Phone number is required.";
     if (!data.email?.trim()) return "Email is required.";
@@ -408,16 +416,16 @@ export default function StaffPage() {
     }
 
     try {
-      const submitData: StaffFormData = {
-        ...formData,
-        store_id: Number(formData.store_id),
-        base_salary: formData.base_salary ? Number(formData.base_salary) : 0,
-        commission_rate: formData.commission_rate
-          ? Number(formData.commission_rate)
-          : undefined,
-        email: formData.email || undefined,
-        address: formData.address,
-      };
+        const submitData: StaffFormData = {
+              ...formData,
+              store_id: Number(formData.store_id),
+              base_salary: formData.base_salary ? Number(formData.base_salary) : 0,
+              commission_rate: formData.commission_rate
+                ? Number(formData.commission_rate)
+                : undefined,
+              email: formData.email || undefined,
+              address: formData.address,
+            };
 
       if (dialogMode === "add") {
         await createStaff(submitData);
@@ -470,15 +478,21 @@ export default function StaffPage() {
 
   return (
     <>
+      <Backdrop
+        sx={{ color: "#fff", zIndex: (theme) => theme.zIndex.drawer + 1 }}
+        open={loading}
+      >
+        <CircularProgress color="inherit" />
+      </Backdrop>
       {/* Header */}
-      <Box sx={{ mb: 3 }}>
+      {/* <Box sx={{ mb: 3 }}>
         <Typography variant="h4" fontWeight="bold" gutterBottom>
           Staff Management
         </Typography>
         <Typography variant="body1" color="text.secondary">
           Manage your spa staff members and their information
         </Typography>
-      </Box>
+      </Box> */}
 
       {/* Stats Cards */}
       <Grid container spacing={3} sx={{ mb: 3 }}>
@@ -665,6 +679,7 @@ export default function StaffPage() {
               variant="contained"
               startIcon={<Add />}
               onClick={handleAddNew}
+              disabled={!canManageStaff}
               sx={{
                 bgcolor: PRIMARY_COLOR,
                 "&:hover": { bgcolor: PRIMARY_DARK },
@@ -802,6 +817,7 @@ export default function StaffPage() {
                       <IconButton
                         size="small"
                         onClick={(e) => handleMenuOpen(e, staffMember)}
+                        disabled={!canManageStaff}
                       >
                         <MoreVert />
                       </IconButton>
@@ -851,15 +867,19 @@ export default function StaffPage() {
         open={Boolean(anchorEl)}
         onClose={handleMenuClose}
       >
-        <MenuItem onClick={handleView}>
+        {/* <MenuItem onClick={handleView}>
           <Visibility sx={{ mr: 1, fontSize: 20 }} />
           View Details
-        </MenuItem>
-        <MenuItem onClick={handleEdit}>
+        </MenuItem> */}
+        <MenuItem onClick={handleEdit} disabled={!canManageStaff}>
           <Edit sx={{ mr: 1, fontSize: 20 }} />
           Edit
         </MenuItem>
-        <MenuItem onClick={handleDelete} sx={{ color: ERROR_COLOR }}>
+        <MenuItem
+          onClick={handleDelete}
+          sx={{ color: ERROR_COLOR }}
+          disabled={!canManageStaff}
+        >
           <Delete sx={{ mr: 1, fontSize: 20 }} />
           Delete
         </MenuItem>
@@ -881,15 +901,6 @@ export default function StaffPage() {
         </DialogTitle>
         <DialogContent dividers>
           <Grid container spacing={3} sx={{ mt: 0.5 }}>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <TextField
-                label="Staff Code *"
-                fullWidth
-                value={formData.code}
-                onChange={handleFormChange("code")}
-                disabled={dialogMode === "view"}
-              />
-            </Grid>
             <Grid size={{ xs: 12, sm: 6 }}>
               <TextField
                 label="Full Name *"
@@ -943,15 +954,6 @@ export default function StaffPage() {
                 InputLabelProps={{ shrink: true }}
               />
             </Grid>
-            <Grid size={{ xs: 12 }}>
-              <TextField
-                label="Address"
-                fullWidth
-                value={formData.address}
-                onChange={handleFormChange("address")}
-                disabled={dialogMode === "view"}
-              />
-            </Grid>
             <Grid size={{ xs: 12, sm: 6 }}>
               <FormControl fullWidth disabled={dialogMode === "view"}>
                 <InputLabel id="store-select-label">Store *</InputLabel>
@@ -972,12 +974,22 @@ export default function StaffPage() {
 
                   {storeList.map((store) => (
                     <MenuItem key={store.id} value={store.id}>
-                      ID {store.id}: {store.name}
+                      {store.name}
                     </MenuItem>
                   ))}
                 </Select>
               </FormControl>
             </Grid>
+            <Grid size={{ xs: 12 }}>
+              <TextField
+                label="Address"
+                fullWidth
+                value={formData.address}
+                onChange={handleFormChange("address")}
+                disabled={dialogMode === "view"}
+              />
+            </Grid>
+
             <Grid size={{ xs: 12, sm: 6 }}>
               <TextField
                 label="Hire Date"
@@ -1051,7 +1063,7 @@ export default function StaffPage() {
             </Grid>
           </Grid>
         </DialogContent>
-        <DialogActions>
+        <DialogActions sx={{ padding: '16px 24px' }}>
           <Button onClick={handleDialogClose} sx={{ color: PRIMARY_COLOR }}>
             {dialogMode === "view" ? "Close" : "Cancel"}
           </Button>
@@ -1078,12 +1090,10 @@ export default function StaffPage() {
         <DialogTitle>Confirm Delete</DialogTitle>
         <DialogContent>
           <Alert severity="warning" sx={{ mb: 2 }}>
-            This action cannot be undone!
-          </Alert>
-          <Typography>
             Are you sure you want to delete staff member{" "}
-            <strong>{selectedStaff?.full_name}</strong>?
-          </Typography>
+            <strong>{selectedStaff?.full_name}</strong>? This action cannot be
+            undone.
+          </Alert>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDeleteConfirmOpen(false)}>Cancel</Button>

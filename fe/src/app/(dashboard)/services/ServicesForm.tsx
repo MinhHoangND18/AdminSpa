@@ -39,7 +39,9 @@ import {
   Switch,
   CircularProgress,
   Snackbar,
-  SelectChangeEvent
+  SelectChangeEvent,
+  FormHelperText,
+  Backdrop,
 } from '@mui/material';
 import {
   Add,
@@ -155,7 +157,9 @@ export default function ServicesPage() {
   const [dialogMode, setDialogMode] = useState<'add' | 'edit' | 'view'>('add');
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' } | null>(null);
-
+  const [validationErrors, setValidationErrors] = useState<Partial<Record<keyof ServiceFormData, string>>>({});
+  const [loading, setLoading] = useState(false);
+  
   const initialFormData: ServiceFormData = {
     name: '',
     categoryId: '',
@@ -169,11 +173,47 @@ export default function ServicesPage() {
   };
 
   const [formData, setFormData] = useState<ServiceFormData>(initialFormData);
+  const validateForm = () => {
+    const errors: Partial<Record<keyof ServiceFormData, string>> = {};
 
-  const { data: categories = [], isLoading: isLoadingCategories } = useQuery({
+    if (!formData.name.trim()) {
+      errors.name = 'Service Name is required.';
+    }
+
+    const duration = parseFloat(formData.durationMinutes);
+    if (!formData.durationMinutes || isNaN(duration) || duration <= 0 || !Number.isInteger(duration)) {
+      errors.durationMinutes = 'Duration must be a positive whole number (minutes).';
+    }
+
+    const price = parseFloat(formData.price);
+    if (!formData.price || isNaN(price) || price <= 0) {
+      errors.price = 'Price must be a positive number.';
+    }
+
+    if (!formData.categoryId) {
+      errors.categoryId = 'Category is required.';
+    }
+
+    const discountPrice = formData.discountPrice ? parseFloat(formData.discountPrice) : null;
+    if (discountPrice !== null && isNaN(discountPrice)) {
+      errors.discountPrice = 'Invalid discount price.';
+    } else if (discountPrice !== null && discountPrice >= price) {
+      errors.discountPrice = 'Discount price must be less than the regular price.';
+    } else if (discountPrice !== null && discountPrice < 0) {
+      errors.discountPrice = 'Discount price cannot be negative.';
+    }
+
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const { data: categories = [], isLoading: isLoadingCategories, error: categoriesError } = useQuery({
     queryKey: ['activeServiceCategories'],
-    queryFn: getActiveServiceCategories,
-    select: (data) => Array.isArray(data) ? data : [],
+    queryFn: async () => {
+      const result = await getActiveServiceCategories();
+      console.log('Categories loaded:', result); // Debug
+      return result;
+    },
   });
 
   const {
@@ -324,6 +364,12 @@ export default function ServicesPage() {
   ) => {
     setFormData({ ...formData, [field]: event.target.value });
   };
+  const handleSelectChange = (field: keyof ServiceFormData) => (
+    event: SelectChangeEvent
+  ) => {
+    setFormData({ ...formData, [field]: event.target.value });
+  };
+
 
   const handleSwitchChange = (field: keyof ServiceFormData) => (
     event: React.ChangeEvent<HTMLInputElement>
@@ -360,21 +406,32 @@ export default function ServicesPage() {
     setPage(0);
   };
 
+  const isAnyLoading =
+  isLoadingServices ||
+  createMutation.isPending ||
+  updateMutation.isPending ||
+  deleteMutation.isPending;
   return (
     <>
+      <Backdrop
+        sx={{ color: "#fff", zIndex: (theme) => theme.zIndex.drawer + 1 }}
+        open={isAnyLoading}
+      >
+        <CircularProgress color="inherit" />
+      </Backdrop>
       {/* Header */}
-      <Box sx={{ mb: 3 }}>
+      {/* <Box sx={{ mb: 3 }}>
         <Typography variant="h4" fontWeight="bold" gutterBottom>
           Service Management
         </Typography>
         <Typography variant="body1" color="text.secondary">
           Manage your spa services and treatment packages
         </Typography>
-      </Box>
+      </Box> */}
 
       {/* Stats Cards */}
       <Grid container spacing={3} sx={{ mb: 3 }}>
-        <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
+        <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
           <Card>
             <CardContent>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -383,7 +440,7 @@ export default function ServicesPage() {
                     Total Services
                   </Typography>
                   <Typography variant="h4" fontWeight="bold">
-                    {isLoadingServices ? <CircularProgress size={24} /> : stats.total}
+                    {stats.total}
                   </Typography>
                 </Box>
                 <Avatar sx={{ bgcolor: alpha(PRIMARY_COLOR, 0.1), width: 56, height: 56 }}>
@@ -393,7 +450,7 @@ export default function ServicesPage() {
             </CardContent>
           </Card>
         </Grid>
-        <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
+        <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
           <Card>
             <CardContent>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -402,7 +459,7 @@ export default function ServicesPage() {
                     Active Services
                   </Typography>
                   <Typography variant="h4" fontWeight="bold">
-                    {isLoadingServices ? <CircularProgress size={24} /> : stats.active}
+                    { stats.active}
                   </Typography>
                 </Box>
                 <Avatar sx={{ bgcolor: alpha(SUCCESS_COLOR, 0.1), width: 56, height: 56 }}>
@@ -412,7 +469,7 @@ export default function ServicesPage() {
             </CardContent>
           </Card>
         </Grid>
-        <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
+        <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
           <Card>
             <CardContent>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -421,7 +478,7 @@ export default function ServicesPage() {
                     Combo Packages
                   </Typography>
                   <Typography variant="h4" fontWeight="bold">
-                    {isLoadingServices ? <CircularProgress size={24} /> : stats.combo}
+                    { stats.combo}
                   </Typography>
                 </Box>
                 <Avatar sx={{ bgcolor: alpha(PURPLE_COLOR, 0.1), width: 56, height: 56 }}>
@@ -478,7 +535,7 @@ export default function ServicesPage() {
                 onChange={(e: SelectChangeEvent) =>
                   handleFilterChange('categoryId', e.target.value === 'all' ? 'all' : Number(e.target.value))
                 }
-                disabled={isLoadingCategories}
+              // disabled={isLoadingCategories}
               >
                 <MenuItem value="all">All Categories</MenuItem>
                 {Array.isArray(categories) && categories.map((category: ServiceCategory) => (
@@ -517,6 +574,7 @@ export default function ServicesPage() {
               startIcon={<Add />}
               onClick={handleAddNew}
               sx={{
+                height: 55,
                 bgcolor: PRIMARY_COLOR,
                 '&:hover': { bgcolor: PRIMARY_DARK },
                 textTransform: 'none',
@@ -548,14 +606,7 @@ export default function ServicesPage() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {isLoadingServices ? (
-                <TableRow>
-                  <TableCell colSpan={8} align="center" sx={{ py: 10 }}>
-                    <CircularProgress />
-                    <Typography>Loading services...</Typography>
-                  </TableCell>
-                </TableRow>
-              ) : isError ? (
+              { isError ? (
                 <TableRow>
                   <TableCell colSpan={8} align="center" sx={{ py: 10 }}>
                     <Alert severity="error">Failed to load services.</Alert>
@@ -696,10 +747,10 @@ export default function ServicesPage() {
 
       {/* Menu */}
       <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleMenuClose}>
-        <MenuItem onClick={handleView}>
+        {/* <MenuItem onClick={handleView}>
           <Visibility sx={{ mr: 1, fontSize: 20 }} />
           View Details
-        </MenuItem>
+        </MenuItem> */}
         <MenuItem onClick={handleEdit}>
           <Edit sx={{ mr: 1, fontSize: 20 }} />
           Edit
@@ -833,21 +884,31 @@ export default function ServicesPage() {
                 />
               </Grid>
               <Grid size={{ xs: 12, sm: 6 }}>
-                <FormControl fullWidth disabled={dialogMode === 'view' || isLoadingCategories}>
+                <FormControl
+                  fullWidth
+                  required
+                  // disabled={dialogMode === 'view' || isLoadingCategories}
+                  error={!!validationErrors.categoryId}
+                >
                   <InputLabel>Category</InputLabel>
                   <Select
                     value={formData.categoryId}
                     label="Category"
-                    onChange={(e: SelectChangeEvent) =>
-                      setFormData({ ...formData, categoryId: e.target.value })
-                    }
+                    onChange={handleSelectChange('categoryId')}
                   >
-                    {Array.isArray(categories) && categories.map((category: ServiceCategory) => (
-                      <MenuItem key={category.id} value={category.id}>
-                        {category.name}
-                      </MenuItem>
-                    ))}
+                    {isLoadingCategories ? (
+                      <MenuItem disabled>Loading...</MenuItem>
+                    ) : categories.length === 0 ? (
+                      <MenuItem disabled>No categories</MenuItem>
+                    ) : (
+                      categories.map((category: ServiceCategory) => (
+                        <MenuItem key={category.id} value={category.id.toString()}>
+                          {category.name}
+                        </MenuItem>
+                      ))
+                    )}
                   </Select>
+                  {validationErrors.categoryId && <FormHelperText>{validationErrors.categoryId}</FormHelperText>}
                 </FormControl>
               </Grid>
               <Grid size={{ xs: 12, sm: 6 }}>
@@ -947,9 +1008,7 @@ export default function ServicesPage() {
                   <Select
                     value={formData.status}
                     label="Status"
-                    onChange={(e) =>
-                      setFormData({ ...formData, status: e.target.value as ServiceStatus })
-                    }
+                    onChange={handleSelectChange('status')}
                   >
                     <MenuItem value="active">Active</MenuItem>
                     <MenuItem value="inactive">Inactive</MenuItem>

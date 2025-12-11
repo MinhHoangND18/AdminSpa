@@ -38,6 +38,15 @@ export class UserEntity {
   email: string;
 
   @Column({
+    type: 'varchar',
+    length: 255,
+    nullable: true,
+    name: 'fullname', 
+    select: false,
+  })
+  fullname: string;
+
+  @Column({
     type: 'enum',
     enum: UserRole,
     default: UserRole.STAFF,
@@ -75,6 +84,14 @@ export class UserEntity {
 
   @Column({ type: 'boolean', default: true })
   is_active: boolean;
+
+  @Column({
+    type: 'boolean',
+    default: false,
+    select: false,
+    name: 'is_deleted',
+  })
+  is_deleted: boolean;
 
   @CreateDateColumn({ type: 'timestamp' })
   created_at: Date;

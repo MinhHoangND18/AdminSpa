@@ -29,9 +29,6 @@ export enum StaffStatusEnum {
 
 export class CreateStaffDto {
   @IsString()
-  code: string;
-
-  @IsString()
   full_name: string;
 
   @IsString()

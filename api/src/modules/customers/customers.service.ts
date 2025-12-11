@@ -2,24 +2,51 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
-  BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Customer, CustomerType, CustomerStatus } from './entities/customer.entity';
+import {
+  Customer,
+  CustomerType,
+  CustomerStatus,
+} from './entities/customer.entity';
 import {
   CreateCustomerDto,
   UpdateCustomerDto,
   QueryCustomerDto,
-  UpdateCustomerVisitDto,
 } from './customers.dto';
+import { Invoice, PaymentStatus } from '../invoices/entities/invoice.entity';
 
 @Injectable()
 export class CustomersService {
   constructor(
     @InjectRepository(Customer)
     private readonly customerRepository: Repository<Customer>,
+    @InjectRepository(Invoice)
+    private readonly invoiceRepository: Repository<Invoice>,
   ) {}
+
+  async findOrCreate(customerData: {
+    phone: string;
+    fullName: string;
+    email?: string;
+  }): Promise<Customer> {
+    let customer = await this.customerRepository.findOne({
+      where: { phone: customerData.phone },
+    });
+
+    if (customer) {
+      return customer;
+    }
+
+    customer = this.customerRepository.create({
+      ...customerData,
+      customerType: CustomerType.NEW,
+      status: CustomerStatus.ACTIVE,
+    });
+
+    return await this.customerRepository.save(customer);
+  }
 
   async create(createCustomerDto: CreateCustomerDto): Promise<Customer> {
     const existingPhone = await this.customerRepository.findOne({
@@ -82,12 +109,34 @@ export class CustomersService {
       queryBuilder.andWhere('customer.storeId = :storeId', { storeId });
     }
 
-    queryBuilder.skip(skip).take(limit).orderBy('customer.createdAt', 'ASC');
+    queryBuilder.skip(skip).take(limit).orderBy('customer.createdAt', 'DESC');
 
     const [data, total] = await queryBuilder.getManyAndCount();
 
+    const enhancedData = await Promise.all(
+      data.map(async (customer) => {
+        const stats = await this.invoiceRepository
+          .createQueryBuilder('invoice')
+          .select('SUM(invoice.paidAmount)', 'totalSpent')
+          .addSelect('COUNT(invoice.id)', 'totalVisits')
+          .where('invoice.customerId = :customerId', {
+            customerId: customer.id,
+          })
+          .andWhere('invoice.paymentStatus = :status', {
+            status: PaymentStatus.PAID,
+          })
+          .getRawOne();
+
+        return {
+          ...customer,
+          totalSpent: parseFloat(stats.totalSpent) || 0,
+          totalVisits: parseInt(stats.totalVisits, 10) || 0,
+        };
+      }),
+    );
+
     return {
-      data,
+      data: enhancedData,
       total,
       page,
       limit,
@@ -105,6 +154,19 @@ export class CustomersService {
       throw new NotFoundException(`Customer with ID ${id} not found`);
     }
 
+    const stats = await this.invoiceRepository
+      .createQueryBuilder('invoice')
+      .select('SUM(invoice.paidAmount)', 'totalSpent')
+      .addSelect('COUNT(invoice.id)', 'totalVisits')
+      .where('invoice.customerId = :customerId', { customerId: customer.id })
+      .andWhere('invoice.paymentStatus = :status', {
+        status: PaymentStatus.PAID,
+      })
+      .getRawOne();
+
+    customer.totalSpent = parseFloat(stats.totalSpent) || 0;
+    customer.totalVisits = parseInt(stats.totalVisits, 10) || 0;
+
     return customer;
   }
 
@@ -118,10 +180,26 @@ export class CustomersService {
       throw new NotFoundException(`Customer with phone ${phone} not found`);
     }
 
+    const stats = await this.invoiceRepository
+      .createQueryBuilder('invoice')
+      .select('SUM(invoice.paidAmount)', 'totalSpent')
+      .addSelect('COUNT(invoice.id)', 'totalVisits')
+      .where('invoice.customerId = :customerId', { customerId: customer.id })
+      .andWhere('invoice.paymentStatus = :status', {
+        status: PaymentStatus.PAID,
+      })
+      .getRawOne();
+
+    customer.totalSpent = parseFloat(stats.totalSpent) || 0;
+    customer.totalVisits = parseInt(stats.totalVisits, 10) || 0;
+
     return customer;
   }
 
-  async update(id: number, updateCustomerDto: UpdateCustomerDto): Promise<Customer> {
+  async update(
+    id: number,
+    updateCustomerDto: UpdateCustomerDto,
+  ): Promise<Customer> {
     const customer = await this.findOne(id);
 
     // Check if phone is being updated and already exists
@@ -145,24 +223,6 @@ export class CustomersService {
     }
 
     Object.assign(customer, updateCustomerDto);
-    return await this.customerRepository.save(customer);
-  }
-
-  async updateVisit(id: number, updateVisitDto: UpdateCustomerVisitDto): Promise<Customer> {
-    const customer = await this.findOne(id);
-
-    // Update total spent and visits
-    customer.totalSpent = Number(customer.totalSpent) + updateVisitDto.amountSpent;
-    customer.totalVisits += 1;
-    customer.lastVisitDate = new Date();
-
-    // Auto upgrade customer type based on total spent
-    if (customer.totalSpent >= 10000000) {
-      customer.customerType = CustomerType.VIP;
-    } else if (customer.totalSpent >= 5000000 || customer.totalVisits >= 10) {
-      customer.customerType = CustomerType.REGULAR;
-    }
-
     return await this.customerRepository.save(customer);
   }
 
@@ -206,7 +266,9 @@ export class CustomersService {
       queryBuilder.getCount(),
       queryBuilder
         .clone()
-        .andWhere('customer.status = :status', { status: CustomerStatus.ACTIVE })
+        .andWhere('customer.status = :status', {
+          status: CustomerStatus.ACTIVE,
+        })
         .getCount(),
       queryBuilder
         .clone()
@@ -214,7 +276,9 @@ export class CustomersService {
         .getCount(),
       queryBuilder
         .clone()
-        .andWhere('customer.customerType = :type', { type: CustomerType.REGULAR })
+        .andWhere('customer.customerType = :type', {
+          type: CustomerType.REGULAR,
+        })
         .getCount(),
       queryBuilder
         .clone()
@@ -222,8 +286,10 @@ export class CustomersService {
         .getCount(),
     ]);
 
-    const totalSpent = await queryBuilder
-      .select('SUM(customer.totalSpent)', 'total')
+    const totalSpent = await this.invoiceRepository
+      .createQueryBuilder('invoice')
+      .select('SUM(invoice.paidAmount)', 'total')
+      .where('invoice.paymentStatus = :status', { status: PaymentStatus.PAID })
       .getRawOne();
 
     return {

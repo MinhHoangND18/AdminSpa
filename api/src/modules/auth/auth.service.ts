@@ -40,16 +40,16 @@ export class AuthService {
 
     if (!isPasswordValid) {
       // Increment login attempts
-      await this.userRepository.update(user.id, {
-        login_attempts: user.login_attempts + 1,
-        is_locked: user.login_attempts + 1 >= 5,
-      });
+      // await this.userRepository.update(user.id, {
+      //   login_attempts: user.login_attempts + 1,
+      //   is_locked: user.login_attempts + 1 >= 5,
+      // });
 
-      if (user.login_attempts + 1 >= 5) {
-        throw new UnauthorizedException(
-          'Account locked due to too many failed attempts'
-        );
-      }
+      // if (user.login_attempts + 1 >= 5) {
+      //   throw new UnauthorizedException(
+      //     'Account locked due to too many failed attempts'
+      //   );
+      // }
 
       throw new UnauthorizedException('Invalid username or password');
     }

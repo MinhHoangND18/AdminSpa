@@ -10,10 +10,12 @@ import { UserEntity } from './entities/user.entity';
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly usersRepository: UsersRepository) {}
+  constructor(private readonly usersRepository: UsersRepository) { }
 
   async findAll(filter: FilterUsersDto) {
-    return this.usersRepository.findAll(filter);
+    const { data, total } = await this.usersRepository.findAll(filter);
+    const sanitizedData = data.map((user) => this.sanitize(user));
+    return { data: sanitizedData, total };
   }
 
   async findOne(id: number) {
@@ -33,6 +35,7 @@ export class UsersService {
       username: dto.username,
       password_hash,
       email: dto.email ?? null,
+      fullname: dto.fullname ?? null,
       role: dto.role,
       staff_id: dto.staff_id ?? null,
       store_id: dto.store_id ?? null,
@@ -63,19 +66,31 @@ export class UsersService {
       username: dto.username ?? existing.username,
       password_hash,
       email: dto.email !== undefined ? dto.email : existing.email,
+      fullname: dto.fullname !== undefined ? dto.fullname : existing.fullname,
       role: dto.role ?? existing.role,
       staff_id: dto.staff_id !== undefined ? dto.staff_id : existing.staff_id,
       store_id: dto.store_id !== undefined ? dto.store_id : existing.store_id,
-      is_active:
-        dto.is_active !== undefined ? dto.is_active : existing.is_active,
+      is_active: dto.is_active !== undefined ? dto.is_active : existing.is_active,
+      login_attempts:
+        dto.login_attempts !== undefined
+          ? dto.login_attempts
+          : existing.login_attempts,
     });
 
     return this.sanitize(updated as UserEntity);
   }
 
   async remove(id: number) {
-    await this.findOne(id);
-    await this.usersRepository.remove(id);
+    const user = await this.findOne(id);
+    if (user.is_deleted) {
+      throw new ConflictException('User already deleted');
+    }
+
+    // Instead of hard delete, we soft delete
+    await this.usersRepository.updateById(id, {
+      is_deleted: true,
+      is_active: false,
+    });
   }
 
   private async ensureUniqueFields(

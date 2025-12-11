@@ -446,21 +446,21 @@ export default function StoresPage() {
 
   return (
     <>
-      {/* <Backdrop
+      <Backdrop
         sx={{ color: "#fff", zIndex: (theme) => theme.zIndex.drawer + 1 }}
         open={loading}
       >
         <CircularProgress color="inherit" />
-      </Backdrop> */}
+      </Backdrop>
 
-      <Box sx={{ mb: 3 }}>
+      {/* <Box sx={{ mb: 3 }}>
         <Typography variant="h4" fontWeight="bold" gutterBottom>
           Store Management
         </Typography>
         <Typography variant="body1" color="text.secondary">
           Manage your spa locations and branches
         </Typography>
-      </Box>
+      </Box> */}
 
       {/* Stats Cards */}
       <Grid container spacing={3} sx={{ mb: 3 }}>
@@ -689,10 +689,10 @@ export default function StoresPage() {
         open={Boolean(anchorEl)}
         onClose={handleMenuClose}
       >
-        <MenuItem onClick={handleView} disabled={loading}>
+        {/* <MenuItem onClick={handleView} disabled={loading}>
           <Visibility sx={{ mr: 1, fontSize: 20 }} />
           View Details
-        </MenuItem>
+        </MenuItem> */}
         <MenuItem onClick={handleEdit} disabled={loading}>
           <Edit sx={{ mr: 1, fontSize: 20 }} />
           Edit
@@ -823,9 +823,9 @@ export default function StoresPage() {
             </Grid>
             <Grid size={{ xs: 12, sm: 6 }}>
               <FormControl fullWidth>
-                <InputLabel>Manager ID</InputLabel>
+                <InputLabel>Manager</InputLabel>
                 <Select
-                  label="Manager ID"
+                  label="Manager"
                   value={formData.manager_id || ""}
                   onChange={handleFormChange("manager_id")}
                   disabled={dialogMode === "view"}
@@ -835,7 +835,7 @@ export default function StoresPage() {
                   </MenuItem>
                   {availableManagers.map((manager) => (
                     <MenuItem key={manager.id} value={String(manager.id)}>
-                      ID: {manager.id} ({manager.username} )
+                      {manager.username} 
                     </MenuItem>
                   ))}
                 </Select>

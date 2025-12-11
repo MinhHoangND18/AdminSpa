@@ -6,6 +6,7 @@ export const API_ENDPOINTS = {
   SERVICES: '/services',
   SERVICE_CATEGORIES: '/service-categories',
   BOOKINGS: '/bookings',
+  BOOKING_ORDER: '/bookings/order',
   INVOICES: '/invoices',
   PAYMENTS: '/payments',
   PROMOTIONS: '/promotions',

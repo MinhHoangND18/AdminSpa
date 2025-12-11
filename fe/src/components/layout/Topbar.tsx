@@ -14,6 +14,7 @@ import {
   Divider,
   Chip,
 } from '@mui/material';
+import { useAuth } from '@/lib/hooks/useAuth';
 import {
   Menu as MenuIcon,
   Notifications as NotificationsIcon,
@@ -24,7 +25,7 @@ import {
 const MENU_TITLES = [
   { text: 'Dashboard', path: '/dashboard' },
   { text: 'Stores', path: '/stores' },
-  { text: 'User', path: '/users' },
+  { text: 'Users', path: '/users' },
   { text: 'Staff', path: '/staff' },
   { text: 'Customers', path: '/customers' },
   { text: 'Services', path: '/services' },
@@ -48,6 +49,8 @@ export default function TopBar({
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const router = useRouter();
   const pathname = usePathname(); // <--- 2. LẤY URL HIỆN TẠI
+  const { user, loading } = useAuth(); // Get user from AuthContext
+
 
   // <--- 3. TÍNH TOÁN TIÊU ĐỀ DỰA TRÊN URL
   const currentTitle = useMemo(() => {
@@ -105,43 +108,45 @@ export default function TopBar({
           {currentTitle} {/* <--- 4. HIỂN THỊ TITLE ĐÃ TÍNH TOÁN */}
         </Typography>
 
-        <Box display="flex" gap={1} alignItems="center">
-          <Chip
-            label="Super Admin"
-            size="small"
-            color="primary"
-            sx={{ fontWeight: 500, bgcolor: '#14b8a6' }}
-          />
+        {!loading && user && (
+          <Box display="flex" gap={1} alignItems="center">
+            <Chip
+              label={user.role.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+              size="small"
+              color="primary"
+              sx={{ fontWeight: 500, bgcolor: '#14b8a6' }}
+            />
 
-          <IconButton sx={{ color: '#14b8a6' }}>
-            <NotificationsIcon />
-          </IconButton>
+            <IconButton sx={{ color: '#14b8a6' }}>
+              <NotificationsIcon />
+            </IconButton>
 
-          <IconButton onClick={handleMenu} sx={{ ml: 1 }}>
-            <Avatar sx={{ width: 36, height: 36, bgcolor: '#14b8a6' }}>
-              A
-            </Avatar>
-          </IconButton>
+            <IconButton onClick={handleMenu} sx={{ ml: 1 }}>
+              <Avatar sx={{ width: 36, height: 36, bgcolor: '#14b8a6' }}>
+                {(user.username || 'A').charAt(0).toUpperCase()}
+              </Avatar>
+            </IconButton>
 
-          <Menu
-            anchorEl={anchorEl}
-            open={Boolean(anchorEl)}
-            onClose={handleClose}
-            anchorOrigin={{
-              vertical: 'bottom',
-              horizontal: 'right',
-            }}
-            transformOrigin={{
-              vertical: 'top',
-              horizontal: 'right',
-            }}
-          >
-            <MenuItem onClick={handleClose}>Profile </MenuItem>
-            <MenuItem onClick={handleClose}>Setting</MenuItem>
-            <Divider />
-            <MenuItem onClick={handleLogout}>Log Out</MenuItem>
-          </Menu>
-        </Box>
+            <Menu
+              anchorEl={anchorEl}
+              open={Boolean(anchorEl)}
+              onClose={handleClose}
+              anchorOrigin={{
+                vertical: 'bottom',
+                horizontal: 'right',
+              }}
+              transformOrigin={{
+                vertical: 'top',
+                horizontal: 'right',
+              }}
+            >
+              <MenuItem onClick={handleClose}>Profile </MenuItem>
+              <MenuItem onClick={handleClose}>Setting</MenuItem>
+              <Divider />
+              <MenuItem onClick={handleLogout}>Log Out</MenuItem>
+            </Menu>
+          </Box>
+        )}
       </Toolbar>
     </AppBar>
   );

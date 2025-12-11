@@ -59,7 +59,7 @@ export class InvoiceItem {
 
   @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
   discount: number;
-
+ 
   @Column({ type: 'decimal', precision: 10, scale: 2, name: 'total_price', nullable: false })
   totalPrice: number;
 }

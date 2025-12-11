@@ -40,6 +40,7 @@ import {
     CircularProgress,
     Snackbar,
     FormHelperText,
+    Backdrop
 } from '@mui/material';
 import {
     Add,
@@ -59,23 +60,17 @@ import {
     CalendarToday,
     ConfirmationNumber,
     Close as CloseIcon,
+    LocationOn,
+    AccessTime,
+    Person,
+    Event,
+    Source,
 } from '@mui/icons-material';
 import { getBookings, createBooking, updateBooking, deleteBooking, confirmBooking, cancelBooking } from '@/lib/api/bookings';
 import { getCustomers } from '@/lib/api/customers';
 import { storesApi } from '@/lib/api/stores';
-import {
-    Booking,
-    BookingStatus,
-    Customer,
-    Store as StoreType,
-    CreateBookingPayload,
-    UpdateBookingPayload,
-    BookingFilters,
-    BookingResponse
-} from '@/types/booking';
-import type { Customer as CustomerFromAPI } from '@/types/customer';
+import { Booking, BookingStatus, Customer, Store as StoreType, CreateBookingPayload, UpdateBookingPayload, BookingFilters, BookingResponse } from '@/types/booking';
 import type { CustomerResponse } from '@/types/customer';
-import type { StoreResponse } from '@/types/store';
 
 interface AxiosErrorResponse {
     response?: {
@@ -95,7 +90,6 @@ const isAxiosError = (error: unknown): error is AxiosErrorResponse => {
     );
 };
 
-// types/store.ts
 
 const PRIMARY_COLOR = '#14b8a6';
 const PRIMARY_DARK = '#0f766e';
@@ -367,6 +361,7 @@ export default function BookingsPage() {
     }, [page, rowsPerPage, filterStatus, filterStore, filterDate]);
 
 
+
     useEffect(() => {
         loadData();
     }, [loadData]);
@@ -475,7 +470,6 @@ export default function BookingsPage() {
             }
         }
     };
-
     const handleDialogClose = () => {
         setOpenDialog(false);
         setFormData(initialFormData);
@@ -679,25 +673,25 @@ export default function BookingsPage() {
         }
     };
 
-    if (loading && bookings.length === 0) {
-        return (
-            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
-                <CircularProgress />
-            </Box>
-        );
-    }
-
+ 
+  const isAnyProcessing = loading || submitting;
     return (
         <>
+            <Backdrop
+                sx={{ color: "#fff", zIndex: (theme) => theme.zIndex.drawer + 1 }}
+                open={isAnyProcessing}
+            >
+                <CircularProgress color="inherit" />
+            </Backdrop>
             {/* Header */}
-            <Box sx={{ mb: 3 }}>
+            {/* <Box sx={{ mb: 3 }}>
                 <Typography variant="h4" fontWeight="bold" gutterBottom>
                     Booking Management
                 </Typography>
                 <Typography variant="body1" color="text.secondary">
                     Manage appointments and customer bookings
                 </Typography>
-            </Box>
+            </Box> */}
 
             {/* Error Alert */}
             {error && (
@@ -869,7 +863,7 @@ export default function BookingsPage() {
                                 <TableCell sx={{ fontWeight: 700 }}>Customer</TableCell>
                                 <TableCell sx={{ fontWeight: 700 }}>Store</TableCell>
                                 <TableCell sx={{ fontWeight: 700 }}>Date & Time</TableCell>
-                                <TableCell sx={{ fontWeight: 700 }}>Duration</TableCell>
+                                {/* <TableCell sx={{ fontWeight: 700 }}>Duration</TableCell> */}
                                 <TableCell sx={{ fontWeight: 700 }}>Source</TableCell>
                                 <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
                                 <TableCell sx={{ fontWeight: 700 }}>Confirmed</TableCell>
@@ -927,11 +921,12 @@ export default function BookingsPage() {
                                                     {formatDate(booking.bookingDate)}
                                                 </Typography>
                                                 <Typography variant="caption" color="text.secondary">
-                                                    {formatTime(booking.startTime)} - {booking.endTime ? formatTime(booking.endTime) : 'N/A'}
+                                                    {formatTime(booking.startTime)}
+                                                    {/* - {booking.endTime ? formatTime(booking.endTime) : 'N/A'} */}
                                                 </Typography>
                                             </Box>
                                         </TableCell>
-                                        <TableCell>
+                                        {/* <TableCell>
                                             {booking.endTime ? (
                                                 <Typography variant="body2">
                                                     {Math.round(
@@ -944,7 +939,7 @@ export default function BookingsPage() {
                                                     Not set
                                                 </Typography>
                                             )}
-                                        </TableCell>
+                                        </TableCell> */}
                                         <TableCell>
                                             <Chip
                                                 label={booking.source || 'Unknown'}
@@ -982,11 +977,7 @@ export default function BookingsPage() {
                             ) : (
                                 <TableRow>
                                     <TableCell colSpan={8}>
-                                        {loading ? (
-                                            <Box sx={{ textAlign: "center", py: 6 }}>
-                                                <CircularProgress />
-                                            </Box>
-                                        ) : (
+                                        { (
                                             <Box sx={{ textAlign: 'center', py: 6 }}>
                                                 <ConfirmationNumber sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }} />
                                                 <Typography variant="h6" color="text.secondary" gutterBottom>
@@ -1017,11 +1008,11 @@ export default function BookingsPage() {
             </Card>
 
             {/* Menu */}
-            <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleMenuClose}>
-                <MenuItem onClick={handleView}>
+            <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleMenuClose} disableScrollLock>
+                {/* <MenuItem onClick={handleView}>
                     <Visibility sx={{ mr: 1, fontSize: 20 }} />
                     View Details
-                </MenuItem>
+                </MenuItem> */}
                 <MenuItem onClick={handleEdit}>
                     <Edit sx={{ mr: 1, fontSize: 20 }} />
                     Edit
@@ -1255,7 +1246,7 @@ export default function BookingsPage() {
                                     <InputLabel>Status</InputLabel>
                                     <Select
                                         value={formData.status}
-                                        label="Status"
+                                        label="Status 1"
                                         onChange={(e) =>
                                             setFormData({ ...formData, status: e.target.value as BookingStatus })
                                         }
@@ -1282,7 +1273,7 @@ export default function BookingsPage() {
                                     helperText={validationErrors.startTime}
                                 />
                             </Grid>
-                            <Grid size={{ xs: 12, sm: 6 }}>
+                            {/* <Grid size={{ xs: 12, sm: 6 }}>
                                 <TextField
                                     fullWidth
                                     label="End Time"
@@ -1293,7 +1284,7 @@ export default function BookingsPage() {
                                     error={!!validationErrors.endTime}
                                     helperText={validationErrors.endTime}
                                 />
-                            </Grid>
+                            </Grid> */}
                             <Grid size={{ xs: 12, sm: 6 }}>
                                 <FormControl fullWidth>
                                     <InputLabel>Source</InputLabel>
@@ -1429,7 +1420,7 @@ export default function BookingsPage() {
             </Snackbar>
 
             {/* Quick Actions Toolbar */}
-            <Box sx={{ position: 'fixed', bottom: 15, left: "43%", zIndex: 10000 }}>
+            <Box sx={{ position: 'fixed', bottom: 15, left: "43%", zIndex: 999 }}>
                 <Card sx={{ boxShadow: 3 }}>
                     <CardContent sx={{ p: 2, pb: "16px !important" }}>
                         <Stack direction="row" spacing={1}>

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     Grid,
     Card,
@@ -38,6 +38,8 @@ import {
     Switch,
     FormControlLabel,
     CircularProgress,
+    Snackbar,
+    FormHelperText,
 } from '@mui/material';
 import {
     Add,
@@ -56,13 +58,33 @@ import {
     NoAccounts,
     CalendarToday,
     ConfirmationNumber,
+    Close as CloseIcon,
 } from '@mui/icons-material';
 import { getBookings, createBooking, updateBooking, deleteBooking, confirmBooking, cancelBooking } from '@/lib/api/bookings';
 import { getCustomers } from '@/lib/api/customers';
 import { storesApi } from '@/lib/api/stores';
-import { Booking, BookingStatus, Customer, Store as StoreType, CreateBookingPayload, UpdateBookingPayload, BookingFilters } from '@/types/booking';
+import { Booking, BookingStatus, Customer, Store as StoreType, CreateBookingPayload, UpdateBookingPayload, BookingFilters, BookingResponse } from '@/types/booking';
+import type { CustomerResponse } from '@/types/customer';
 
-// Colors
+interface AxiosErrorResponse {
+    response?: {
+        data?: {
+            message?: string | string[];
+        };
+    };
+    message?: string; // Thêm message tiêu chuẩn của Error object
+}
+
+const isAxiosError = (error: unknown): error is AxiosErrorResponse => {
+    // Kiểm tra cơ bản đối tượng lỗi Axios (cần có thuộc tính response hoặc message)
+    return (
+        typeof error === 'object' &&
+        error !== null &&
+        ('response' in error || 'message' in error)
+    );
+};
+
+
 const PRIMARY_COLOR = '#14b8a6';
 const PRIMARY_DARK = '#0f766e';
 const SUCCESS_COLOR = '#10b981';
@@ -71,12 +93,12 @@ const WARNING_COLOR = '#f59e0b';
 const INFO_COLOR = '#3b82f6';
 
 interface BookingFormData {
-    customerId: string;
-    storeId: string;
+    customerId: string | '';
+    storeId: string | '';
     bookingDate: string;
     startTime: string;
     endTime: string;
-    status: BookingStatus;
+    status: BookingStatus | '';
     source: string;
     notes: string;
     confirm: boolean;
@@ -156,6 +178,17 @@ const formatDate = (date: string) => {
     });
 };
 
+const formatTimeToHHMM = (time: string | null | undefined): string => {
+    if (!time) return '';
+    const parts = time.split(':');
+    if (parts.length < 2) return time;
+
+    const hour = parts[0].padStart(2, '0');
+    const minute = parts[1].padStart(2, '0');
+
+    return `${hour}:${minute}`;
+};
+
 export default function BookingsPage() {
     const [bookings, setBookings] = useState<Booking[]>([]);
     const [customers, setCustomers] = useState<Customer[]>([]);
@@ -176,14 +209,17 @@ export default function BookingsPage() {
     const [dialogMode, setDialogMode] = useState<'add' | 'edit' | 'view'>('add');
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [validationErrors, setValidationErrors] = useState<Partial<Record<keyof BookingFormData, string>>>({});
+    const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' | 'warning' } | null>(null);
+
 
     const initialFormData: BookingFormData = {
         customerId: '',
         storeId: '',
         bookingDate: new Date().toISOString().split('T')[0],
-        startTime: '09:00',
-        endTime: '10:00',
-        status: BookingStatus.PENDING,
+        startTime: '01:00',
+        endTime: '11:00',
+        status: '',
         source: '',
         notes: '',
         confirm: false,
@@ -191,17 +227,40 @@ export default function BookingsPage() {
 
     const [formData, setFormData] = useState<BookingFormData>(initialFormData);
 
-    // Load initial data
-    useEffect(() => {
-        loadData();
-    }, [page, rowsPerPage, filterStatus, filterStore, filterDate]);
+    const validateForm = () => {
+        const errors: Partial<Record<keyof BookingFormData, string>> = {};
 
-    const loadData = async () => {
+        if (!formData.customerId) {
+            errors.customerId = 'Customer is required.';
+        }
+        if (!formData.storeId) {
+            errors.storeId = 'Store is required.';
+        }
+        if (!formData.bookingDate) {
+            errors.bookingDate = 'Booking Date is required.';
+        }
+        if (!formData.startTime) {
+            errors.startTime = 'Start Time is required.';
+        }
+
+        if (formData.endTime) {
+            const start = new Date(`2000/01/01 ${formData.startTime}`);
+            const end = new Date(`2000/01/01 ${formData.endTime}`);
+
+            if (end.getTime() <= start.getTime()) {
+                errors.endTime = 'End Time must be after Start Time.';
+            }
+        }
+
+        setValidationErrors(errors);
+        return Object.keys(errors).length === 0;
+    };
+
+    const loadData = useCallback(async () => {
         try {
             setLoading(true);
             setError(null);
 
-            // Build filters
             const filters: BookingFilters = {
                 page: page + 1,
                 limit: rowsPerPage,
@@ -213,51 +272,108 @@ export default function BookingsPage() {
             if (filterStore !== 'all') {
                 filters.storeId = filterStore;
             }
-            if (filterDate) {
+            if (filterDate && filterDate.trim() !== '') {
                 filters.bookingDate = filterDate;
             }
 
-            // Load bookings
-            const bookingResponse = await getBookings(filters);
-            setBookings(bookingResponse.data);
-            setTotalRecords(bookingResponse.meta.total);
-            setTotalPages(bookingResponse.meta.totalPages);
+            const response: BookingResponse | Booking[] = await getBookings(filters);
 
-            // Load customers and stores if not loaded
-            if (customers.length === 0) {
-                const response: any = await getCustomers({ limit: 1000 });
-                setCustomers(response.data || response);
+            // NEW:
+            let bookingData: Booking[], metaData: Partial<BookingResponse['meta']> = {};
+
+            if ('data' in response && Array.isArray(response.data)) {
+                bookingData = response.data;
+                metaData = (response as BookingResponse).meta;
+            } else if (Array.isArray(response)) {
+                bookingData = response;
+            } else {
+                bookingData = [];
             }
 
+            setBookings(Array.isArray(bookingData) ? bookingData : []);
+            setTotalRecords(metaData?.total || bookingData.length || 0);
+            setTotalPages(metaData?.totalPages || 1);
+
+            if (customers.length === 0) {
+                const customerResponse = await getCustomers({ limit: 1000 }) as CustomerResponse;
+                let customerData: Customer[]; // ✅ Giờ Customer đã thống nhất
+
+                if (customerResponse?.data?.data && Array.isArray(customerResponse.data.data)) {
+                    customerData = customerResponse.data.data; // ✅ Không lỗi nữa
+                } else if (customerResponse?.data && Array.isArray(customerResponse.data)) {
+                    customerData = customerResponse.data;
+                } else if (Array.isArray(customerResponse)) {
+                    customerData = customerResponse;
+                } else {
+                    customerData = [];
+                }
+
+                setCustomers(customerData);
+            }
             if (stores.length === 0) {
                 const storeResponse = await storesApi.getAll({ limit: 1000 });
-                setStores(storeResponse.data);
+                let storeData: StoreType[];
+
+                console.log('🔍 Store Response:', storeResponse); // Debug
+
+                // Kiểm tra cấu trúc { data: { data: [...] } }
+                if (storeResponse?.data?.data && Array.isArray(storeResponse.data.data)) {
+                    storeData = storeResponse.data.data;
+                } else if (storeResponse?.data && Array.isArray(storeResponse.data)) {
+                    storeData = storeResponse.data;
+                } else if (Array.isArray(storeResponse)) {
+                    storeData = storeResponse;
+                } else {
+                    storeData = [];
+                }
+
+                console.log('✅ Parsed Store Data:', storeData);
+                setStores(storeData);
             }
-        } catch (err: any) {
-            setError(err.message || 'Failed to load data');
+        } catch (err: unknown) {
             console.error('Error loading data:', err);
+
+            let errorMessage: string = 'Failed to load data';
+            if (isAxiosError(err)) {
+                const backendMessage = err.response?.data?.message;
+                if (Array.isArray(backendMessage)) {
+                    errorMessage = backendMessage[0] || errorMessage;
+                } else if (typeof backendMessage === 'string') {
+                    errorMessage = backendMessage;
+                }
+                else if (err.message) {
+                    errorMessage = err.message;
+                }
+            } else if (err instanceof Error) {
+                errorMessage = err.message;
+            }
+            setError(errorMessage);
+            setBookings([]);
         } finally {
             setLoading(false);
         }
-    };
+    }, [page, rowsPerPage, filterStatus, filterStore, filterDate]);
 
-    // Filter bookings by search query (client-side)
-    const filteredBookings = bookings.filter((booking) => {
+
+
+    useEffect(() => {
+        loadData();
+    }, [loadData]);
+
+    const filteredBookings = Array.isArray(bookings) ? bookings.filter((booking) => {
         if (!searchQuery) return true;
         const query = searchQuery.toLowerCase();
         return (
-            booking.customer?.full_name.toLowerCase().includes(query) ||
-            booking.customer?.phone.includes(query) ||
+            booking.customer?.fullName?.toLowerCase().includes(query) ||
+            booking.customer?.phone?.includes(query) ||
             booking.customer?.email?.toLowerCase().includes(query)
         );
-    });
-
-    // Stats
+    }) : [];
     const stats = {
         total: totalRecords,
-        pending: bookings.filter((b) => b.status === BookingStatus.PENDING).length,
-        confirmed: bookings.filter((b) => b.status === BookingStatus.CONFIRMED).length,
-        today: bookings.filter((b) => b.bookingDate === new Date().toISOString().split('T')[0]).length,
+        pending: Array.isArray(bookings) ? bookings.filter((b) => b.status === BookingStatus.PENDING).length : 0,
+        confirmed: Array.isArray(bookings) ? bookings.filter((b) => b.status === BookingStatus.CONFIRMED).length : 0,
+        today: Array.isArray(bookings) ? bookings.filter((b) => b.bookingDate === new Date().toISOString().split('T')[0]).length : 0,
     };
 
     const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, booking: Booking) => {
@@ -272,6 +388,7 @@ export default function BookingsPage() {
     const handleAddNew = () => {
         setDialogMode('add');
         setFormData(initialFormData);
+        setValidationErrors({});
         setOpenDialog(true);
     };
 
@@ -282,13 +399,14 @@ export default function BookingsPage() {
                 customerId: selectedBooking.customerId.toString(),
                 storeId: selectedBooking.storeId.toString(),
                 bookingDate: selectedBooking.bookingDate,
-                startTime: selectedBooking.startTime,
-                endTime: selectedBooking.endTime || '',
+                startTime: formatTimeToHHMM(selectedBooking.startTime),
+                endTime: formatTimeToHHMM(selectedBooking.endTime),
                 status: selectedBooking.status,
                 source: selectedBooking.source || '',
                 notes: selectedBooking.notes || '',
                 confirm: selectedBooking.confirm,
             });
+            setValidationErrors({});
             setOpenDialog(true);
         }
         handleMenuClose();
@@ -315,23 +433,48 @@ export default function BookingsPage() {
                 await loadData();
                 setDeleteConfirmOpen(false);
                 setSelectedBooking(null);
-            } catch (err: any) {
-                setError(err.message || 'Failed to delete booking');
+                setSnackbar({
+                    open: true,
+                    message: `Booking deleted successfully!`,
+                    severity: 'success',
+                });
+            } catch (error: unknown) {
+                let errorMessage: string = 'An unknown error occurred.';
+                if (isAxiosError(error)) {
+                    const backendMessage = error.response?.data?.message;
+                    if (Array.isArray(backendMessage)) {
+                        errorMessage = backendMessage[0] || errorMessage;
+                    } else if (typeof backendMessage === 'string') {
+                        errorMessage = backendMessage;
+                    }
+                    else if (error.message) {
+                        errorMessage = error.message;
+                    }
+                }
+                else if (error instanceof Error) {
+                    errorMessage = error.message;
+                }
+                setSnackbar({
+                    open: true,
+                    message: `Deletion failed: ${errorMessage}`,
+                    severity: 'error',
+                });
             } finally {
                 setSubmitting(false);
             }
         }
     };
-
     const handleDialogClose = () => {
         setOpenDialog(false);
         setFormData(initialFormData);
+        setValidationErrors({});
     };
 
     const handleFormChange = (field: keyof BookingFormData) => (
-        event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+        event: { target: { value: string } }
     ) => {
         setFormData({ ...formData, [field]: event.target.value });
+        setValidationErrors(prev => ({ ...prev, [field]: undefined }));
     };
 
     const handleSwitchChange = (field: keyof BookingFormData) => (
@@ -341,36 +484,73 @@ export default function BookingsPage() {
     };
 
     const handleSubmit = async () => {
-        try {
-            setSubmitting(true);
-            setError(null);
-
-            const payload: CreateBookingPayload | UpdateBookingPayload = {
-                customerId: parseInt(formData.customerId),
-                storeId: parseInt(formData.storeId),
-                bookingDate: formData.bookingDate,
-                startTime: formData.startTime,
-                endTime: formData.endTime || undefined,
-                status: formData.status,
-                source: formData.source || undefined,
-                notes: formData.notes || undefined,
-                confirm: formData.confirm,
-            };
-
-            if (dialogMode === 'add') {
-                await createBooking(payload as CreateBookingPayload);
-            } else if (dialogMode === 'edit' && selectedBooking) {
-                await updateBooking(selectedBooking.id, payload);
+            if (!validateForm()) {
+                setSnackbar({
+                    open: true,
+                    message: 'Please correct the errors in the form.',
+                    severity: 'warning',
+                });
+                return;
             }
-
-            await loadData();
-            handleDialogClose();
-        } catch (err: any) {
-            setError(err.message || 'Failed to save booking');
-        } finally {
-            setSubmitting(false);
-        }
-    };
+    
+            try {
+                setSubmitting(true);
+                setError(null);
+    
+                const payload: CreateBookingPayload | UpdateBookingPayload = {
+                    customerId: parseInt(formData.customerId),
+                    storeId: parseInt(formData.storeId),
+                    bookingDate: formData.bookingDate,
+                    startTime: formData.startTime,
+                    endTime: formData.endTime || undefined,
+                    status: formData.status || undefined,
+                    source: formData.source || undefined,
+                    notes: formData.notes || undefined,
+                    confirm: formData.confirm,
+                };
+    
+                let successMessage = '';
+    
+                if (dialogMode === 'add') {
+                    await createBooking(payload as CreateBookingPayload);
+                    successMessage = 'New booking created successfully!';
+                } else if (dialogMode === 'edit' && selectedBooking) {
+                    await updateBooking(selectedBooking.id, payload);
+                    successMessage = 'Booking updated successfully!';
+                }
+    
+                await loadData();
+                handleDialogClose();
+                setSnackbar({
+                    open: true,
+                    message: successMessage,
+                    severity: 'success',
+                });
+            } catch (error: unknown) {
+                let errorMessage: string = 'An unknown error occurred.';
+                if (isAxiosError(error)) {
+                    const backendMessage = error.response?.data?.message;
+                    if (Array.isArray(backendMessage)) {
+                        errorMessage = backendMessage[0] || errorMessage;
+                    } else if (typeof backendMessage === 'string') {
+                        errorMessage = backendMessage;
+                    }
+                    else if (error.message) {
+                        errorMessage = error.message;
+                    }
+                }
+                else if (error instanceof Error) {
+                    errorMessage = error.message;
+                }
+                setSnackbar({
+                    open: true,
+                    message: `Action failed: ${errorMessage}`,
+                    severity: 'error',
+                });
+            } finally {
+                setSubmitting(false);
+            }
+        };
 
     const handleChangePage = (event: unknown, newPage: number) => {
         setPage(newPage);
@@ -381,39 +561,111 @@ export default function BookingsPage() {
         setPage(0);
     };
 
-    const updateBookingStatus = async (bookingId: number, newStatus: BookingStatus) => {
-        try {
-            await updateBooking(bookingId, { status: newStatus });
-            await loadData();
-            handleMenuClose();
-        } catch (err: any) {
-            setError(err.message || 'Failed to update status');
-        }
-    };
-
-    const handleConfirmBooking = async () => {
-        if (selectedBooking) {
+    const updateBookingStatus = async (bookingId: number, newStatus: BookingStatus, successMsg: string) => {
             try {
-                await confirmBooking(selectedBooking.id);
+                await updateBooking(bookingId, { status: newStatus });
                 await loadData();
                 handleMenuClose();
-            } catch (err: any) {
-                setError(err.message || 'Failed to confirm booking');
+                setSnackbar({
+                    open: true,
+                    message: successMsg,
+                    severity: 'success',
+                });
+            } catch (error: unknown) {
+                let errorMessage: string = 'An unknown error occurred.';
+                if (isAxiosError(error)) {
+                    const backendMessage = error.response?.data?.message;
+                    if (Array.isArray(backendMessage)) {
+                        errorMessage = backendMessage[0] || errorMessage;
+                    } else if (typeof backendMessage === 'string') {
+                        errorMessage = backendMessage;
+                    }
+                    else if (error.message) {
+                        errorMessage = error.message;
+                    }
+                }
+                else if (error instanceof Error) {
+                    errorMessage = error.message;
+                }
+                setSnackbar({
+                    open: true,
+                    message: `Status update failed: ${errorMessage}`,
+                    severity: 'error',
+                });
             }
-        }
-    };
+        };
 
-    const handleCancelBooking = async () => {
-        if (selectedBooking) {
-            try {
-                await cancelBooking(selectedBooking.id);
-                await loadData();
-                handleMenuClose();
-            } catch (err: any) {
-                setError(err.message || 'Failed to cancel booking');
+      const handleConfirmBooking = async () => {
+            if (selectedBooking) {
+                try {
+                    await confirmBooking(selectedBooking.id);
+                    await loadData();
+                    handleMenuClose();
+                    setSnackbar({
+                        open: true,
+                        message: `Booking #${selectedBooking.id} confirmed successfully!`,
+                        severity: 'success',
+                    });
+                } catch (error: unknown) {
+                    let errorMessage: string = 'An unknown error occurred.';
+                    if (isAxiosError(error)) {
+                        const backendMessage = error.response?.data?.message;
+                        if (Array.isArray(backendMessage)) {
+                            errorMessage = backendMessage[0] || errorMessage;
+                        } else if (typeof backendMessage === 'string') {
+                            errorMessage = backendMessage;
+                        }
+                        else if (error.message) {
+                            errorMessage = error.message;
+                        }
+                    }
+                    else if (error instanceof Error) {
+                        errorMessage = error.message;
+                    }
+                    setSnackbar({
+                        open: true,
+                        message: `Confirmation failed: ${errorMessage}`,
+                        severity: 'error',
+                    });
+                }
             }
-        }
-    };
+        };
+
+     const handleCancelBooking = async () => {
+            if (selectedBooking) {
+                try {
+                    await cancelBooking(selectedBooking.id);
+                    await loadData();
+                    handleMenuClose();
+                    setSnackbar({
+                        open: true,
+                        message: `Booking #${selectedBooking.id} cancelled successfully.`,
+                        severity: 'warning',
+                    });
+                } catch (error: unknown) {
+                    let errorMessage: string = 'An unknown error occurred.';
+                    if (isAxiosError(error)) {
+                        const backendMessage = error.response?.data?.message;
+                        if (Array.isArray(backendMessage)) {
+                            errorMessage = backendMessage[0] || errorMessage;
+                        } else if (typeof backendMessage === 'string') {
+                            errorMessage = backendMessage;
+                        }
+                        else if (error.message) {
+                            errorMessage = error.message;
+                        }
+                    }
+                    else if (error instanceof Error) {
+                        errorMessage = error.message;
+                    }
+                    setSnackbar({
+                        open: true,
+                        message: `Cancellation failed: ${errorMessage}`,
+                        severity: 'error',
+                    });
+                }
+            }
+        };
 
     if (loading && bookings.length === 0) {
         return (
@@ -615,13 +867,7 @@ export default function BookingsPage() {
                             </TableRow>
                         </TableHead>
                         <TableBody>
-                            {loading ? (
-                                <TableRow>
-                                    <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
-                                        <CircularProgress />
-                                    </TableCell>
-                                </TableRow>
-                            ) : filteredBookings.length > 0 ? (
+                            {filteredBookings.length > 0 ? (
                                 filteredBookings.map((booking) => (
                                     <TableRow
                                         key={booking.id}
@@ -640,11 +886,11 @@ export default function BookingsPage() {
                                                         fontWeight: 600,
                                                     }}
                                                 >
-                                                    {booking.customer?.full_name.charAt(0)}
+                                                    {(booking.customer?.fullName || '?').charAt(0)}
                                                 </Avatar>
                                                 <Box>
                                                     <Typography variant="body2" fontWeight="600">
-                                                        {booking.customer?.full_name}
+                                                        {booking.customer?.fullName}
                                                     </Typography>
                                                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
                                                         <Phone sx={{ fontSize: 12, color: 'text.secondary' }} />
@@ -724,17 +970,23 @@ export default function BookingsPage() {
                             ) : (
                                 <TableRow>
                                     <TableCell colSpan={8}>
-                                        <Box sx={{ textAlign: 'center', py: 6 }}>
-                                            <ConfirmationNumber sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }} />
-                                            <Typography variant="h6" color="text.secondary" gutterBottom>
-                                                No bookings found
-                                            </Typography>
-                                            <Typography variant="body2" color="text.secondary">
-                                                {searchQuery || filterStatus !== 'all' || filterStore !== 'all' || filterDate
-                                                    ? 'Try adjusting your search or filters'
-                                                    : 'Get started by creating your first booking'}
-                                            </Typography>
-                                        </Box>
+                                        {loading ? (
+                                            <Box sx={{ textAlign: "center", py: 6 }}>
+                                                <CircularProgress />
+                                            </Box>
+                                        ) : (
+                                            <Box sx={{ textAlign: 'center', py: 6 }}>
+                                                <ConfirmationNumber sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }} />
+                                                <Typography variant="h6" color="text.secondary" gutterBottom>
+                                                    No bookings found
+                                                </Typography>
+                                                <Typography variant="body2" color="text.secondary">
+                                                    {searchQuery || filterStatus !== 'all' || filterStore !== 'all' || filterDate
+                                                        ? 'Try adjusting your search or filters'
+                                                        : 'Get started by creating your first booking'}
+                                                </Typography>
+                                            </Box>
+                                        )}
                                     </TableCell>
                                 </TableRow>
                             )}
@@ -771,14 +1023,14 @@ export default function BookingsPage() {
                     Confirm
                 </MenuItem>
                 <MenuItem
-                    onClick={() => selectedBooking && updateBookingStatus(selectedBooking.id, BookingStatus.IN_PROGRESS)}
+                    onClick={() => selectedBooking && updateBookingStatus(selectedBooking.id, BookingStatus.IN_PROGRESS, 'Booking status updated to In Progress.')}
                     disabled={selectedBooking?.status === BookingStatus.IN_PROGRESS}
                 >
                     <PlayArrow sx={{ mr: 1, fontSize: 20, color: PRIMARY_COLOR }} />
                     Start Service
                 </MenuItem>
                 <MenuItem
-                    onClick={() => selectedBooking && updateBookingStatus(selectedBooking.id, BookingStatus.COMPLETED)}
+                    onClick={() => selectedBooking && updateBookingStatus(selectedBooking.id, BookingStatus.COMPLETED, 'Booking status updated to Completed.')}
                     disabled={selectedBooking?.status === BookingStatus.COMPLETED}
                 >
                     <Done sx={{ mr: 1, fontSize: 20, color: SUCCESS_COLOR }} />
@@ -823,11 +1075,11 @@ export default function BookingsPage() {
                                             fontWeight: 700,
                                         }}
                                     >
-                                        {selectedBooking.customer?.full_name.charAt(0)}
+                                        {(selectedBooking.customer?.fullName || '?').charAt(0)}
                                     </Avatar>
                                     <Box>
                                         <Typography variant="h5" fontWeight="bold">
-                                            {selectedBooking.customer?.full_name}
+                                            {selectedBooking.customer?.fullName}
                                         </Typography>
                                         <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
                                             <Chip
@@ -853,7 +1105,7 @@ export default function BookingsPage() {
                                     Customer
                                 </Typography>
                                 <Typography variant="body1" fontWeight="600">
-                                    {selectedBooking.customer?.full_name}
+                                    {selectedBooking.customer?.fullName}
                                 </Typography>
                             </Grid>
                             <Grid size={{ xs: 12, sm: 6 }}>
@@ -940,32 +1192,29 @@ export default function BookingsPage() {
                     ) : (
                         <Grid container spacing={3} sx={{ mt: 0.5 }}>
                             <Grid size={{ xs: 12, sm: 6 }}>
-                                <FormControl fullWidth required>
+                                <FormControl fullWidth required error={!!validationErrors.customerId}>
                                     <InputLabel>Customer</InputLabel>
                                     <Select
                                         value={formData.customerId}
                                         label="Customer"
-                                        onChange={(e) =>
-                                            setFormData({ ...formData, customerId: e.target.value })
-                                        }
+                                        onChange={handleFormChange('customerId')}
                                     >
                                         {customers.map((customer) => (
                                             <MenuItem key={customer.id} value={customer.id}>
-                                                {customer.full_name} - {customer.phone}
+                                                {customer.fullName} - {customer.phone}
                                             </MenuItem>
                                         ))}
                                     </Select>
+                                    {validationErrors.customerId && <FormHelperText>{validationErrors.customerId}</FormHelperText>}
                                 </FormControl>
                             </Grid>
                             <Grid size={{ xs: 12, sm: 6 }}>
-                                <FormControl fullWidth required>
+                                <FormControl fullWidth required error={!!validationErrors.storeId}>
                                     <InputLabel>Store</InputLabel>
                                     <Select
                                         value={formData.storeId}
                                         label="Store"
-                                        onChange={(e) =>
-                                            setFormData({ ...formData, storeId: e.target.value })
-                                        }
+                                        onChange={handleFormChange('storeId')}
                                     >
                                         {stores.map((store) => (
                                             <MenuItem key={store.id} value={store.id}>
@@ -973,6 +1222,7 @@ export default function BookingsPage() {
                                             </MenuItem>
                                         ))}
                                     </Select>
+                                    {validationErrors.storeId && <FormHelperText>{validationErrors.storeId}</FormHelperText>}
                                 </FormControl>
                             </Grid>
                             <Grid size={{ xs: 12, sm: 6 }}>
@@ -984,6 +1234,8 @@ export default function BookingsPage() {
                                     onChange={handleFormChange('bookingDate')}
                                     required
                                     InputLabelProps={{ shrink: true }}
+                                    error={!!validationErrors.bookingDate}
+                                    helperText={validationErrors.bookingDate}
                                 />
                             </Grid>
                             <Grid size={{ xs: 12, sm: 6 }}>
@@ -991,7 +1243,7 @@ export default function BookingsPage() {
                                     <InputLabel>Status</InputLabel>
                                     <Select
                                         value={formData.status}
-                                        label="Status"
+                                        label="Status 1"
                                         onChange={(e) =>
                                             setFormData({ ...formData, status: e.target.value as BookingStatus })
                                         }
@@ -1014,6 +1266,8 @@ export default function BookingsPage() {
                                     onChange={handleFormChange('startTime')}
                                     required
                                     InputLabelProps={{ shrink: true }}
+                                    error={!!validationErrors.startTime}
+                                    helperText={validationErrors.startTime}
                                 />
                             </Grid>
                             <Grid size={{ xs: 12, sm: 6 }}>
@@ -1024,6 +1278,8 @@ export default function BookingsPage() {
                                     value={formData.endTime}
                                     onChange={handleFormChange('endTime')}
                                     InputLabelProps={{ shrink: true }}
+                                    error={!!validationErrors.endTime}
+                                    helperText={validationErrors.endTime}
                                 />
                             </Grid>
                             <Grid size={{ xs: 12, sm: 6 }}>
@@ -1032,9 +1288,7 @@ export default function BookingsPage() {
                                     <Select
                                         value={formData.source}
                                         label="Source"
-                                        onChange={(e) =>
-                                            setFormData({ ...formData, source: e.target.value })
-                                        }
+                                        onChange={handleFormChange('source')}
                                     >
                                         <MenuItem value="website">Website</MenuItem>
                                         <MenuItem value="mobile_app">Mobile App</MenuItem>
@@ -1119,11 +1373,11 @@ export default function BookingsPage() {
                                     fontWeight: 600,
                                 }}
                             >
-                                {selectedBooking.customer?.full_name.charAt(0)}
+                                {(selectedBooking.customer?.fullName || '?').charAt(0)}
                             </Avatar>
                             <Box>
                                 <Typography variant="body1" fontWeight="600">
-                                    {selectedBooking.customer?.full_name}
+                                    {selectedBooking.customer?.fullName}
                                 </Typography>
                                 <Typography variant="body2" color="text.secondary">
                                     {formatDate(selectedBooking.bookingDate)} at {formatTime(selectedBooking.startTime)}
@@ -1150,10 +1404,22 @@ export default function BookingsPage() {
                 </DialogActions>
             </Dialog>
 
+            {/* Snackbar for notifications */}
+            <Snackbar
+                open={snackbar?.open}
+                autoHideDuration={6000}
+                onClose={() => setSnackbar(null)}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+            >
+                <Alert onClose={() => setSnackbar(null)} severity={snackbar?.severity} sx={{ width: '100%' }}>
+                    {snackbar?.message}
+                </Alert>
+            </Snackbar>
+
             {/* Quick Actions Toolbar */}
-            <Box sx={{ position: 'fixed', bottom: 24, left: "18%", zIndex: 1000 }}>
+            <Box sx={{ position: 'fixed', bottom: 15, left: "43%", zIndex: 10000 }}>
                 <Card sx={{ boxShadow: 3 }}>
-                    <CardContent sx={{ p: 2 }}>
+                    <CardContent sx={{ p: 2, pb: "16px !important" }}>
                         <Stack direction="row" spacing={1}>
                             <Tooltip title="Today's Bookings">
                                 <Button

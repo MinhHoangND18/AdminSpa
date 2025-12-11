@@ -39,6 +39,7 @@ import {
   Switch,
   CircularProgress,
   Snackbar,
+  FormHelperText,
 } from '@mui/material';
 import {
   Add,
@@ -76,7 +77,6 @@ import {
   CreateServiceDto,
 } from '@/types';
 
-// Colors
 const PRIMARY_COLOR = '#14b8a6';
 const PRIMARY_DARK = '#0f766e';
 const SUCCESS_COLOR = '#10b981';
@@ -153,6 +153,7 @@ export default function ServicesPage() {
   const [dialogMode, setDialogMode] = useState<'add' | 'edit' | 'view'>('add');
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' } | null>(null);
+  const [validationErrors, setValidationErrors] = useState<Partial<Record<keyof ServiceFormData, string>>>({});
 
   const initialFormData: ServiceFormData = {
     name: '',
@@ -168,6 +169,40 @@ export default function ServicesPage() {
 
   const [formData, setFormData] = useState<ServiceFormData>(initialFormData);
 
+  const validateForm = () => {
+    const errors: Partial<Record<keyof ServiceFormData, string>> = {};
+
+    if (!formData.name.trim()) {
+      errors.name = 'Service Name is required.';
+    }
+
+    const duration = parseFloat(formData.durationMinutes);
+    if (!formData.durationMinutes || isNaN(duration) || duration <= 0 || !Number.isInteger(duration)) {
+      errors.durationMinutes = 'Duration must be a positive whole number (minutes).';
+    }
+
+    const price = parseFloat(formData.price);
+    if (!formData.price || isNaN(price) || price <= 0) {
+      errors.price = 'Price must be a positive number.';
+    }
+    
+    if (!formData.categoryId) {
+        errors.categoryId = 'Category is required.';
+    }
+
+    const discountPrice = formData.discountPrice ? parseFloat(formData.discountPrice) : null;
+    if (discountPrice !== null && isNaN(discountPrice)) {
+      errors.discountPrice = 'Invalid discount price.';
+    } else if (discountPrice !== null && discountPrice >= price) {
+      errors.discountPrice = 'Discount price must be less than the regular price.';
+    } else if (discountPrice !== null && discountPrice < 0) {
+      errors.discountPrice = 'Discount price cannot be negative.';
+    }
+
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const { data: categories = [], isLoading: isLoadingCategories } = useQuery({
     queryKey: ['activeServiceCategories'],
     queryFn: getActiveServiceCategories,
@@ -180,13 +215,8 @@ export default function ServicesPage() {
     placeholderData: (previousData) => previousData,
   });
 
-  const services = useMemo((): Service[] => {
-    const response = paginatedServices as any;
-    return response?.data?.data ?? [];
-  }, [paginatedServices]);
-
-  const totalServices = (paginatedServices as any)?.data?.total ?? 0;
-
+  const services: Service[] = paginatedServices?.data?.data ?? [];
+  const totalServices = paginatedServices?.data?.total ?? 0;
 
   const createMutation = useMutation({
     mutationFn: createService,
@@ -196,7 +226,7 @@ export default function ServicesPage() {
       handleDialogClose();
     },
     onError: (error: Error) => {
-      setSnackbar({ open: true, message: `Error: ${error.message}`, severity: 'error' });
+      setSnackbar({ open: true, message: `Action failed: ${error.message}`, severity: 'error' });
     }
   });
 
@@ -208,7 +238,7 @@ export default function ServicesPage() {
       handleDialogClose();
     },
     onError: (error: Error) => {
-      setSnackbar({ open: true, message: `Error: ${error.message}`, severity: 'error' });
+      setSnackbar({ open: true, message: `Action failed: ${error.message}`, severity: 'error' });
     }
   });
 
@@ -221,7 +251,7 @@ export default function ServicesPage() {
       setSelectedService(null);
     },
     onError: (error: Error) => {
-      setSnackbar({ open: true, message: `Error: ${error.message}`, severity: 'error' });
+      setSnackbar({ open: true, message: `Action failed: ${error.message}`, severity: 'error' });
     }
   });
 
@@ -232,7 +262,7 @@ export default function ServicesPage() {
     }));
     setPage(0);
   };
-
+  
   const handleSearch = () => {
     setFilters(prev => ({ ...prev, search: searchQuery }));
     setPage(0);
@@ -240,7 +270,6 @@ export default function ServicesPage() {
 
   const stats = useMemo(() => ({
     total: totalServices,
-    // These stats would ideally come from a dedicated stats endpoint for accuracy across all pages
     active: services.filter((s) => s.status === 'active').length,
     combo: services.filter((s) => s.isCombo).length,
     totalRevenue: services.reduce((sum, s) => sum + (Number(s.price) || 0), 0),
@@ -258,6 +287,7 @@ export default function ServicesPage() {
   const handleAddNew = () => {
     setDialogMode('add');
     setFormData(initialFormData);
+    setValidationErrors({});
     setOpenDialog(true);
   };
 
@@ -275,6 +305,7 @@ export default function ServicesPage() {
         isCombo: selectedService.isCombo,
         status: selectedService.status,
       });
+      setValidationErrors({});
       setOpenDialog(true);
     }
     handleMenuClose();
@@ -302,12 +333,20 @@ export default function ServicesPage() {
   const handleDialogClose = () => {
     setOpenDialog(false);
     setFormData(initialFormData);
+    setValidationErrors({});
   };
 
   const handleFormChange = (field: keyof ServiceFormData) => (
     event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
-    setFormData({ ...formData, [field]: event.target.value });
+    let value = event.target.value;
+    
+    if ((field === 'durationMinutes' || field === 'price' || field === 'discountPrice') && value !== '') {
+        value = value.replace(/[^\d.]/g, '');
+    }
+
+    setFormData(prev => ({ ...prev, [field]: value }));
+    setValidationErrors(prev => ({ ...prev, [field]: undefined }));
   };
 
   const handleSwitchChange = (field: keyof ServiceFormData) => (
@@ -317,6 +356,10 @@ export default function ServicesPage() {
   };
 
   const handleSubmit = () => {
+    if (!validateForm()) {
+        return;
+    }
+
     const submissionData: CreateServiceDto | UpdateServiceDto = {
       name: formData.name,
       description: formData.description || undefined,
@@ -359,7 +402,7 @@ export default function ServicesPage() {
 
       {/* Stats Cards */}
       <Grid container spacing={3} sx={{ mb: 3 }}>
-        <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
+        <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
           <Card>
             <CardContent>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -378,7 +421,7 @@ export default function ServicesPage() {
             </CardContent>
           </Card>
         </Grid>
-        <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
+        <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
           <Card>
             <CardContent>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -397,7 +440,7 @@ export default function ServicesPage() {
             </CardContent>
           </Card>
         </Grid>
-        <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
+        <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
           <Card>
             <CardContent>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -416,25 +459,6 @@ export default function ServicesPage() {
             </CardContent>
           </Card>
         </Grid>
-        {/* <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-            <Card>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <Box>
-                    <Typography color="text.secondary" variant="body2" gutterBottom>
-                      Total Value
-                    </Typography>
-                    <Typography variant="h4" fontWeight="bold">
-                      {isLoadingServices ? <CircularProgress size={24} /> : formatCurrency(stats.totalRevenue)}
-                    </Typography>
-                  </Box>
-                  <Avatar sx={{ bgcolor: alpha(INFO_COLOR, 0.1), width: 56, height: 56 }}>
-                    <TrendingUp sx={{ color: INFO_COLOR, fontSize: 28 }} />
-                  </Avatar>
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid> */}
       </Grid>
 
       {/* Actions Bar */}
@@ -539,9 +563,9 @@ export default function ServicesPage() {
                   </TableCell>
                 </TableRow>
               ) : isError ? (
-                <TableRow>
+                 <TableRow>
                   <TableCell colSpan={8} align="center" sx={{ py: 10 }}>
-                    <Alert severity="error">Failed to load services.</Alert>
+                     <Alert severity="error">Failed to load services.</Alert>
                   </TableCell>
                 </TableRow>
               ) : services.length > 0 ? (
@@ -699,8 +723,8 @@ export default function ServicesPage() {
           {dialogMode === 'add'
             ? 'Add New Service'
             : dialogMode === 'edit'
-              ? 'Edit Service'
-              : 'Service Details'}
+            ? 'Edit Service'
+            : 'Service Details'}
         </DialogTitle>
         <DialogContent dividers>
           {dialogMode === 'view' && selectedService ? (
@@ -777,7 +801,7 @@ export default function ServicesPage() {
                 </Typography>
               </Grid>
               {selectedService.description && (
-                <Grid size={{ xs: 12 }}>
+              <Grid size={{ xs: 12 }}>
                   <Typography variant="caption" color="text.secondary">
                     Description
                   </Typography>
@@ -813,17 +837,22 @@ export default function ServicesPage() {
                   onChange={handleFormChange('name')}
                   required
                   disabled={dialogMode === 'view'}
+                  error={!!validationErrors.name}
+                  helperText={validationErrors.name}
                 />
               </Grid>
               <Grid size={{ xs: 12, sm: 6 }}>
-                <FormControl fullWidth disabled={dialogMode === 'view' || isLoadingCategories}>
+                <FormControl 
+                    fullWidth 
+                    required
+                    disabled={dialogMode === 'view' || isLoadingCategories}
+                    error={!!validationErrors.categoryId}
+                >
                   <InputLabel>Category</InputLabel>
                   <Select
                     value={formData.categoryId}
                     label="Category"
-                    onChange={(e) =>
-                      setFormData({ ...formData, categoryId: e.target.value })
-                    }
+                    onChange={(e) => handleFormChange('categoryId')(e as React.ChangeEvent<HTMLInputElement>)}
                   >
                     {categories.map((category: ServiceCategory) => (
                       <MenuItem key={category.id} value={category.id}>
@@ -831,17 +860,20 @@ export default function ServicesPage() {
                       </MenuItem>
                     ))}
                   </Select>
+                  {validationErrors.categoryId && <FormHelperText>{validationErrors.categoryId}</FormHelperText>}
                 </FormControl>
               </Grid>
               <Grid size={{ xs: 12, sm: 6 }}>
                 <TextField
                   fullWidth
                   label="Duration (minutes)"
-                  type="number"
+                  type="text" 
                   value={formData.durationMinutes}
                   onChange={handleFormChange('durationMinutes')}
                   required
                   disabled={dialogMode === 'view'}
+                  error={!!validationErrors.durationMinutes}
+                  helperText={validationErrors.durationMinutes || 'Must be a whole number.'}
                   InputProps={{
                     endAdornment: (
                       <InputAdornment position="end">minutes</InputAdornment>
@@ -853,11 +885,13 @@ export default function ServicesPage() {
                 <TextField
                   fullWidth
                   label="Price"
-                  type="number"
+                  type="text" 
                   value={formData.price}
                   onChange={handleFormChange('price')}
                   required
                   disabled={dialogMode === 'view'}
+                  error={!!validationErrors.price}
+                  helperText={validationErrors.price}
                   InputProps={{
                     startAdornment: (
                       <InputAdornment position="start">
@@ -871,10 +905,12 @@ export default function ServicesPage() {
                 <TextField
                   fullWidth
                   label="Discount Price"
-                  type="number"
+                  type="text" 
                   value={formData.discountPrice}
                   onChange={handleFormChange('discountPrice')}
                   disabled={dialogMode === 'view'}
+                  error={!!validationErrors.discountPrice}
+                  helperText={validationErrors.discountPrice}
                   InputProps={{
                     startAdornment: (
                       <InputAdornment position="start">
@@ -1009,13 +1045,13 @@ export default function ServicesPage() {
           </Button>
         </DialogActions>
       </Dialog>
-
+      
       {/* Snackbar for notifications */}
       <Snackbar
         open={snackbar?.open}
         autoHideDuration={6000}
         onClose={() => setSnackbar(null)}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
       >
         <Alert onClose={() => setSnackbar(null)} severity={snackbar?.severity} sx={{ width: '100%' }}>
           {snackbar?.message}

@@ -1,16 +1,69 @@
 // src/invoices/dto/invoice.dto.ts
-import { 
-  IsNotEmpty, 
-  IsNumber, 
-  IsString, 
-  IsEnum, 
-  IsOptional, 
+import {
+  IsNotEmpty,
+  IsNumber,
+  IsString,
+  IsEnum,
+  IsOptional,
   Min,
-  Length 
+  Length,
+  IsArray,
+  ValidateNested,
+  IsInt,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { DiscountType, PaymentStatus } from '../invoices/entities/invoice.entity';
+import {
+  DiscountType,
+  PaymentStatus,
+} from '../invoices/entities/invoice.entity';
+import { ItemType } from '../invoice_item/entities/invoice_item.entity';
+
+// This DTO is used when creating invoice items as part of a whole invoice
+// It does not have invoiceId because the invoice is not yet created.
+export class NestedCreateInvoiceItemDto {
+  @ApiProperty({ enum: ItemType, example: ItemType.PRODUCT })
+  @IsEnum(ItemType)
+  @IsNotEmpty()
+  itemType: ItemType;
+
+  @ApiProperty({ example: 1 })
+  @IsInt()
+  @IsNotEmpty()
+  itemId: number;
+
+  @ApiPropertyOptional({ example: 'Product Name', maxLength: 200 })
+  @IsOptional()
+  @IsString()
+  @Length(1, 200)
+  itemName?: string;
+
+  @ApiPropertyOptional({ example: 1 })
+  @IsOptional()
+  @IsNumber()
+  staffId?: number;
+
+  @ApiProperty({ example: 1, default: 1 })
+  @IsInt()
+  @Min(1)
+  quantity: number;
+
+  @ApiProperty({ example: 150000 })
+  @IsNumber()
+  @Min(0)
+  unitPrice: number;
+
+  @ApiPropertyOptional({ example: 10000, default: 0 })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  discount?: number;
+
+  @ApiProperty({ example: 140000 })
+  @IsNumber()
+  @Min(0)
+  totalPrice: number;
+}
 
 // DTO cho việc tạo invoice mới
 export class CreateInvoiceDto {
@@ -35,7 +88,7 @@ export class CreateInvoiceDto {
   @IsNumber()
   storeId: number;
 
-  @ApiProperty({ example: 1000000.50 })
+  @ApiProperty({ example: 1000000.5 })
   @IsNotEmpty()
   @IsNumber()
   @Min(0)
@@ -84,6 +137,12 @@ export class CreateInvoiceDto {
   @IsOptional()
   @IsNumber()
   createdBy?: number;
+
+  @ApiProperty({ type: () => [NestedCreateInvoiceItemDto] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => NestedCreateInvoiceItemDto)
+  items: NestedCreateInvoiceItemDto[];
 }
 
 // DTO cho việc cập nhật invoice

@@ -20,7 +20,7 @@ export class UsersRepository {
   }
 
   findById(id: number) {
-    return this.repository.findOne({ where: { id },relations: ['store', 'staff'] });
+    return this.repository.findOne({ where: { id }, relations: ['store', 'staff'] });
   }
 
   findByUsername(username: string) {
@@ -32,9 +32,13 @@ export class UsersRepository {
   }
 
   async findAll(filter: FilterUsersDto) {
+    const { page = 1, limit = 10 } = filter;
+    const skip = (page - 1) * limit;
+
     const qb = this.repository.createQueryBuilder('user')
-      .leftJoinAndSelect('user.store', 'store') 
-      .leftJoinAndSelect('user.staff', 'staff');
+      .leftJoinAndSelect('user.store', 'store')
+      .leftJoinAndSelect('user.staff', 'staff')
+      .where('1 = 1');
     if (filter.role) {
       qb.andWhere('user.role = :role', { role: filter.role });
     }
@@ -52,9 +56,10 @@ export class UsersRepository {
       );
     }
 
-    qb.orderBy('user.created_at', 'ASC');
+    qb.orderBy('user.created_at', 'DESC').skip(skip).take(limit);
 
-    return qb.getMany();
+    const [data, total] = await qb.getManyAndCount();
+    return { data, total };
   }
 
   async updateById(id: number, data: Partial<UserEntity>) {
@@ -66,4 +71,3 @@ export class UsersRepository {
     await this.repository.delete(id);
   }
 }
-

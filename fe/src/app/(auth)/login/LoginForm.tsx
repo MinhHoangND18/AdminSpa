@@ -21,6 +21,8 @@ import {
   Lock,
 } from '@mui/icons-material';
 import api from '@/lib/api/axios';
+import { useAuth } from '@/lib/hooks/useAuth';
+import { User } from '@/types/user';
 
 const PRIMARY_COLOR = '#14b8a6';
 const PRIMARY_DARK = '#0f766e';
@@ -35,13 +37,12 @@ interface LoginResponse {
   message: string;
   data: {
     token: string;
-    user: object;
+    user: User;
   };
 }
 
 const getErrorMessage = (error: unknown): string => {
   if (error && typeof error === 'object') {
-    // Handle NestJS validation errors which can be an array of strings
     const maybeAxios = error as {
       response?: { data?: { message?: string | string[] } };
     };
@@ -53,7 +54,6 @@ const getErrorMessage = (error: unknown): string => {
       return axiosMessage;
     }
 
-    // Standard error message property
     if (
       'message' in error &&
       typeof (error as { message?: unknown }).message === 'string'
@@ -65,9 +65,10 @@ const getErrorMessage = (error: unknown): string => {
   return 'Login failed, please try again.';
 };
 
-export default function LoginForm() {
+export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { login } = useAuth();
 
   const [values, setValues] = useState<LoginFormValues>({
     username: '',
@@ -100,13 +101,15 @@ export default function LoginForm() {
       setLoading(true);
       setError(null);
       const response = await api.post<LoginResponse>('/auth/login', values);
-      const token = response.data.data.token;
-      if (token) {
-        document.cookie = `token=${token}; path=/; SameSite=Lax`;
+      
+      const { user, token } = response.data.data;
+
+      if (user && token) {
+        login(user, token);
+      } else {
+        throw new Error('Login response did not contain user or token.');
       }
-      const redirectTo = searchParams.get('from') || '/dashboard';
-      router.push(redirectTo);
-      router.refresh();
+      
     } catch (err: unknown) {
       setError(getErrorMessage(err));
     } finally {

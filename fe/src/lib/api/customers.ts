@@ -20,6 +20,7 @@ export const getCustomers = async (query: { [key: string]: string | number | boo
   const { data } = await api.get<CustomerResponse>(API_ENDPOINTS.CUSTOMERS, { params: query }); 
   return data; 
 };
+
 export const getCustomerStats = async (storeId?: number): Promise<CustomerStats> => {
   const { data } = await api.get<CustomerStatsResponse>(
     `${API_ENDPOINTS.CUSTOMERS}/statistics`,

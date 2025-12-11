@@ -96,7 +96,7 @@ export class ServiceCategoriesService {
 
     // Sort by displayOrder if requested, otherwise by createdAt
     if (sortByOrder) {
-      queryBuilder.orderBy('category.displayOrder', 'ASC');
+      queryBuilder.orderBy('category.displayOrder', 'DESC');
     } else {
       queryBuilder.orderBy('category.createdAt', 'DESC');
     }
@@ -117,7 +117,7 @@ export class ServiceCategoriesService {
   async findAllActive(): Promise<ServiceCategory[]> {
     return await this.categoryRepository.find({
       where: { isActive: true },
-      order: { displayOrder: 'ASC' },
+      order: { displayOrder: 'DESC' },
     });
   }
 
@@ -213,7 +213,7 @@ export class ServiceCategoriesService {
     // Return updated categories in new order
     return await this.categoryRepository.find({
       where: { id: In(categoryIds) },
-      order: { displayOrder: 'ASC' },
+      order: { displayOrder: 'DESC' },
     });
   }
 

@@ -16,7 +16,7 @@ export class Staff {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ length: 20, unique: true })
+  @Column({ length: 20, unique: true, nullable: true })
   code: string;
 
   @Column({ length: 100 })
@@ -69,6 +69,16 @@ export class Staff {
     default: 'active',
   })
   status: string;
+
+  // DB hiện chưa có cột is_deleted; tạm thời không map để tránh lỗi.
+  // Khi thêm cột, khôi phục mapping với name đúng.
+  // @Column({
+  //   type: 'boolean',
+  //   default: false,
+  //   select: false,
+  //   name: 'is_deleted',
+  // })
+  // is_deleted: boolean;
 
   @CreateDateColumn({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   created_at: Date;

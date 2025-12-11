@@ -26,6 +26,7 @@ import {
   Assessment as AssessmentIcon,
   Settings as SettingsIcon,
   AccountBox as AccountBoxIcon,
+  Category as CategoryOutlinedIcon,
 } from '@mui/icons-material';
 import Link from 'next/link';
 
@@ -41,7 +42,9 @@ const menuItems: MenuItem[] = [
   { text: 'User', icon: <AccountBoxIcon />, path: '/users' },
   { text: 'Staff', icon: <PeopleIcon />, path: '/staff' },
   { text: 'Customers', icon: <PersonOutlineIcon />, path: '/customers' },
+   { text: 'Category', icon: <CategoryOutlinedIcon />, path: '/category' },
   { text: 'Services', icon: <LocalOfferIcon />, path: '/services' },
+ 
   { text: 'Bookings', icon: <EventNoteIcon />, path: '/bookings' },
   { text: 'Invoices', icon: <ReceiptIcon />, path: '/invoices' },
   { text: 'Reports', icon: <AssessmentIcon />, path: '/report' },
@@ -106,14 +109,13 @@ export default function Sidebar({
       <Divider />
       <List sx={{ flex: 1, px: 1.5, pt: 2 }}>
         {menuItems.map((item) => {
-          // <--- 3. TÍNH TOÁN TRẠNG THÁI ACTIVE DỰA TRÊN URL
           const active = isSelected(item.path);
 
           return (
             <ListItem key={item.text} disablePadding sx={{ mb: 0.5 }}>
               <Link href={item.path} style={{ textDecoration: 'none', width: '100%' }}>
                 <ListItemButton
-                  selected={active} // <--- 4. DÙNG BIẾN ACTIVE THAY VÌ selectedMenu
+                  selected={active} 
                   onClick={() => onMenuSelect(item.text)}
                   sx={{
                     borderRadius: 2,
@@ -135,18 +137,18 @@ export default function Sidebar({
                   <ListItemIcon
                     sx={{
                       minWidth: 40,
-                      color: active ? 'white' : PRIMARY_COLOR  // <--- 5. CẬP NHẬT MÀU ICON
+                      color: active ? 'white' : PRIMARY_COLOR  
                     }}
                   >
                     {item.icon}
                   </ListItemIcon>
                   <ListItemText
                     sx={{
-                      color: active ? 'white' : PRIMARY_COLOR // <--- 6. CẬP NHẬT MÀU CHỮ
+                      color: active ? 'white' : PRIMARY_COLOR 
                     }}
                     primary={item.text}
                     primaryTypographyProps={{
-                      fontWeight: active ? 600 : 400, // <--- 7. CẬP NHẬT FONT WEIGHT
+                      fontWeight: active ? 600 : 400, 
                     }}
                   />
                 </ListItemButton>

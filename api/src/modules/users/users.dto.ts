@@ -8,6 +8,7 @@ import {
   MaxLength,
   MinLength,
   IsNumber,
+  IsInt,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { PartialType } from '@nestjs/mapped-types';
@@ -30,6 +31,11 @@ export class CreateUserDto {
   @MaxLength(100)
   email?: string;
 
+  @IsString()
+  @IsOptional()
+  @MaxLength(255)
+  fullname?: string;
+
   @IsEnum(UserRole)
   @IsOptional()
   role?: UserRole;
@@ -50,9 +56,17 @@ export class CreateUserDto {
   )
   @IsBoolean()
   is_active?: boolean;
+
+
 }
 
-export class UpdateUserDto extends PartialType(CreateUserDto) {}
+
+export class UpdateUserDto extends PartialType(CreateUserDto) {
+  @IsOptional()
+  @IsInt()
+  login_attempts?: number;
+}
+
 export class PageOptionsDto {
   @IsOptional()
   @Transform(({ value }) => (value !== undefined ? Number(value) : 1))
