@@ -88,6 +88,22 @@ export class BookingsController {
     return this.bookingsService.cancelBooking(id);
   }
 
+  @Patch(':id/start')
+  @ApiOperation({ summary: 'Start service for a booking' })
+  @ApiResponse({ status: 200, description: 'Service started successfully' })
+  @ApiResponse({ status: 404, description: 'Booking not found' })
+  startService(@Param('id', ParseIntPipe) id: number) {
+    return this.bookingsService.startService(id);
+  }
+
+  @Patch(':id/complete')
+  @ApiOperation({ summary: 'Complete service for a booking' })
+  @ApiResponse({ status: 200, description: 'Service completed successfully' })
+  @ApiResponse({ status: 404, description: 'Booking not found' })
+  completeService(@Param('id', ParseIntPipe) id: number) {
+    return this.bookingsService.completeService(id);
+  }
+
   @Get('store/:storeId/date-range')
   @ApiOperation({ summary: 'Get bookings by store and date range' })
   @ApiQuery({ name: 'startDate', example: '2025-10-01' })

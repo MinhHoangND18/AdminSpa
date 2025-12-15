@@ -1,5 +1,6 @@
 // types/booking.ts
 import { Customer as CustomerType } from './customer';
+import { Invoice } from './invoice';
 
 export enum BookingStatus {
     PENDING = 'pending',
@@ -27,8 +28,11 @@ export interface Store {
 
 export interface Booking {
     id: number;
-    customerId: number;
+    customerId: number | null;
     customer?: Customer;
+    customerName?: string;
+    customerPhone?: string;
+    customerEmail?: string;
     storeId: number;
     store?: Store;
     bookingDate: string; 
@@ -41,6 +45,7 @@ export interface Booking {
     createdBy: number | null;
     createdAt: string;
     updatedAt: string;
+    invoices?: Invoice[];
 }
 
 // Interface cho Response trả về từ findAll (có phân trang)

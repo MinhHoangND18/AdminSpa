@@ -267,7 +267,7 @@ const initialFormData: CustomerFormData = {
   status: CustomerStatus.ACTIVE,
 };
 
-interface CustomerFormDialogProps {
+export interface CustomerFormDialogProps {
   customerId: number | null;
   dialogMode: "add" | "edit" | "view";
   open: boolean;
@@ -275,7 +275,7 @@ interface CustomerFormDialogProps {
   onSuccess: (message: string, severity?: "success" | "error") => void;
 }
 
-const CustomerFormDialog: React.FC<CustomerFormDialogProps> = ({
+export const CustomerFormDialog: React.FC<CustomerFormDialogProps> = ({
   customerId,
   dialogMode,
   open,
@@ -1557,7 +1557,7 @@ export default function CustomersPage() {
         open={snackbar?.open}
         autoHideDuration={6000}
         onClose={() => setSnackbar(null)}
-        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+        anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
       >
         <Alert
           onClose={() => setSnackbar(null)}

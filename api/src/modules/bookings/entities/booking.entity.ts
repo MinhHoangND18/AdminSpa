@@ -7,11 +7,13 @@ import {
   JoinColumn,
   CreateDateColumn,
   UpdateDateColumn,
-  Index
+  Index,
+  OneToMany
 } from 'typeorm';
 import { Customer } from '../../customers/entities/customer.entity';
 import { Store } from '../../stores/entities/store.entity';
 import { UserEntity } from '../../users/entities/user.entity';
+import { Invoice } from '../../invoices/entities/invoice.entity';
 
 export enum BookingStatus {
   PENDING = 'pending',
@@ -81,4 +83,7 @@ export class Booking {
 
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
+
+  @OneToMany(() => Invoice, invoice => invoice.booking)
+  invoices: Invoice[];
 }

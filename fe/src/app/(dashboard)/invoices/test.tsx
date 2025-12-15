@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
     Grid,
     Card,
@@ -45,6 +45,7 @@ import {
     ListItemIcon,
     CircularProgress,
     Autocomplete,
+    Backdrop
 } from "@mui/material";
 import {
     Add,
@@ -112,6 +113,7 @@ import { Staff as StaffType } from "@/types/staff";
 import { Product as ProductType } from "@/types/product";
 import { Service as ServiceType } from "@/types/service";
 
+
 interface ApiResponseWrapper<T> {
     data?: {
         data: T[];
@@ -168,7 +170,6 @@ interface InvoiceFormData {
     booking_id: string;
     discount_amount: string;
     discount_type: DiscountType | "";
-    tax_amount: string;
     notes: string;
     payment_status: PaymentStatus;
 }
@@ -191,6 +192,13 @@ interface SelectableItem {
     type: "product" | "service" | "package";
 }
 
+interface FetchError extends Error {
+    response?: {
+        data?: {
+            message?: string | string[];
+        };
+    };
+}
 const getPaymentStatusColor = (status: PaymentStatus) => {
     switch (status) {
         case "paid":
@@ -296,6 +304,12 @@ export default function InvoicesPage() {
     const [openItemsDialog, setOpenItemsDialog] = useState(false);
     const [dialogMode, setDialogMode] = useState<"add" | "edit" | "view">("add");
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+    const [isFormDataLoading, setIsFormDataLoading] = useState(false);
+    const isMountedRef = useRef(true);
+    const abortControllerRef = useRef<AbortController | null>(null);
+    const [isInitialLoad, setIsInitialLoad] = useState(true);
+    const [loading, setLoading] = useState(false);
+
 
     const initialFormData: InvoiceFormData = useMemo(
         () => ({
@@ -304,7 +318,6 @@ export default function InvoicesPage() {
             booking_id: "",
             discount_amount: "0",
             discount_type: "",
-            tax_amount: "0",
             notes: "",
             payment_status: "pending",
         }),
@@ -323,62 +336,124 @@ export default function InvoicesPage() {
         }),
         []
     );
+    useEffect(() => {
+        isMountedRef.current = true;
+
+        return () => {
+            isMountedRef.current = false;
+            // Cancel mọi request đang pending khi unmount
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
+            }
+        };
+    }, []);
 
     const [formData, setFormData] = useState<InvoiceFormData>(initialFormData);
     const [items, setItems] = useState<InvoiceItemFormData[]>([]);
     const [currentItem, setCurrentItem] =
         useState<InvoiceItemFormData>(initialItemFormData);
 
+    const fetchCustomers = async () => {
+        try {
+            const data = await getCustomers({ limit: 1000 }) as unknown as ApiResponseWrapper<CustomerType>;
+            setCustomers(data?.data?.data ?? []);
+        } catch (err) {
+            console.error("Failed to fetch customers:", err);
+        }
+    };
+
+    const fetchStores = async () => {
+        try {
+            const data = await storesApi.getAll({ limit: 1000 }) as unknown as ApiResponseWrapper<StoreType>;
+            setStores(data?.data?.data ?? []);
+        } catch (err) {
+            console.error("Failed to fetch stores:", err);
+        }
+    };
+
+    const fetchBookings = async () => {
+        try {
+            const response = await getBookings({ limit: 1000 });
+            const bookingsData = response?.data ?? [];
+            console.log("Extracted bookings data (count):", bookingsData.length);
+            setBookings(bookingsData);
+        } catch (err) {
+            console.error("Failed to fetch bookings:", err);
+        }
+    };
+
+    const fetchStaff = async () => {
+        try {
+            const data = await getStaff({ limit: 1000 }) as unknown as ApiResponseWrapper<StaffType>;
+            setStaff(data?.data?.data ?? []);
+        } catch (err) {
+            console.error("Failed to fetch staff:", err);
+        }
+    };
+
+    const fetchProducts = async () => {
+        try {
+            const data = await getProducts({ limit: 1000 });
+            setProducts(Array.isArray(data) ? data : []);
+        } catch (err) {
+            console.error("Failed to fetch products:", err);
+        }
+    };
+
+    const fetchServices = async () => {
+        try {
+            const data = await getServices({ limit: 1000 });
+            const servicesData = data?.data ?? [];
+            setServices(servicesData);
+        } catch (err) {
+            console.error("Failed to fetch services:", err);
+        }
+    };
+
     useEffect(() => {
-        const fetchRelatedData = async () => {
+        const loadInitialData = async () => {
+            if (!isMountedRef.current) return;
+
+            setIsLoading(true);
+
             try {
-                const [
-                    customersData,
-                    storesData,
-                    bookingsData,
-                    staffData,
-                    productsData,
-                    servicesData,
-                ] = (await Promise.all([
-                    getCustomers({ limit: 1000 }),
-                    storesApi.getAll({ limit: 1000 }),
-                    getBookings({ limit: 1000 }),
-                    getStaff({ limit: 1000 }),
-                    getProducts({ limit: 1000 }),
-                    getServices({ limit: 1000 }),
-                ])) as unknown as [ 
-                        ApiResponseWrapper<CustomerType>,
-                        ApiResponseWrapper<StoreType>,
-                        ApiResponseWrapper<BookingType>,
-                        ApiResponseWrapper<StaffType>,
-                        ProductType[] | ApiResponseWrapper<ProductType>,
-                        ApiResponseWrapper<ServiceType>
-                    ];
-                setCustomers(customersData?.data?.data ?? []);
-                setStores(storesData?.data?.data ?? []);
-                setBookings(bookingsData?.data?.data ?? []);
-                setStaff(staffData?.data?.data ?? []);
-                setProducts(Array.isArray(productsData) ? productsData : []);
-                setServices(servicesData?.data?.data ?? []);
+                // Load song song các data cơ bản trước
+                await Promise.all([
+                    fetchCustomers(),
+                    fetchStores(),
+                    fetchStaff(),
+                ]);
+
+                // Load bookings sau (ít quan trọng hơn)
+                if (isMountedRef.current) {
+                    fetchBookings();
+                }
             } catch (err) {
-                console.error("Failed to fetch related data:", err);
-                setError("Failed to load related data for invoices.");
+                console.error("Failed to load initial data:", err);
+            } finally {
+                if (isMountedRef.current) {
+                    setIsInitialLoad(false);
+                }
             }
         };
-        fetchRelatedData();
+
+        loadInitialData();
     }, []);
 
     const fetchInvoices = useCallback(async () => {
+        if (customers.length === 0 || stores.length === 0) {
+            return;
+        }
+
         setIsLoading(true);
         setError(null);
         try {
             const params: QueryInvoiceDto = {
-                limit: 1000, 
-                paymentStatus:
-                    filterStatus === "all"
-                        ? undefined
-                        : (filterStatus as PaymentStatusEnum),
+                page: page + 1,
+                limit: rowsPerPage,
+                paymentStatus: filterStatus === "all" ? undefined : (filterStatus as PaymentStatusEnum),
                 storeId: filterStore === "all" ? undefined : filterStore,
+               
             };
 
             const data = await getInvoices(params);
@@ -397,24 +472,66 @@ export default function InvoicesPage() {
                 created_by: apiInvoice.createdBy,
                 created_at: apiInvoice.createdAt,
                 updated_at: apiInvoice.updatedAt,
-
                 customer: customers.find((c) => c.id === apiInvoice.customerId),
                 store: stores.find((s) => s.id === apiInvoice.storeId),
                 booking: bookings.find((b) => b.id === apiInvoice.bookingId),
             }));
 
             setInvoices(processedInvoices);
-            setTotalItems(processedInvoices.length); // Update total items based on fetched length
+            setTotalItems(data.meta.total);
         } catch (err) {
             console.error("Failed to fetch invoices:", err);
             setError("Failed to load invoices. Please try again.");
         } finally {
             setIsLoading(false);
         }
-    }, [filterStatus, filterStore, bookings, customers, stores]);
+    }, [page, rowsPerPage, filterStatus, filterStore, bookings, customers, stores]);
+
+
+    const handleBookingSelect = (bookingId: string) => {
+        setFormData((prev) => ({ ...prev, booking_id: bookingId }));
+
+        if (bookingId) {
+            const selectedBooking = bookings.find(
+                (b) => b.id.toString() === bookingId
+            );
+
+            if (selectedBooking) {
+                const customer = customers.find(
+                    (c) => c.id === selectedBooking.customerId
+                );
+
+                setFormData((prev) => ({
+                    ...prev,
+                    customer_id: selectedBooking.customerId.toString(),
+                    store_id: selectedBooking.storeId.toString(),
+
+                }));
+            }
+        } else {
+            setFormData((prev) => ({
+                ...prev,
+                customer_id: initialFormData.customer_id,
+                store_id: initialFormData.store_id,
+            }));
+        }
+    };
     useEffect(() => {
-        fetchInvoices();
-    }, [fetchInvoices]);
+        if (!isInitialLoad && customers.length > 0 && stores.length > 0) {
+            fetchInvoices();
+        }
+    }, [isInitialLoad, customers.length, stores.length, page, rowsPerPage, filterStatus, filterStore]);
+
+    // useEffect(() => {
+    //     if (bookings.length > 0 && invoices.length > 0) {
+    //         // Re-map invoices với bookings data
+    //         const updatedInvoices = invoices.map(invoice => ({
+    //             ...invoice,
+    //             booking: bookings.find((b) => b.id === invoice.booking_id),
+    //         }));
+    //         setInvoices(updatedInvoices);
+    //     }
+    // }, [bookings, invoices]);
 
     const filteredInvoices = useMemo(() => {
         if (!debouncedSearchQuery) {
@@ -435,12 +552,8 @@ export default function InvoicesPage() {
     }, [invoices, debouncedSearchQuery]);
 
     const paginatedInvoices = useMemo(
-        () =>
-            filteredInvoices.slice(
-                page * rowsPerPage,
-                page * rowsPerPage + rowsPerPage
-            ),
-        [filteredInvoices, page, rowsPerPage]
+        () => filteredInvoices,
+        [filteredInvoices]
     );
 
     const stats = useMemo(
@@ -473,16 +586,24 @@ export default function InvoicesPage() {
         setAnchorEl(null);
     };
 
-    const handleAddNew = () => {
+    const handleAddNew = async () => {
         setDialogMode("add");
         setFormData(initialFormData);
         setItems([]);
         setOpenDialog(true);
+
+        // Load services/products nếu chưa có
+        if (services.length === 0 || products.length === 0) {
+            setIsFormDataLoading(true);
+            await Promise.all([
+                services.length === 0 ? fetchServices() : Promise.resolve(),
+                products.length === 0 ? fetchProducts() : Promise.resolve(),
+            ]);
+            setIsFormDataLoading(false);
+        }
     };
 
-    const fetchInvoiceItemsAndOpenDialog = async (
-        mode: "view" | "edit" | "view_items"
-    ) => {
+    const fetchInvoiceItemsAndOpenDialog = async (mode: "view" | "edit" | "view_items") => {
         if (!selectedInvoice) return;
 
         setIsItemsLoading(true);
@@ -510,7 +631,7 @@ export default function InvoicesPage() {
                     booking_id: selectedInvoice.booking_id?.toString() || "",
                     discount_amount: selectedInvoice.discount_amount.toString(),
                     discount_type: (selectedInvoice.discount_type as DiscountType) || "",
-                    tax_amount: selectedInvoice.tax_amount.toString(),
+                    // tax_amount: selectedInvoice.tax_amount.toString(),
                     notes: selectedInvoice.notes || "",
                     payment_status: selectedInvoice.payment_status,
                 });
@@ -538,7 +659,17 @@ export default function InvoicesPage() {
         handleMenuClose();
     };
 
-    const handleEdit = () => {
+    const handleEdit = async () => {
+        // Load services/products nếu chưa có
+        if (services.length === 0 || products.length === 0) {
+            setIsFormDataLoading(true);
+            await Promise.all([
+                services.length === 0 ? fetchServices() : Promise.resolve(),
+                products.length === 0 ? fetchProducts() : Promise.resolve(),
+            ]);
+            setIsFormDataLoading(false);
+        }
+
         fetchInvoiceItemsAndOpenDialog("edit");
     };
 
@@ -618,27 +749,34 @@ export default function InvoicesPage() {
         }, 0);
 
         const inputDiscountAmount = parseFloat(formData.discount_amount) || 0;
-        const taxAmount = parseFloat(formData.tax_amount) || 0;
 
+        // --- THAY ĐỔI TÍNH TOÁN THUẾ Ở ĐÂY ---
+        const TAX_RATE = 0.08; // 8%
         let finalDiscountAmount = inputDiscountAmount;
-        let total = subtotal;
+        let amountAfterDiscount = subtotal;
 
         if (formData.discount_type === "percent" && inputDiscountAmount > 0) {
             finalDiscountAmount = subtotal * (inputDiscountAmount / 100);
-            total = subtotal - finalDiscountAmount + taxAmount;
+            amountAfterDiscount = subtotal - finalDiscountAmount;
         } else {
-            total = subtotal - finalDiscountAmount + taxAmount;
+            amountAfterDiscount = subtotal - finalDiscountAmount;
         }
+
+        // Tính thuế 8% trên Subtotal sau khi trừ Discount (nếu có)
+        const calculatedTaxAmount = amountAfterDiscount * TAX_RATE;
+
+        const total = amountAfterDiscount + calculatedTaxAmount;
+        // ----------------------------------------
 
         return {
             subtotal,
             discountAmount: finalDiscountAmount,
+            taxAmount: calculatedTaxAmount, // Thêm taxAmount đã tính toán
             total: Math.max(0, total),
         };
     };
 
     const handleSubmit = async () => {
-
         const {
             subtotal: finalSubtotal,
             total: finalTotal,
@@ -669,14 +807,11 @@ export default function InvoicesPage() {
                     storeId: parseInt(formData.store_id),
                     subtotal: finalSubtotal,
                     totalAmount: finalTotal,
-                    items: itemsToSubmit, // Add items directly to the payload
-                    bookingId: formData.booking_id
-                        ? parseInt(formData.booking_id)
-                        : undefined,
+                    items: itemsToSubmit,
+                    bookingId: formData.booking_id ? parseInt(formData.booking_id) : undefined,
                     discountAmount: finalDiscountAmount,
-                    discountType:
-                        (formData.discount_type as DiscountTypeEnum) || undefined,
-                    taxAmount: parseFloat(formData.tax_amount) || 0,
+                    discountType: (formData.discount_type as DiscountTypeEnum) || undefined,
+                    taxAmount: calculatedTaxAmount,
                     paidAmount: formData.payment_status === "paid" ? finalTotal : 0,
                     paymentStatus: formData.payment_status as PaymentStatusEnum,
                     notes: formData.notes || undefined,
@@ -694,12 +829,9 @@ export default function InvoicesPage() {
                     subtotal: finalSubtotal,
                     discountAmount: finalDiscountAmount,
                     discountType: (formData.discount_type as DiscountTypeEnum) || null,
-                    taxAmount: parseFloat(formData.tax_amount) || 0,
+                    taxAmount: calculatedTaxAmount,
                     totalAmount: finalTotal,
-                    paidAmount:
-                        formData.payment_status === "paid"
-                            ? finalTotal
-                            : 0,
+                    paidAmount: formData.payment_status === "paid" ? finalTotal : 0,
                     paymentStatus: formData.payment_status as PaymentStatusEnum,
                     notes: formData.notes || null,
                 };
@@ -731,14 +863,13 @@ export default function InvoicesPage() {
 
             fetchInvoices();
             handleDialogClose();
-        } catch (err: unknown) {
+        } catch (err) {
             console.error("Failed to submit invoice:", err);
-            let errorMessage =
-                "An error occurred while submitting the invoice. Please check the data and try again.";
-            const apiError = err as ApiErrorResponse;
+            let errorMessage = "An error occurred while submitting the invoice. Please check the data and try again.";
 
-            if (apiError.response?.data?.message) {
-                const backendMessage = apiError.response.data.message;
+            const fetchError = err as FetchError;
+            if (fetchError.response?.data?.message) {
+                const backendMessage = fetchError.response.data.message;
                 if (Array.isArray(backendMessage)) {
                     errorMessage += "\n\nServer errors:\n- " + backendMessage.join("\n- ");
                 } else {
@@ -782,12 +913,14 @@ export default function InvoicesPage() {
         subtotal,
         total,
         discountAmount: calculatedDiscountAmount,
+        taxAmount: calculatedTaxAmount,
     } = calculateTotals();
 
     const invoiceToView: Invoice | null = selectedInvoice
         ? {
             ...selectedInvoice,
             items: itemsForView.length > 0 ? itemsForView : selectedInvoice.items,
+            tax_amount: selectedInvoice.tax_amount,
         }
         : null;
 
@@ -802,17 +935,25 @@ export default function InvoicesPage() {
     }, [currentItem.item_type]);
 
     const selectableItems = useMemo((): SelectableItem[] => {
+        // console.log('🔍 selectableItems recalculating:', {
+        //     item_type: currentItem.item_type,
+        //     products: products.length,
+        //     services: services.length
+        // });
+
         if (currentItem.item_type === "product") {
-            return (products || []).map((product) => ({
+            const items = (products || []).map((product) => ({
                 id: product.id,
                 name: product.name,
                 price: product.price,
                 discount: product.discount || 0,
-                type: "product",
+                type: "product" as const,
             }));
+            // console.log('📦 Products items:', items);
+            return items;
         }
         if (currentItem.item_type === "service") {
-            return (services || [])
+            const items = (services || [])
                 .filter((service) => !service.isCombo)
                 .map((service) => ({
                     id: service.id,
@@ -821,11 +962,13 @@ export default function InvoicesPage() {
                     discount: service.discountPrice
                         ? service.price - service.discountPrice
                         : 0,
-                    type: "service",
+                    type: "service" as const,
                 }));
+            // console.log('🛠️ Service items:', items);
+            return items;
         }
         if (currentItem.item_type === "package") {
-            return (services || [])
+            const items = (services || [])
                 .filter((service) => service.isCombo)
                 .map((service) => ({
                     id: service.id,
@@ -834,8 +977,10 @@ export default function InvoicesPage() {
                     discount: service.discountPrice
                         ? service.price - service.discountPrice
                         : 0,
-                    type: "package",
+                    type: "package" as const,
                 }));
+            // console.log('📦 Package items:', items);
+            return items;
         }
         return [];
     }, [products, services, currentItem.item_type]);
@@ -860,18 +1005,30 @@ export default function InvoicesPage() {
             discount: item.discount.toString(),
         }));
     };
+    const isAnyLoading =
+  isLoading ||           // Tải danh sách hóa đơn
+  isInitialLoad ||       // Tải dữ liệu ban đầu (Customers, Stores, Staff)
+  isFormDataLoading ||   // Tải dữ liệu form (Products, Services)
+  isItemsLoading ||      // Tải chi tiết mục hóa đơn (khi View/Edit)
+  false;
 
     return (
-        <>
-            <Box sx={{ mb: 3 }}>
+        <>                                                                                      
+            {/* <Box sx={{ mb: 3 }}>
                 <Typography variant="h4" fontWeight="bold" gutterBottom>
                     Invoice Management
                 </Typography>
                 <Typography variant="body1" color="text.secondary">
                     Manage customer invoices and payments
                 </Typography>
-            </Box>
-
+            </Box> */}
+            <Backdrop
+                sx={{ color: "#fff", zIndex: (theme) => theme.zIndex.drawer + 1 }}
+                open={isAnyLoading}
+            >
+                <CircularProgress color="inherit" />
+            </Backdrop>
+            {/* Stats Cards */}
             <Grid container spacing={3} sx={{ mb: 3 }}>
                 <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
                     <Card>
@@ -902,8 +1059,10 @@ export default function InvoicesPage() {
                                         height: 56,
                                     }}
                                 >
-                                    <Receipt sx={{ fontSize: 32 }} />
+                                    <Receipt sx={{ color: PRIMARY_COLOR, fontSize: 28 }} />
                                 </Avatar>
+
+
                             </Box>
                         </CardContent>
                     </Card>
@@ -1023,6 +1182,7 @@ export default function InvoicesPage() {
                 </Grid>
             </Grid>
 
+            {/* Actions Bar */}
             <Card sx={{ mb: 3 }}>
                 <CardContent>
                     <Box
@@ -1034,7 +1194,7 @@ export default function InvoicesPage() {
                         }}
                     >
                         <TextField
-                            placeholder="Search by voucher, customer name, phone..."
+                            placeholder="Search by invoice code, customer name, phone..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             sx={{ flex: 1, minWidth: 250 }}
@@ -1082,6 +1242,7 @@ export default function InvoicesPage() {
                             startIcon={<Add />}
                             onClick={handleAddNew}
                             sx={{
+                                height: 55,
                                 bgcolor: PRIMARY_COLOR,
                                 "&:hover": { bgcolor: PRIMARY_DARK },
                                 textTransform: "none",
@@ -1094,17 +1255,18 @@ export default function InvoicesPage() {
                 </CardContent>
             </Card>
 
+            {/* Invoices Table */}
             <Card>
                 <TableContainer>
                     <Table>
                         <TableHead>
                             <TableRow sx={{ bgcolor: alpha(PRIMARY_COLOR, 0.05) }}>
-                                <TableCell sx={{ fontWeight: 700 }}>Voucher</TableCell>
+                                <TableCell sx={{ fontWeight: 700 }}>Invoice code</TableCell>
                                 <TableCell sx={{ fontWeight: 700 }}>Customer</TableCell>
                                 <TableCell sx={{ fontWeight: 700 }}>Store</TableCell>
                                 <TableCell sx={{ fontWeight: 700 }}>Booking</TableCell>
                                 <TableCell sx={{ fontWeight: 700 }}>Subtotal</TableCell>
-                                <TableCell sx={{ fontWeight: 700 }}>Discount</TableCell>
+                                {/* <TableCell sx={{ fontWeight: 700 }}>Discount</TableCell> */}
                                 <TableCell sx={{ fontWeight: 700 }}>Tax</TableCell>
                                 <TableCell sx={{ fontWeight: 700 }}>Total</TableCell>
                                 <TableCell sx={{ fontWeight: 700 }}>Paid</TableCell>
@@ -1115,32 +1277,7 @@ export default function InvoicesPage() {
                             </TableRow>
                         </TableHead>
                         <TableBody>
-                            {isLoading && paginatedInvoices.length === 0 ? (
-                                <TableRow>
-                                    <TableCell colSpan={11} align="center">
-                                        <Box
-                                            sx={{
-                                                display: "flex",
-                                                justifyContent: "center",
-                                                alignItems: "center",
-                                                py: 2,
-                                            }}
-                                        >
-                                            <CircularProgress
-                                                size={24}
-                                                sx={{ color: PRIMARY_COLOR }}
-                                            />
-                                            <Typography
-                                                variant="body2"
-                                                color="text.secondary"
-                                                sx={{ ml: 2 }}
-                                            >
-                                                Loading...
-                                            </Typography>
-                                        </Box>
-                                    </TableCell>
-                                </TableRow>
-                            ) : paginatedInvoices.length > 0 ? (
+                            { paginatedInvoices.length > 0 ? (
                                 paginatedInvoices.map((invoice) => (
                                     <TableRow
                                         key={invoice.id}
@@ -1187,6 +1324,13 @@ export default function InvoicesPage() {
                                                     size="small"
                                                     variant="outlined"
                                                 />
+                                            ) : invoice.booking_id ? (
+                                                <Chip
+                                                    label={`BK${invoice.booking_id}`}
+                                                    size="small"
+                                                    variant="outlined"
+                                                    color="warning"
+                                                />
                                             ) : (
                                                 <Typography variant="body2" color="text.secondary">
                                                     No booking
@@ -1198,7 +1342,7 @@ export default function InvoicesPage() {
                                                 {formatCurrency(invoice.subtotal)}
                                             </Typography>
                                         </TableCell>
-                                        <TableCell>
+                                        {/* <TableCell>
                                             {invoice.discount_amount > 0 ? (
                                                 <Box>
                                                     <Typography
@@ -1229,7 +1373,7 @@ export default function InvoicesPage() {
                                                     No discount
                                                 </Typography>
                                             )}
-                                        </TableCell>
+                                        </TableCell> */}
                                         <TableCell>
                                             <Typography variant="body2">
                                                 {formatCurrency(invoice.tax_amount)}
@@ -1304,7 +1448,7 @@ export default function InvoicesPage() {
                 <TablePagination
                     rowsPerPageOptions={[5, 10, 25, 50]}
                     component="div"
-                    count={filteredInvoices.length}
+                    count={totalItems}
                     rowsPerPage={rowsPerPage}
                     page={page}
                     onPageChange={handleChangePage}
@@ -1312,15 +1456,16 @@ export default function InvoicesPage() {
                 />
             </Card>
 
+            {/* Menu for invoice actions */}
             <Menu
                 anchorEl={anchorEl}
                 open={Boolean(anchorEl)}
                 onClose={handleMenuClose}
             >
-                <MenuItem onClick={handleView}>
+                {/* <MenuItem onClick={handleView}>
                     <Visibility sx={{ mr: 1, fontSize: 20 }} />
                     View Details
-                </MenuItem>
+                </MenuItem> */}
                 <MenuItem onClick={handleViewItems}>
                     <Inventory sx={{ mr: 1, fontSize: 20 }} />
                     View Items
@@ -1351,6 +1496,7 @@ export default function InvoicesPage() {
                 </MenuItem>
             </Menu>
 
+            {/* Create/Edit Dialog */}
             <Dialog
                 open={openDialog}
                 onClose={handleDialogClose}
@@ -1365,13 +1511,7 @@ export default function InvoicesPage() {
                             : "Invoice Details"}
                 </DialogTitle>
                 <DialogContent dividers>
-                    {isItemsLoading &&
-                        (dialogMode === "view" || dialogMode === "edit") ? (
-                        <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
-                            <CircularProgress size={24} />
-                            <Typography sx={{ ml: 2 }}>Loading Details...</Typography>
-                        </Box>
-                    ) : dialogMode === "view" && invoiceToView ? (
+                    { dialogMode === "view" && invoiceToView ? (
                         <Grid container spacing={3} sx={{ mt: 0.5 }}>
                             <Grid size={{ xs: 12 }}>
                                 <Box
@@ -1557,7 +1697,7 @@ export default function InvoicesPage() {
                                                     {formatCurrency(invoiceToView.subtotal)}
                                                 </Typography>
                                             </Box>
-                                            {invoiceToView.discount_amount > 0 && (
+                                            {/* {invoiceToView.discount_amount > 0 && (
                                                 <Box
                                                     sx={{
                                                         display: "flex",
@@ -1575,7 +1715,7 @@ export default function InvoicesPage() {
                                                         -{formatCurrency(invoiceToView.discount_amount)}
                                                     </Typography>
                                                 </Box>
-                                            )}
+                                            )} */}
                                             <Box
                                                 sx={{
                                                     display: "flex",
@@ -1689,31 +1829,22 @@ export default function InvoicesPage() {
                                 </FormControl>
                             </Grid>
                             <Grid size={{ xs: 12, sm: 6 }}>
-                                <FormControl fullWidth>
-                                    <InputLabel>Booking</InputLabel>
-                                    <Select
-                                        value={formData.booking_id}
-                                        label="Booking"
-                                        onChange={(e) =>
-                                            setFormData({ ...formData, booking_id: e.target.value })
-                                        }
-                                    >
-                                        <MenuItem value="">No Booking</MenuItem>
-                                        {bookings
-                                            .filter(
-                                                (booking) =>
-                                                    booking.confirm === true
-                                            )
-                                            .map((booking) => (
-                                                <MenuItem key={booking.id} value={booking.id}>
-                                                    {`Booking #${booking.id} - ${customers.find(
-                                                        (c) => c.id === booking.customerId
-                                                    )?.fullName || "Unknown Customer"
-                                                        }`}
-                                                </MenuItem>
-                                            ))}
-                                    </Select>
-                                </FormControl>
+                                <TextField
+                                    fullWidth
+                                    label="Booking"
+                                    value={
+                                        formData.booking_id
+                                            ? `BK${formData.booking_id} - ${bookings.find((b) => b.id.toString() === formData.booking_id)?.customer?.fullName ||
+                                            customers.find((c) => c.id === bookings.find((b) => b.id.toString() === formData.booking_id)?.customerId)?.fullName ||
+                                            "Unknown Customer"
+                                            }`
+                                            : "No Booking"
+                                    }
+                                    InputProps={{
+                                        readOnly: true,
+                                    }}
+                                    helperText="Booking information"
+                                />
                             </Grid>
                             <Grid size={{ xs: 12, sm: 6 }}>
                                 <FormControl fullWidth>
@@ -1868,6 +1999,7 @@ export default function InvoicesPage() {
                                                     <TableCell align="center">Actions</TableCell>
                                                 </TableRow>
                                             </TableHead>
+
                                             <TableBody>
                                                 {items.map((item, index) => (
                                                     <TableRow key={index}>
@@ -1962,7 +2094,7 @@ export default function InvoicesPage() {
                   </Select>
                 </FormControl>
               </Grid> */}
-                            <Grid size={{ xs: 12, sm: 4 }}>
+                            {/* <Grid size={{ xs: 12, sm: 4 }}>
                                 <TextField
                                     fullWidth
                                     label="Tax Amount"
@@ -1975,7 +2107,7 @@ export default function InvoicesPage() {
                                         ),
                                     }}
                                 />
-                            </Grid>
+                            </Grid> */}
 
                             <Grid size={{ xs: 12 }}>
                                 <Box
@@ -2028,7 +2160,7 @@ export default function InvoicesPage() {
                                             >
                                                 <Typography>Tax:</Typography>
                                                 <Typography fontWeight="600">
-                                                    {formatCurrency(parseFloat(formData.tax_amount))}
+                                                    {formatCurrency(calculatedTaxAmount)}
                                                 </Typography>
                                             </Box>
                                             <Divider />
@@ -2062,7 +2194,7 @@ export default function InvoicesPage() {
                         </Grid>
                     )}
                 </DialogContent>
-                <DialogActions>
+                <DialogActions sx={{ px: 4, py: 2 }}>
                     {dialogMode !== "view" && (
                         <>
                             <Button onClick={handleDialogClose}>Cancel</Button>
@@ -2185,6 +2317,7 @@ export default function InvoicesPage() {
                 </DialogActions>
             </Dialog>
 
+            {/* Delete Confirmation Dialog */}
             <Dialog
                 open={deleteConfirmOpen}
                 onClose={() => setDeleteConfirmOpen(false)}

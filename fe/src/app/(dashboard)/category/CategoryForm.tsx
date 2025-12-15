@@ -334,7 +334,7 @@ export default function CategoryForm() {
       </Backdrop>
       {/* Stats Cards */}
       <Grid container spacing={3} sx={{ mb: 3 }}>
-        <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
+        <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
           <Card>
             <CardContent>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -353,7 +353,7 @@ export default function CategoryForm() {
             </CardContent>
           </Card>
         </Grid>
-        <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
+        <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
           <Card>
             <CardContent>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -372,7 +372,7 @@ export default function CategoryForm() {
             </CardContent>
           </Card>
         </Grid>
-        <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
+        <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
           <Card>
             <CardContent>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -459,7 +459,6 @@ export default function CategoryForm() {
               <TableRow sx={{ bgcolor: alpha(PRIMARY_COLOR, 0.05) }}>
                 <TableCell sx={{ fontWeight: 700 }}>Category</TableCell>
                 <TableCell sx={{ fontWeight: 700 }}>Slug</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Display Order</TableCell>
                 <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
                 <TableCell sx={{ fontWeight: 700 }}>Created At</TableCell>
                 <TableCell sx={{ fontWeight: 700 }} align="center">
@@ -519,14 +518,7 @@ export default function CategoryForm() {
                         }}
                       />
                     </TableCell>
-                    <TableCell>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        <Reorder sx={{ fontSize: 16, color: 'text.secondary' }} />
-                        <Typography variant="body2" fontWeight="600">
-                          {category.displayOrder}
-                        </Typography>
-                      </Box>
-                    </TableCell>
+                  
                     <TableCell>
                       <Chip
                         label={getStatusLabel(category.status)}
@@ -623,24 +615,7 @@ export default function CategoryForm() {
                 placeholder="category-slug"
               />
             </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <TextField
-                fullWidth
-                label="Display Order"
-                type="number"
-                value={formData.displayOrder}
-                onChange={handleFormChange('displayOrder')}
-                error={!!validationErrors.displayOrder}
-                helperText={validationErrors.displayOrder}
-                InputProps={{
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <Reorder sx={{ color: 'text.secondary' }} />
-                    </InputAdornment>
-                  ),
-                }}
-              />
-            </Grid>
+        
             <Grid size={{ xs: 12 }}>
               <TextField
                 fullWidth
@@ -752,7 +727,7 @@ export default function CategoryForm() {
         open={snackbar?.open}
         autoHideDuration={6000}
         onClose={() => setSnackbar(null)}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
       >
         <Alert onClose={() => setSnackbar(null)} severity={snackbar?.severity} sx={{ width: '100%' }}>
           {snackbar?.message}

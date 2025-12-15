@@ -478,7 +478,7 @@ export default function InvoicesPage() {
             }));
 
             setInvoices(processedInvoices);
-            setTotalItems(processedInvoices.length);
+            setTotalItems(data.meta.total);
         } catch (err) {
             console.error("Failed to fetch invoices:", err);
             setError("Failed to load invoices. Please try again.");
@@ -503,7 +503,7 @@ export default function InvoicesPage() {
 
                 setFormData((prev) => ({
                     ...prev,
-                    customer_id: selectedBooking.customerId.toString(),
+                    customer_id: selectedBooking.customerId?.toString() || "",
                     store_id: selectedBooking.storeId.toString(),
 
                 }));
@@ -552,12 +552,8 @@ export default function InvoicesPage() {
     }, [invoices, debouncedSearchQuery]);
 
     const paginatedInvoices = useMemo(
-        () =>
-            filteredInvoices.slice(
-                page * rowsPerPage,
-                page * rowsPerPage + rowsPerPage
-            ),
-        [filteredInvoices, page, rowsPerPage]
+        () => filteredInvoices,
+        [filteredInvoices]
     );
 
     const stats = useMemo(
@@ -1198,7 +1194,7 @@ export default function InvoicesPage() {
                         }}
                     >
                         <TextField
-                            placeholder="Search by voucher, customer name, phone..."
+                            placeholder="Search by invoice code, customer name, phone..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             sx={{ flex: 1, minWidth: 250 }}
@@ -1265,7 +1261,7 @@ export default function InvoicesPage() {
                     <Table>
                         <TableHead>
                             <TableRow sx={{ bgcolor: alpha(PRIMARY_COLOR, 0.05) }}>
-                                <TableCell sx={{ fontWeight: 700 }}>Voucher</TableCell>
+                                <TableCell sx={{ fontWeight: 700 }}>Invoice code</TableCell>
                                 <TableCell sx={{ fontWeight: 700 }}>Customer</TableCell>
                                 <TableCell sx={{ fontWeight: 700 }}>Store</TableCell>
                                 <TableCell sx={{ fontWeight: 700 }}>Booking</TableCell>
@@ -1452,7 +1448,7 @@ export default function InvoicesPage() {
                 <TablePagination
                     rowsPerPageOptions={[5, 10, 25, 50]}
                     component="div"
-                    count={filteredInvoices.length}
+                    count={totalItems}
                     rowsPerPage={rowsPerPage}
                     page={page}
                     onPageChange={handleChangePage}
@@ -1504,7 +1500,7 @@ export default function InvoicesPage() {
             <Dialog
                 open={openDialog}
                 onClose={handleDialogClose}
-                maxWidth="lg"
+                maxWidth="xl"
                 fullWidth
             >
                 <DialogTitle>
@@ -1838,7 +1834,7 @@ export default function InvoicesPage() {
                                     label="Booking"
                                     value={
                                         formData.booking_id
-                                            ? `BK #${formData.booking_id} - ${bookings.find((b) => b.id.toString() === formData.booking_id)?.customer?.fullName ||
+                                            ? `BK${formData.booking_id} - ${bookings.find((b) => b.id.toString() === formData.booking_id)?.customer?.fullName ||
                                             customers.find((c) => c.id === bookings.find((b) => b.id.toString() === formData.booking_id)?.customerId)?.fullName ||
                                             "Unknown Customer"
                                             }`

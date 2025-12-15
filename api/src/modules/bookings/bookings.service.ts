@@ -32,21 +32,16 @@ export class BookingsService {
 
   async createBookingFromOrder(orderDto: CreateBookingOrderDto): Promise<Booking> {
     const { customer: customerData, booking: bookingData, invoice: invoiceData } = orderDto;
-
-    // Step 1: Find or create the customer
     const customer = await this.customersService.findOrCreate(customerData);
-
-    // Step 2: Create the booking
     const booking = this.bookingRepository.create({
       ...bookingData,
       customerId: customer.id,
-      status: BookingStatus.PENDING, // Or PENDING, depending on business logic
+      status: BookingStatus.PENDING, 
       confirm: true,
-      source: 'website', // Or another source if available
+      source: 'website', 
     });
     const savedBooking = await this.bookingRepository.save(booking);
 
-    // Step 3: Create the invoice
     const voucher = `INV-${savedBooking.id}-${Date.now()}`;
     await this.invoicesService.create({
       ...invoiceData,
@@ -56,14 +51,12 @@ export class BookingsService {
       paymentStatus: PaymentStatus.PENDING, 
     });
     
-    // Step 4: Update customer's last visit date
     await this._updateCustomerLastVisit(savedBooking);
 
     return savedBooking;
   }
 
   async create(createBookingDto: CreateBookingDto): Promise<Booking> {
-    // Validate booking time
     if (
       createBookingDto.endTime &&
       createBookingDto.startTime >= createBookingDto.endTime
@@ -73,12 +66,6 @@ export class BookingsService {
 
     const booking = this.bookingRepository.create(createBookingDto);
     const savedBooking = await this.bookingRepository.save(booking);
-
-    // If booking is created with confirm: true, create an invoice and update customer
-    if (savedBooking.confirm) {
-      await this.createInvoiceFromBooking(savedBooking);
-      await this._updateCustomerLastVisit(savedBooking);
-    }
 
     return savedBooking;
   }
@@ -97,7 +84,8 @@ export class BookingsService {
       .createQueryBuilder('booking')
       .leftJoinAndSelect('booking.customer', 'customer')
       .leftJoinAndSelect('booking.store', 'store')
-      .leftJoinAndSelect('booking.creator', 'creator');
+      .leftJoinAndSelect('booking.creator', 'creator')
+      .leftJoinAndSelect('booking.invoices', 'invoices');
 
     if (customerId) {
       queryBuilder.andWhere('booking.customerId = :customerId', { customerId });
@@ -152,7 +140,6 @@ export class BookingsService {
     updateBookingDto: UpdateBookingDto,
   ): Promise<Booking> {
     const booking = await this.findOne(id);
-    const originalConfirmState = booking.confirm;
 
     // Validate booking time if both times are provided
     if (updateBookingDto.endTime && updateBookingDto.startTime) {
@@ -163,12 +150,6 @@ export class BookingsService {
 
     Object.assign(booking, updateBookingDto);
     const updatedBooking = await this.bookingRepository.save(booking);
-
-    // If 'confirm' status changed from false to true, create an invoice and update customer
-    if (!originalConfirmState && updatedBooking.confirm) {
-      await this.createInvoiceFromBooking(updatedBooking);
-      await this._updateCustomerLastVisit(updatedBooking);
-    }
 
     return updatedBooking;
   }
@@ -215,16 +196,9 @@ export class BookingsService {
 
   async confirmBooking(id: number): Promise<Booking> {
     const booking = await this.findOne(id);
-    const originalConfirmState = booking.confirm;
     booking.confirm = true;
 
     const updatedBooking = await this.bookingRepository.save(booking);
-
-    // If booking is just being confirmed, create an invoice and update customer
-    if (!originalConfirmState) {
-      await this.createInvoiceFromBooking(updatedBooking);
-      await this._updateCustomerLastVisit(updatedBooking);
-    }
 
     return updatedBooking;
   }
@@ -264,5 +238,21 @@ export class BookingsService {
       .orderBy('booking.bookingDate', 'DESC')
       .addOrderBy('booking.startTime', 'DESC')
       .getMany();
+  }
+
+  async startService(id: number): Promise<Booking> {
+    const booking = await this.findOne(id);
+
+    booking.status = BookingStatus.IN_PROGRESS;
+    return await this.bookingRepository.save(booking);
+  }
+
+  async completeService(id: number): Promise<Booking> {
+    const booking = await this.findOne(id);
+
+    booking.status = BookingStatus.COMPLETED;
+    const updatedBooking = await this.bookingRepository.save(booking);
+
+    return updatedBooking;
   }
 }

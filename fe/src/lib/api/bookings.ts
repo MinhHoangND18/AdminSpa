@@ -8,6 +8,27 @@ import {
 } from '@/types/booking';
 import api from './axios';
 
+interface CompleteServicePayload {
+  storeId: number;
+  subtotal: number;
+  totalAmount: number;
+  discountAmount?: number;
+  taxAmount?: number;
+  notes?: string;
+  paymentStatus: string;
+  items: Array<{
+    itemType: string;
+    itemId: number;
+    itemName?: string;
+    quantity: number;
+    unitPrice: number;
+    discount: number;
+    staffId?: number;
+  }>;
+}
+
+export type { CompleteServicePayload };
+
 interface ApiResponseWrapper {
     success: boolean;
     data: BookingResponse; 
@@ -47,6 +68,16 @@ export const confirmBooking = async (id: number) => {
 
 export const cancelBooking = async (id: number) => {
   const { data } = await api.patch(`${API_ENDPOINTS.BOOKINGS}/${id}/cancel`);
+  return data;
+};
+
+export const startService = async (id: number) => {
+  const { data } = await api.post(`${API_ENDPOINTS.BOOKINGS}/${id}/start`);
+  return data;
+};
+
+export const completeService = async (id: number, invoiceData: CompleteServicePayload) => {
+  const { data } = await api.post(`${API_ENDPOINTS.BOOKINGS}/${id}/complete`, invoiceData);
   return data;
 };
 
