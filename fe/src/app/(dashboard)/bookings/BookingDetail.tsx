@@ -119,9 +119,9 @@ export default function BookingDetail({
         };
         const updatedItems = [...(booking.pendingInvoiceItems || [])];
         if (editingItemIndex !== null) {
-            updatedItems[editingItemIndex] = newItem as any;
+            updatedItems[editingItemIndex] = newItem;
         } else {
-            updatedItems.push(newItem as any);
+            updatedItems.push(newItem);
         }
 
         onUpdateBookingItems(booking.id, updatedItems);
@@ -209,7 +209,7 @@ export default function BookingDetail({
                                                     onClick={() => handleOpenEditItem(index)}
                                                     sx={{ cursor: 'pointer' }}
                                                 >
-                                                    <TableCell>#{item.itemId}</TableCell>
+                                                    <TableCell>#{index + 1}</TableCell>
                                                     <TableCell>
                                                         <Typography variant="body2" color="#1957bd" fontWeight={600}>{item.itemName}</Typography>
                                                         <Typography variant="caption" color="text.secondary">{item.itemType.toUpperCase()}</Typography>
@@ -237,7 +237,7 @@ export default function BookingDetail({
                                                 { label: "Source", value: booking.source || "Website" },
                                                 { label: "Booking Date", value: booking.bookingDate },
                                                 { label: "Time Slot", value: booking.startTime },
-                                                { label: "Notes", value: booking.notes || "N/A" },
+                                                { label: "Notes", value: booking.notes || "No note now" },
                                             ].map((row, i) => (
                                                 <React.Fragment key={i}>
                                                     <Grid size={{ xs: 4 }}><Typography variant="body2" color="text.secondary">{row.label}</Typography></Grid>
@@ -283,7 +283,7 @@ export default function BookingDetail({
                                         onChange={(e) => setNote(e.target.value)}
                                         sx={{ "& fieldset": { borderRadius: 0 } }}
                                     />
-                                    <Button variant="contained" sx={{ bgcolor: "#3498db", borderRadius: 0, height: 40 }}>Save Note</Button>
+                                    <Button variant="contained" sx={{ bgcolor: "#3498db", borderRadius: 0, height: 40,}}>Save Note</Button>
                                 </Stack>
                             </Paper>
                         </Stack>

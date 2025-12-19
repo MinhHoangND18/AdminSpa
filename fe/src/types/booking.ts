@@ -1,4 +1,4 @@
-// types/booking.ts
+
 import { Customer as CustomerType } from './customer';
 import { Invoice } from './invoice';
 import { ItemType } from './invoice-item';
@@ -62,7 +62,6 @@ export interface Booking {
     invoices?: Invoice[];
 }
 
-// Interface cho Response trả về từ findAll (có phân trang)
 export interface BookingResponse {
     data: Booking[];
     meta: {
@@ -86,10 +85,8 @@ export interface CreateBookingPayload {
     pendingInvoiceItems?: CreatePendingInvoiceItemPayload[];
 }
 
-// Payload khi cập nhật (UpdateBookingDto)
 export type UpdateBookingPayload = Partial<CreateBookingPayload>;
 
-// Query params cho filter
 export interface BookingFilters {
     page?: number;
     limit?: number;

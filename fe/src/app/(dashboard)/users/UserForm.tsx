@@ -40,7 +40,6 @@ import {
   CircularProgress,
 } from "@mui/material";
 import { usersApi } from "@/lib/api/users";
-import { UserResponse } from "@/types/user"
 import {
   getStaff,
   createStaff,
@@ -67,7 +66,8 @@ import {
   Group,
   Close as CloseIcon,
 } from "@mui/icons-material";
-
+import UserDetail from "./UserDetail";
+import { User, UserFormData, UserResponse, Staff } from "@/types/user";
 interface AxiosErrorResponse {
   response?: {
     data?: {
@@ -107,44 +107,14 @@ type UserRole =
   | "receptionist"
   | "staff";
 
-interface Staff {
-  id: number;
-  full_name: string;
-}
+
 
 interface StoreData {
   id: number;
   name: string;
 }
 
-interface User {
-  id: number;
-  username: string;
-  email: string | null;
-  fullname: string | null;
-  role: UserRole;
-  staff_id: number | null;
-  staff_name?: string;
-  store_id: number | null;
-  store_name?: string;
-  last_login: string | null;
-  login_attempts: number;
-  is_locked: boolean;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-}
 
-interface UserFormData {
-  username: string;
-  email: string;
-  fullname: string;
-  password: string;
-  role: UserRole;
-  staff_id: string;
-  store_id: string;
-  is_active: boolean;
-}
 
 const StaffApi = {
   getAll: getStaff,
@@ -233,6 +203,7 @@ export default function UsersPage() {
   const [validationErrors, setValidationErrors] = useState<
     Partial<Record<keyof UserFormData, string>>
   >({});
+  const [showDetail, setShowDetail] = useState(false);
 
   const [loading, setLoading] = useState(false);
 
@@ -315,9 +286,9 @@ export default function UsersPage() {
       const responseData: UserResponse['data'] = apiResponse.data || { data: [], total: 0, page: 0, limit: 0 };
       const users = responseData.data || [];
 
-    console.log('Users data:', users);
+      console.log('Users data:', users);
       console.log('First user:', users[0]);
-      
+
 
       const total = responseData.total ?? 0;
 
@@ -344,7 +315,7 @@ export default function UsersPage() {
       const staffResponse = await StaffApi.getAll({});
       const storeResponse = await storesApi.getAll();
 
-      const staffData = staffResponse?.data.data || [];
+      const staffData = staffResponse?.data?.data || [];
       setAvailableStaff(Array.isArray(staffData) ? staffData : []);
 
       const storeData = storeResponse?.data.data || [];
@@ -384,24 +355,14 @@ export default function UsersPage() {
 
   const handleAddNew = () => {
     setDialogMode("add");
-    setFormData(initialFormData);
-    setOpenDialog(true);
+    setSelectedUser(null);
+    setShowDetail(true);
   };
 
   const handleEdit = () => {
     if (selectedUser) {
       setDialogMode("edit");
-      setFormData({
-        username: selectedUser.username,
-        email: selectedUser.email || "",
-        fullname: selectedUser.fullname || "",
-        password: "",
-        role: selectedUser.role,
-        staff_id: selectedUser.staff_id?.toString() || "",
-        store_id: selectedUser.store_id?.toString() || "",
-        is_active: selectedUser.is_active,
-      });
-      setOpenDialog(true);
+      setShowDetail(true);
     }
     handleMenuClose();
   };
@@ -413,6 +374,74 @@ export default function UsersPage() {
     }
     handleMenuClose();
   };
+  const handleSaveUser = async (submittedData: UserFormData) => {
+    setLoading(true);
+    try {
+      const dataToSend: Partial<User> & { password?: string } = {
+        username: submittedData.username,
+        email: submittedData.email || null,
+        fullname: submittedData.fullname || null,
+        role: submittedData.role,
+        is_active: submittedData.is_active,
+        staff_id: submittedData.staff_id ? parseInt(submittedData.staff_id, 10) : null,
+        store_id: submittedData.store_id ? parseInt(submittedData.store_id, 10) : null,
+        password: submittedData.password,
+      };
+
+      if (dialogMode === "edit" && !dataToSend.password) {
+        delete dataToSend.password;
+      }
+
+      if (dialogMode === "add") {
+        await usersApi.create(dataToSend);
+      } else if (dialogMode === "edit" && selectedUser) {
+        await usersApi.update(selectedUser.id, dataToSend);
+      }
+
+      setShowDetail(false);
+      fetchUsers();
+      setSnackbar({
+        open: true,
+        message: dialogMode === "add" ? "Tạo người dùng thành công" : "Cập nhật thành công",
+        severity: "success",
+      });
+    } catch (error: unknown) {
+      console.error("Failed to delete user:", error);
+      let errorMessage = "An unknown error occurred.";
+
+      if (isAxiosError(error)) {
+        errorMessage =
+          error.response?.data?.message ||
+          error.message ||
+          errorMessage;
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      setSnackbar({
+        open: true,
+        message: `Deletion failed: ${errorMessage}`,
+        severity: "error",
+      });
+
+    } finally {
+      setLoading(false);
+    }
+  };
+  if (showDetail) {
+    return (
+      <UserDetail
+        mode={dialogMode}
+        initialData={selectedUser}
+        availableStaff={availableStaff}
+        availableStores={availableStores}
+        assignableRoles={assignableRoles}
+        getRoleLabel={getRoleLabel}
+        onBack={() => setShowDetail(false)}
+        onSave={handleSaveUser}
+        loading={loading}
+      />
+    );
+  }
 
   const handleDelete = () => {
     setDeleteConfirmOpen(true);

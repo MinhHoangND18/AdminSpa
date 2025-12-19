@@ -12,14 +12,15 @@ import {
   ConfirmationNumber, CheckCircle, Cancel
 } from "@mui/icons-material";
 import { useQuery } from "@tanstack/react-query";
-import { BookingStatus } from "@/types/booking";
-import BookingDetail from "./BookingDetail";
+import { Booking, BookingStatus, PendingInvoiceItem, CreatePendingInvoiceItemPayload } from "@/types/booking";
+import BookingDetail from "./BookingDetail"
 import { getServices } from "@/lib/api/services";
 import { getProducts } from "@/lib/api/products";
 import { getStaff } from "@/lib/api/staffs";
-import { getBookings, updateBooking, startService, confirmBooking } from "@/lib/api/bookings";
+import { Staff } from "@/types/staff";
+import { getBookings, updateBooking, startService, confirmBooking, completeService, type CompleteServicePayload } from "@/lib/api/bookings";
 import { useQueryClient, useMutation } from "@tanstack/react-query";
-import { PendingInvoiceItem } from "@/types/booking";
+
 
 const PRIMARY_COLOR = "#3b82f6";
 const SUCCESS_COLOR = "#10b981";
@@ -49,15 +50,12 @@ export default function BookingsPage() {
     queryKey: ['staff'],
     queryFn: () => getStaff({ limit: 1000 })
   });
-  const staffData = (staffDataRes as any)?.data?.data || [];
+  const staffData: Staff[] = staffDataRes?.data?.data || [];
 
-  const bookings = useMemo(() => {
-    if (!response) return [];
-    return Array.isArray(response) ? response : (response as any).data || [];
-  }, [response]);
+  const bookings = useMemo(() => response?.data || [], [response]);
 
   const filteredBookings = useMemo(() => {
-    return bookings.filter((booking: any) => {
+    return bookings.filter((booking: Booking) => {
       const matchStatus = currentTab === "ALL" || booking.status === currentTab;
       const query = searchTerm.toLowerCase();
       return matchStatus && (
@@ -77,19 +75,67 @@ export default function BookingsPage() {
     queryClient.invalidateQueries({ queryKey: ['bookings'] });
   };
 
-  const handleCompleteService = (id: number) => {
-    console.log("Complete service for booking:", id);
+  const handleCompleteService = async (id: number) => {
+    const booking = bookings.find((b: Booking) => b.id === id);
+    if (!booking) return;
+
+    const subtotal = booking.pendingInvoiceItems?.reduce(
+        (sum, item) => sum + (item.unitPrice * item.quantity), 0
+    ) || 0;
+
+    const totalDiscount = booking.pendingInvoiceItems?.reduce(
+        (sum, item) => sum + (item.discount || 0), 0
+    ) || 0;
+
+    const afterDiscount = subtotal - totalDiscount;
+
+    const taxRate = 0.1;
+    const taxAmount = Math.round(afterDiscount * taxRate);
+
+    const finalAmount = afterDiscount + taxAmount;
+
+    const invoiceData: CompleteServicePayload = {
+        storeId: booking.storeId,
+        subtotal: subtotal,
+        totalAmount: finalAmount,
+        discountAmount: totalDiscount,
+        taxAmount: taxAmount,
+        paymentStatus: 'pending',
+        items: booking.pendingInvoiceItems?.map(item => ({
+            itemType: item.itemType,
+            itemId: item.itemId,
+            itemName: item.itemName,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            discount: item.discount || 0,
+            staffId: item.staffId,
+        })) || []
+    };
+
+    await completeService(id, invoiceData);
+    await queryClient.invalidateQueries({ queryKey: ['bookings'] });
+    setSelectedId(null); 
   };
 
   const handleUpdateBookingItems = async (id: number, items: PendingInvoiceItem[]) => {
-    await updateBooking(id, { pendingInvoiceItems: items });
+    const payloadItems: CreatePendingInvoiceItemPayload[] = items.map(item => ({
+        itemType: item.itemType,
+        itemId: item.itemId,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        discount: item.discount,
+        totalPrice: item.totalPrice,
+        staffId: item.staffId,
+        itemName: item.itemName,
+    }));
+    await updateBooking(id, { pendingInvoiceItems: payloadItems });
     queryClient.invalidateQueries({ queryKey: ['bookings'] });
   };
 
   if (isLoading) return <Box sx={{ display: 'flex', justifyContent: 'center', mt: 10 }}><CircularProgress /></Box>;
 
   if (selectedId && response) {
-    const selectedBooking = bookings.find((b: any) => b.id === selectedId);
+    const selectedBooking = bookings.find((b: Booking) => b.id === selectedId);
     if (selectedBooking) {
       return (
         <BookingDetail
@@ -102,9 +148,7 @@ export default function BookingsPage() {
           onStartService={handleStartService}
           onCompleteService={handleCompleteService}
           onEdit={(b) => console.log("Edit", b)}
-          onUpdateBookingItems={(id, items) => {
-            console.log("Update items for booking", id, items);
-          }}
+          onUpdateBookingItems={handleUpdateBookingItems}
         />
       );
     }
@@ -158,7 +202,7 @@ export default function BookingsPage() {
           <TextField
             fullWidth
             size="small"
-            placeholder="Tìm theo tên khách, số điện thoại..."
+            // placeholder="Tìm theo tên khách, số điện thoại..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             InputProps={{
@@ -183,7 +227,7 @@ export default function BookingsPage() {
       {/* TABLE - CỐ ĐỊNH LAYOUT ĐỂ KHÔNG BỊ NHẢY KHI LOAD DATA */}
       <Card sx={{ borderRadius: 0, border: "1px solid #E2E8F0" }} elevation={0}>
         <TableContainer>
-          <Table sx={{ tableLayout: "fixed" }}> {/* QUAN TRỌNG: Giữ nguyên khung bảng */}
+          <Table sx={{ tableLayout: "fixed" }}>
             <TableHead>
               <TableRow sx={{ bgcolor: alpha(PRIMARY_COLOR, 0.05) }}>
                 <TableCell sx={{ fontWeight: 700, width: "100px" }}>Booking</TableCell>
@@ -265,11 +309,14 @@ export default function BookingsPage() {
         </TableContainer>
         <TablePagination
           component="div"
-          count={(response as any)?.meta?.total || filteredBookings.length}
+          count={response?.meta?.total || filteredBookings.length}
           rowsPerPage={rowsPerPage}
           page={page}
           onPageChange={(_, newPage) => setPage(newPage)}
-          onRowsPerPageChange={(e) => setPage(parseInt(e.target.value, 10))}
+          onRowsPerPageChange={(e) => {
+            setRowsPerPage(parseInt(e.target.value, 10));
+            setPage(0);
+          }}
           sx={{ borderTop: "1px solid #E2E8F0" }}
         />
       </Card>
