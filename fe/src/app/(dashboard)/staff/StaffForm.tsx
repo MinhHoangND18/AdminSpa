@@ -68,6 +68,7 @@ import {
 } from "@/lib/api/staffs";
 
 import { useAuth } from "@/lib/hooks/useAuth";
+import StaffDetail from "./StaffDetail";
 
 interface AxiosErrorResponse {
   response?: {
@@ -80,7 +81,6 @@ interface AxiosErrorResponse {
 
 
 const isAxiosError = (error: unknown): error is AxiosErrorResponse => {
-  // Kiểm tra xem nó có phải là đối tượng và có thuộc tính 'response' không
   return (
     typeof error === 'object' &&
     error !== null &&
@@ -154,6 +154,9 @@ export default function StaffPage() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   const [storeList, setStoreList] = useState<Store[]>([]);
+
+  const [showDetail, setShowDetail] = useState(false);
+
   useEffect(() => {
     const fetchStores = async () => {
       try {
@@ -220,18 +223,16 @@ export default function StaffPage() {
         limit: rowsPerPage,
         keyword: searchQuery,
       };
-      if (filterStatus !== "all") params.status = filterStatus;
+      if (filterStatus !== "all") {
+        params.status = filterStatus as StaffStatus;
+      }
 
       const response = await getStaff(params);
 
       if (response && response.data && Array.isArray(response.data.data)) {
         setStaff(response.data.data);
         setTotalCount(response.data.total);
-      } else if (response && Array.isArray(response.data)) {
-        setStaff(response.data);
-        setTotalCount(response.data.total);
       } else {
-        console.warn("Strange data structure:", response);
         setStaff([]);
         setTotalCount(0);
       }
@@ -242,15 +243,57 @@ export default function StaffPage() {
       setLoading(false);
     }
   }, [page, rowsPerPage, searchQuery, filterStatus]);
+  const handleAddNew = () => {
+    setDialogMode("add");
+    setSelectedStaff(null);
+    setShowDetail(true);
+  };
 
+  const handleEdit = () => {
+    if (selectedStaff) {
+      setDialogMode("edit");
+      setShowDetail(true);
+    }
+    handleMenuClose();
+  };
+
+  const handleSaveStaff = async (submitData: StaffFormData) => {
+    try {
+      if (dialogMode === "add") {
+        await createStaff(submitData);
+      } else if (dialogMode === "edit" && selectedStaff) {
+        await updateStaff({ id: selectedStaff.id, data: submitData });
+      }
+
+      setSnackbar({ open: true, message: "Staff saved successfully", severity: "success" });
+      setShowDetail(false);
+      fetchStaffData();
+    } catch (error) {
+      console.error("Failed to fetch dropdown data:", error);
+    }
+  };
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       fetchStaffData();
     }, 500);
+
     return () => clearTimeout(timeoutId);
   }, [fetchStaffData]);
 
+  if (showDetail) {
+    return (
+      <StaffDetail
+        key={selectedStaff?.id || 'new'}
+        mode={dialogMode}
+        initialData={selectedStaff}
+        storeList={storeList}
+        onBack={() => setShowDetail(false)}
+        onSave={handleSaveStaff}
+        loading={loading}
+      />
+    );
+  }
   const stats = {
     total: staff.length,
     active: staff.filter((s) => s.status === "active").length,
@@ -270,38 +313,38 @@ export default function StaffPage() {
     setAnchorEl(null);
   };
 
-  const handleAddNew = () => {
-    setDialogMode("add");
-    setFormData(initialFormData);
-    setOpenDialog(true);
-  };
+  // const handleAddNew = () => {
+  //   setDialogMode("add");
+  //   setFormData(initialFormData);
+  //   setOpenDialog(true);
+  // };
 
-  const handleEdit = () => {
-    if (selectedStaff) {
-      setDialogMode("edit");
-      setFormData({
+  // const handleEdit = () => {
+  //   if (selectedStaff) {
+  //     setDialogMode("edit");
+  //     setFormData({
 
-        full_name: selectedStaff.full_name,
-        phone: selectedStaff.phone,
-        email: selectedStaff.email || "",
-        gender: selectedStaff.gender,
-        birthday: selectedStaff.birthday
-          ? new Date(selectedStaff.birthday).toISOString().split("T")[0]
-          : "",
-        address: selectedStaff.address || "",
-        store_id: selectedStaff.store?.id ?? selectedStaff.store_id ?? null,
-        hire_date: selectedStaff.hire_date
-          ? new Date(selectedStaff.hire_date).toISOString().split("T")[0]
-          : "",
-        salary_type: selectedStaff.salary_type,
-        base_salary: selectedStaff.base_salary || 0,
-        commission_rate: selectedStaff.commission_rate || 0,
-        status: selectedStaff.status,
-      });
-      setOpenDialog(true);
-    }
-    handleMenuClose();
-  };
+  //       full_name: selectedStaff.full_name,
+  //       phone: selectedStaff.phone,
+  //       email: selectedStaff.email || "",
+  //       gender: selectedStaff.gender,
+  //       birthday: selectedStaff.birthday
+  //         ? new Date(selectedStaff.birthday).toISOString().split("T")[0]
+  //         : "",
+  //       address: selectedStaff.address || "",
+  //       store_id: selectedStaff.store?.id ?? selectedStaff.store_id ?? null,
+  //       hire_date: selectedStaff.hire_date
+  //         ? new Date(selectedStaff.hire_date).toISOString().split("T")[0]
+  //         : "",
+  //       salary_type: selectedStaff.salary_type,
+  //       base_salary: selectedStaff.base_salary || 0,
+  //       commission_rate: selectedStaff.commission_rate || 0,
+  //       status: selectedStaff.status,
+  //     });
+  //     setOpenDialog(true);
+  //   }
+  //   handleMenuClose();
+  // };
 
   const handleView = () => {
     if (selectedStaff) {
@@ -358,14 +401,14 @@ export default function StaffPage() {
   };
 
   const handleFormChange =
-      (field: keyof StaffFormDataType) =>
-        (
-          event:
-            | React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-            | { target: { value: string | number | StaffStatus | SalaryType | Gender | null | '' } }
-        ) => {
-          setFormData({ ...formData, [field]: event.target.value });
-        };
+    (field: keyof StaffFormDataType) =>
+      (
+        event:
+          | React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+          | { target: { value: string | number | StaffStatus | SalaryType | Gender | null | '' } }
+      ) => {
+        setFormData({ ...formData, [field]: event.target.value });
+      };
   const validateForm = (data: StaffFormDataType): string | null => {
     if (!data.full_name?.trim()) return "Full Name is required.";
     if (!data.phone?.trim()) return "Phone number is required.";
@@ -416,16 +459,16 @@ export default function StaffPage() {
     }
 
     try {
-        const submitData: StaffFormData = {
-              ...formData,
-              store_id: Number(formData.store_id),
-              base_salary: formData.base_salary ? Number(formData.base_salary) : 0,
-              commission_rate: formData.commission_rate
-                ? Number(formData.commission_rate)
-                : undefined,
-              email: formData.email || undefined,
-              address: formData.address,
-            };
+      const submitData: StaffFormData = {
+        ...formData,
+        store_id: Number(formData.store_id),
+        base_salary: formData.base_salary ? Number(formData.base_salary) : 0,
+        commission_rate: formData.commission_rate
+          ? Number(formData.commission_rate)
+          : undefined,
+        email: formData.email || undefined,
+        address: formData.address,
+      };
 
       if (dialogMode === "add") {
         await createStaff(submitData);
@@ -740,16 +783,6 @@ export default function StaffPage() {
                       <Box
                         sx={{ display: "flex", alignItems: "center", gap: 1.5 }}
                       >
-                        <Avatar
-                          sx={{
-                            bgcolor: alpha(PRIMARY_COLOR, 0.1),
-                            color: PRIMARY_COLOR,
-                            width: 40,
-                            height: 40,
-                          }}
-                        >
-                          {staffMember.full_name.charAt(0)}
-                        </Avatar>
                         <Box>
                           <Typography variant="body2" fontWeight="600">
                             {staffMember.full_name}

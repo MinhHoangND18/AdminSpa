@@ -118,6 +118,7 @@ import { Booking as BookingType } from "@/types/booking";
 import { Staff as StaffType } from "@/types/staff";
 import { Product as ProductType } from "@/types/product";
 import { Service as ServiceType } from "@/types/service";
+import InvoiceDetail from "./InvoiceDetail";
 
 interface ApiResponseWrapper<T> {
   data?: {
@@ -317,6 +318,7 @@ export default function InvoicesPage() {
   const abortControllerRef = useRef<AbortController | null>(null);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [showDetail, setShowDetail] = useState(false);
 
   const initialFormData: InvoiceFormData = useMemo(
     () => ({
@@ -609,23 +611,11 @@ export default function InvoicesPage() {
     setAnchorEl(null);
   };
 
-  const handleAddNew = async () => {
+const handleAddNew = () => {
     setDialogMode("add");
-    setFormData(initialFormData);
-    setItems([]);
-    setOpenDialog(true);
-
-    // Load services/products nếu chưa có
-    if (services.length === 0 || products.length === 0) {
-      setIsFormDataLoading(true);
-      await Promise.all([
-        services.length === 0 ? fetchServices() : Promise.resolve(),
-        products.length === 0 ? fetchProducts() : Promise.resolve(),
-      ]);
-      setIsFormDataLoading(false);
-    }
+    setSelectedInvoice(null);
+    setShowDetail(true);
   };
-
   const fetchInvoiceItemsAndOpenDialog = async (
     mode: "view" | "edit" | "view_items"
   ) => {
@@ -684,19 +674,111 @@ export default function InvoicesPage() {
     handleMenuClose();
   };
 
-  const handleEdit = async () => {
-    // Load services/products nếu chưa có
-    if (services.length === 0 || products.length === 0) {
-      setIsFormDataLoading(true);
-      await Promise.all([
-        services.length === 0 ? fetchServices() : Promise.resolve(),
-        products.length === 0 ? fetchProducts() : Promise.resolve(),
-      ]);
-      setIsFormDataLoading(false);
+  const handleEdit = async (invoice: Invoice) => {
+    setSelectedInvoice(invoice);
+    setIsItemsLoading(true);
+    try {
+        const items = await getItemsByInvoiceId(invoice.id);
+        setSelectedInvoice({ ...invoice, items });
+        setDialogMode("edit");
+        setShowDetail(true);
+    } catch (err) {
+        alert("Failed to load invoice items");
+    } finally {
+        setIsItemsLoading(false);
     }
-
-    fetchInvoiceItemsAndOpenDialog("edit");
   };
+
+  const handleSaveInvoice = async (submissionData: any) => {
+    try {
+      setLoading(true);
+      if (dialogMode === "add") {
+        await createInvoice({
+            ...submissionData,
+            voucher: `INV-${Date.now()}`,
+            createdBy: 1 
+        });
+      } else if (dialogMode === "edit" && selectedInvoice) {
+        await updateInvoice(selectedInvoice.id, submissionData);
+    
+      }
+      fetchInvoices();
+      setShowDetail(false);
+    } catch (err) {
+      console.error(err);
+      alert("Error saving invoice");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    setCurrentItem((prev) => ({
+      ...prev,
+      item_id: "",
+      item_name: "",
+      unit_price: "0",
+      discount: "0",
+    }));
+  }, [currentItem.item_type]);
+
+  const selectableItems = useMemo((): SelectableItem[] => {
+
+    if (currentItem.item_type === "product") {
+      const items = (products || []).map((product) => ({
+        id: product.id,
+        name: product.name,
+        price: product.price,
+        discount: product.discount || 0,
+        type: "product" as const,
+      }));
+      return items;
+    }
+    if (currentItem.item_type === "service") {
+      const items = (services || [])
+        .filter((service) => !service.isCombo)
+        .map((service) => ({
+          id: service.id,
+          name: service.name,
+          price: service.price,
+          discount: service.discountPrice
+            ? service.price - service.discountPrice
+            : 0,
+          type: "service" as const,
+        }));
+      return items;
+    }
+    if (currentItem.item_type === "package") {
+      const items = (services || [])
+        .filter((service) => service.isCombo)
+        .map((service) => ({
+          id: service.id,
+          name: service.name,
+          price: service.price,
+          discount: service.discountPrice
+            ? service.price - service.discountPrice
+            : 0,
+          type: "package" as const,
+        }));
+      return items;
+    }
+    return [];
+  }, [products, services, currentItem.item_type]);
+
+  if (showDetail) {
+    return (
+      <InvoiceDetail
+        mode={dialogMode}
+        initialData={selectedInvoice}
+        customers={customers}
+        stores={stores}
+        staff={staff}
+        onSave={handleSaveInvoice}
+        onBack={() => setShowDetail(false)}
+        loading={loading}
+      />
+    );
+  }
   const formatVoucherToBK = (voucher?: string) => {
     if (!voucher) return "";
     const parts = voucher.split("-");
@@ -958,67 +1040,6 @@ export default function InvoicesPage() {
       }
     : null;
 
-  useEffect(() => {
-    setCurrentItem((prev) => ({
-      ...prev,
-      item_id: "",
-      item_name: "",
-      unit_price: "0",
-      discount: "0",
-    }));
-  }, [currentItem.item_type]);
-
-  const selectableItems = useMemo((): SelectableItem[] => {
-    // console.log('🔍 selectableItems recalculating:', {
-    //     item_type: currentItem.item_type,
-    //     products: products.length,
-    //     services: services.length
-    // });
-
-    if (currentItem.item_type === "product") {
-      const items = (products || []).map((product) => ({
-        id: product.id,
-        name: product.name,
-        price: product.price,
-        discount: product.discount || 0,
-        type: "product" as const,
-      }));
-      // console.log('📦 Products items:', items);
-      return items;
-    }
-    if (currentItem.item_type === "service") {
-      const items = (services || [])
-        .filter((service) => !service.isCombo)
-        .map((service) => ({
-          id: service.id,
-          name: service.name,
-          price: service.price,
-          discount: service.discountPrice
-            ? service.price - service.discountPrice
-            : 0,
-          type: "service" as const,
-        }));
-      // console.log('🛠️ Service items:', items);
-      return items;
-    }
-    if (currentItem.item_type === "package") {
-      const items = (services || [])
-        .filter((service) => service.isCombo)
-        .map((service) => ({
-          id: service.id,
-          name: service.name,
-          price: service.price,
-          discount: service.discountPrice
-            ? service.price - service.discountPrice
-            : 0,
-          type: "package" as const,
-        }));
-      // console.log('📦 Package items:', items);
-      return items;
-    }
-    return [];
-  }, [products, services, currentItem.item_type]);
-
   const handleItemSelection = (item: SelectableItem | null) => {
     if (!item) {
       setCurrentItem((prev) => ({
@@ -1274,7 +1295,7 @@ export default function InvoicesPage() {
               startIcon={<Add />}
               onClick={handleAddNew}
               sx={{
-                height: 55,
+                height: 40,
                 bgcolor: PRIMARY_COLOR,
                 "&:hover": { bgcolor: PRIMARY_DARK },
                 textTransform: "none",
@@ -1482,22 +1503,13 @@ export default function InvoicesPage() {
       </Card>
 
       {/* Menu for invoice actions */}
-      <Menu
-        anchorEl={anchorEl}
-        open={Boolean(anchorEl)}
-        onClose={handleMenuClose}
-      >
-        {/* <MenuItem onClick={handleView}>
-                    <Visibility sx={{ mr: 1, fontSize: 20 }} />
-                    View Details
-                </MenuItem> */}
+     <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleMenuClose}>
         <MenuItem onClick={handleViewItems}>
           <Inventory sx={{ mr: 1, fontSize: 20 }} />
           View Items
         </MenuItem>
-        <MenuItem onClick={handleEdit}>
-          <Edit sx={{ mr: 1, fontSize: 20 }} />
-          Edit
+        <MenuItem onClick={() => handleEdit(selectedInvoice!)}>
+          <Edit sx={{ mr: 1, fontSize: 20 }} /> Edit
         </MenuItem>
         <Divider />
         {selectedInvoice?.payment_status === "pending" && (

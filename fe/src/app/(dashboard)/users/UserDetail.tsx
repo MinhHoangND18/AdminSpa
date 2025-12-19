@@ -13,16 +13,16 @@ import {
 } from "@mui/icons-material";
 import { User, UserRole, UserFormData } from "@/types/user";
 import { Staff } from "@/types/staff";
-import { StoreFormData } from "@/types/store";
+import { Store } from "@/types/store";
 
 interface UserDetailProps {
     mode: "add" | "edit" | "view";
     initialData?: User | null;
     availableStaff: Staff[];
-    availableStores: StoreFormData[];
+    availableStores: Store[];
     assignableRoles: UserRole[];
     getRoleLabel: (role: UserRole) => string;
-    onSave: (data: UserFormData) => Promise<void>; // Fixed: Use UserFormData instead of any
+    onSave: (data: UserFormData) => Promise<void>; 
     onBack: () => void;
     loading?: boolean;
 }
@@ -38,22 +38,9 @@ export default function UserDetail({
     onBack,
     loading
 }: UserDetailProps) {
-    const [formData, setFormData] = useState<UserFormData>({
-        username: "",
-        email: "",
-        fullname: "",
-        password: "",
-        role: "" as UserRole,
-        staff_id: "",
-        store_id: "",
-        is_active: true,
-    });
-
-    const [errors, setErrors] = useState<Partial<Record<keyof UserFormData, string>>>({});
-
-    useEffect(() => {
+    const [formData, setFormData] = useState<UserFormData>(() => {
         if (initialData && (mode === "edit" || mode === "view")) {
-            setFormData({
+            return {
                 username: initialData.username,
                 email: initialData.email || "",
                 fullname: initialData.fullname || "",
@@ -62,9 +49,9 @@ export default function UserDetail({
                 staff_id: initialData.staff_id?.toString() || "",
                 store_id: initialData.store_id?.toString() || "",
                 is_active: initialData.is_active,
-            });
+            };
         } else {
-            setFormData({
+            return {
                 username: "",
                 email: "",
                 fullname: "",
@@ -73,11 +60,11 @@ export default function UserDetail({
                 staff_id: "",
                 store_id: "",
                 is_active: true,
-            });
+            };
         }
-    }, [initialData, mode]);
+    });
 
-    // Fixed: Handled specific event types for TextField, Select, and Switch
+    const [errors, setErrors] = useState<Partial<Record<keyof UserFormData, string>>>({});
     const handleChange = (field: keyof UserFormData) => (
         event: React.ChangeEvent<HTMLInputElement | { name?: string; value: unknown }> | SelectChangeEvent<string>
     ) => {
@@ -142,7 +129,7 @@ export default function UserDetail({
                                     size="small"
                                     sx={{ 
                                         position: 'absolute', bottom: 20, right: 0, 
-                                        bgcolor: 'primary.main', color: 'white',
+                                        bgcolor: '#3b82f6', color: 'white',
                                         '&:hover': { bgcolor: 'primary.dark' }
                                     }}
                                 >
@@ -176,7 +163,7 @@ export default function UserDetail({
                 <Grid size={{ xs: 12, md: 8 }}>
                     <Paper sx={{ p: 3, borderRadius: 2 }}>
                         <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <Badge fontSize="small" color="primary" /> Basic Information
+                            <Badge fontSize="small" sx={{ color: '#3b82f6' }} /> Basic Information
                         </Typography>
                         
                         <Grid container spacing={2}>

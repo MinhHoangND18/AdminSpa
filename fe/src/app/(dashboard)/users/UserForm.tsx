@@ -67,7 +67,9 @@ import {
   Close as CloseIcon,
 } from "@mui/icons-material";
 import UserDetail from "./UserDetail";
-import { User, UserFormData, UserResponse, Staff } from "@/types/user";
+import { User, UserFormData, UserResponse } from "@/types/user";
+import { Staff } from "@/types/staff";
+import { Store as StoreType } from "@/types/store";
 interface AxiosErrorResponse {
   response?: {
     data?: {
@@ -106,13 +108,6 @@ type UserRole =
   | "manager"
   | "receptionist"
   | "staff";
-
-
-
-interface StoreData {
-  id: number;
-  name: string;
-}
 
 
 
@@ -186,7 +181,7 @@ export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [totalUsers, setTotalUsers] = useState(0);
   const [availableStaff, setAvailableStaff] = useState<Staff[]>([]);
-  const [availableStores, setAvailableStores] = useState<StoreData[]>([]);
+  const [availableStores, setAvailableStores] = useState<StoreType[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterRole, setFilterRole] = useState<UserRole | "all">("all");
   const [filterStatus, setFilterStatus] = useState<

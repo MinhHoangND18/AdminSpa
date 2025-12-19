@@ -156,20 +156,11 @@ export default function BookingDetail({
     return (
         <Box sx={{ minHeight: "100vh", bgcolor: "#f4f6f8", pb: 5 }}>
 
-            <Paper elevation={0} sx={{ p: 0, borderRadius: 0, borderBottom: "1px solid #e0e0e0", bgcolor: "#fff" }}>
+            <Paper elevation={0} sx={{ p: 0, borderRadius: 0, bgcolor: "#fff" }}>
                 <Stack direction="row" justifyContent="space-between" alignItems="center">
                     <Stack direction="row" spacing={2} alignItems="center">
-                        <IconButton
-                            onClick={onBack}
-                            sx={{
-                                bgcolor: "#fff",
-                                // border: "1px solid #e0e0e0",
-                                borderRadius: 0,
-                                p: 2,
-                                "&:hover": { bgcolor: "#f5f5f5" }
-                            }}
-                        >
-                            <ArrowBack fontSize="small" />
+                        <IconButton onClick={onBack} sx={{ bgcolor: 'background.paper' }}>
+                            <ArrowBack />
                         </IconButton>
                         <Typography variant="h6" fontWeight={700}>Booking Details #BK{booking.id}</Typography>
                     </Stack>
@@ -283,7 +274,7 @@ export default function BookingDetail({
                                         onChange={(e) => setNote(e.target.value)}
                                         sx={{ "& fieldset": { borderRadius: 0 } }}
                                     />
-                                    <Button variant="contained" sx={{ bgcolor: "#3498db", borderRadius: 0, height: 40,}}>Save Note</Button>
+                                    <Button variant="contained" sx={{ bgcolor: "#3498db", borderRadius: 0, height: 40, }}>Save Note</Button>
                                 </Stack>
                             </Paper>
                         </Stack>

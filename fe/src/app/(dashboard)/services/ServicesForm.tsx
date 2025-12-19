@@ -79,6 +79,7 @@ import {
   CreateServiceDto,
   PaginatedServices,
 } from '@/types';
+import ServiceDetail from './ServiceDetail';
 
 // Colors
 const PRIMARY_COLOR = '#3b82f6';
@@ -159,6 +160,7 @@ export default function ServicesPage() {
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' } | null>(null);
   const [validationErrors, setValidationErrors] = useState<Partial<Record<keyof ServiceFormData, string>>>({});
   const [loading, setLoading] = useState(false);
+  const [showDetail, setShowDetail] = useState(false);
   
   const initialFormData: ServiceFormData = {
     name: '',
@@ -312,25 +314,14 @@ export default function ServicesPage() {
 
   const handleAddNew = () => {
     setDialogMode('add');
-    setFormData(initialFormData);
-    setOpenDialog(true);
+    setSelectedService(null);
+    setShowDetail(true);
   };
 
   const handleEdit = () => {
     if (selectedService) {
       setDialogMode('edit');
-      setFormData({
-        name: selectedService.name,
-        categoryId: selectedService.categoryId?.toString() || '',
-        description: selectedService.description || '',
-        durationMinutes: selectedService.durationMinutes.toString(),
-        price: selectedService.price.toString(),
-        discountPrice: selectedService.discountPrice?.toString() || '',
-        imageUrl: selectedService.imageUrl || '',
-        isCombo: selectedService.isCombo,
-        status: selectedService.status,
-      });
-      setOpenDialog(true);
+      setShowDetail(true);
     }
     handleMenuClose();
   };
@@ -338,15 +329,41 @@ export default function ServicesPage() {
   const handleView = () => {
     if (selectedService) {
       setDialogMode('view');
-      setOpenDialog(true);
+      setShowDetail(true);
     }
     handleMenuClose();
+  };
+  const handleBack = () => {
+    setShowDetail(false);
+    setSelectedService(null);
   };
 
   const handleDelete = () => {
     setDeleteConfirmOpen(true);
     handleMenuClose();
   };
+  const handleSave = async (submissionData: any) => {
+    if (dialogMode === 'add') {
+      await createMutation.mutateAsync(submissionData);
+    } else if (dialogMode === 'edit' && selectedService) {
+      await updateMutation.mutateAsync({ id: selectedService.id, data: submissionData });
+    }
+    setShowDetail(false);
+  };
+
+  // --- Logic Render ---
+  if (showDetail) {
+    return (
+      <ServiceDetail
+        mode={dialogMode}
+        initialData={selectedService}
+        categories={categories}
+        onSave={handleSave}
+        onBack={handleBack}
+        loading={createMutation.isPending || updateMutation.isPending}
+      />
+    );
+  }
 
   const confirmDelete = () => {
     if (selectedService) {

@@ -64,6 +64,7 @@ import {
   CreateServiceCategoryDto,
   PaginatedServiceCategories,
 } from '@/types';
+import CategoryDetail from './CategoryDetail';
 
 // Colors
 const PRIMARY_COLOR = '#3b82f6';
@@ -103,6 +104,7 @@ export default function CategoryForm() {
   const [openDialog, setOpenDialog] = useState(false);
   const [dialogMode, setDialogMode] = useState<'add' | 'edit' | 'view'>('add');
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [showDetail, setShowDetail] = useState(false);
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' } | null>(null);
   const [validationErrors, setValidationErrors] = useState<Partial<Record<keyof CategoryFormData, string>>>({});
 
@@ -154,6 +156,7 @@ export default function CategoryForm() {
     placeholderData: (previousData) => previousData,
   });
 
+  
 
   const categories = useMemo((): ServiceCategory[] => {
     if (!paginatedCategories?.data) return [];
@@ -236,33 +239,35 @@ export default function CategoryForm() {
     setAnchorEl(null);
   };
 
-  const handleAddNew = () => {
+const handleAddNew = () => {
     setDialogMode('add');
-    setFormData(initialFormData);
-    setValidationErrors({});
-    setOpenDialog(true);
+    setSelectedCategory(null);
+    setShowDetail(true);
   };
 
-  const handleEdit = () => {
+ const handleEdit = () => {
     if (selectedCategory) {
       setDialogMode('edit');
-      setFormData({
-        name: selectedCategory.name,
-        slug: selectedCategory.slug,
-        description: selectedCategory.description || '',
-        displayOrder: selectedCategory.displayOrder.toString(),
-        imageUrl: selectedCategory.imageUrl || '',
-        status: selectedCategory.status,
-      });
-      setValidationErrors({});
-      setOpenDialog(true);
+      setShowDetail(true);
     }
     handleMenuClose();
+  };
+  const handleBack = () => {
+    setShowDetail(false);
+    setSelectedCategory(null);
   };
 
   const handleDelete = () => {
     setDeleteConfirmOpen(true);
     handleMenuClose();
+  };
+  const handleSave = async (formData: any) => {
+    if (dialogMode === 'add') {
+      await createMutation.mutateAsync(formData);
+    } else if (dialogMode === 'edit' && selectedCategory) {
+      await updateMutation.mutateAsync({ id: selectedCategory.id, data: formData });
+    }
+    setShowDetail(false);
   };
 
   const confirmDelete = () => {
@@ -270,6 +275,17 @@ export default function CategoryForm() {
       deleteMutation.mutate(selectedCategory.id);
     }
   };
+  if (showDetail) {
+    return (
+      <CategoryDetail
+        mode={dialogMode}
+        initialData={selectedCategory}
+        onSave={handleSave}
+        onBack={handleBack}
+        loading={createMutation.isPending || updateMutation.isPending}
+      />
+    );
+  }
 
   const handleDialogClose = () => {
     setOpenDialog(false);
@@ -317,7 +333,7 @@ export default function CategoryForm() {
     setRowsPerPage(parseInt(event.target.value, 10));
     setPage(0);
   };
-  const [loading, setLoading] = useState(false);
+ 
   const isAnyLoading =
   isLoadingCategories ||        
   createMutation.isPending ||   
