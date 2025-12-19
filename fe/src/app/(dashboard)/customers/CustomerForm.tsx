@@ -87,7 +87,7 @@ import {
   CustomerStats,
 } from "@/lib/api/customers";
 import { storesApi } from "@/lib/api/stores";
-import { Store } from "@/types/store";
+import { Store,StoreResponse } from "@/types/store";
 
 
 interface CustomerDetailResponse {
@@ -111,17 +111,10 @@ interface CustomErrorResponse {
 interface AxiosErrorLike extends Error {
   response?: CustomErrorResponse;
 }
-interface PaginatedStoreResponse {
-  data: {
-    data: Store[];
-    total: number;
-  };
-}
+
 type DirectStoreArrayResponse = Store[];
 
-interface AxiosResponseWrapper {
-  data: unknown;
-}
+
 interface GenericListResponse<T> {
   data: T[];
   meta: {
@@ -132,17 +125,7 @@ interface GenericListResponse<T> {
   };
 }
 
-const isPaginatedStoreResponse = (data: unknown): data is PaginatedStoreResponse => {
-  return (
-    typeof data === 'object' &&
-    data !== null &&
-    'data' in data &&
-    typeof (data as PaginatedStoreResponse).data === 'object' &&
-    (data as PaginatedStoreResponse).data !== null &&
-    'data' in (data as PaginatedStoreResponse).data &&
-    Array.isArray((data as PaginatedStoreResponse).data.data)
-  );
-};
+
 
 const isAxiosErrorLike = (error: unknown): error is AxiosErrorLike => {
   return (
@@ -162,7 +145,7 @@ const getErrorMessage = (error: unknown): string => {
   return "An unexpected error occurred.";
 };
 
-const PRIMARY_COLOR = "#14b8a6";
+const PRIMARY_COLOR = "#3b82f6";
 const PRIMARY_DARK = "#0f766e";
 const SUCCESS_COLOR = "#10b981";
 const ERROR_COLOR = "#ef4444";
@@ -241,7 +224,7 @@ const formatToFormDate = (date: string | Date | null | undefined): string => {
   return dateObj.toISOString().split("T")[0];
 };
 
-interface CustomerFormData {
+export interface CustomerFormData {
   fullName: string;
   phone: string;
   email: string;
@@ -272,7 +255,8 @@ export interface CustomerFormDialogProps {
   dialogMode: "add" | "edit" | "view";
   open: boolean;
   onClose: () => void;
-  onSuccess: (message: string, severity?: "success" | "error") => void;
+  onSuccess: (message: string, severity?: "success" | "error", customer?: Customer) => void;
+  initialData?: Partial<CustomerFormData>;
 }
 
 export const CustomerFormDialog: React.FC<CustomerFormDialogProps> = ({
@@ -281,6 +265,7 @@ export const CustomerFormDialog: React.FC<CustomerFormDialogProps> = ({
   open,
   onClose,
   onSuccess,
+  initialData,
 }) => {
   const queryClient = useQueryClient();
   const [formData, setFormData] = useState<CustomerFormData>(initialFormData);
@@ -289,25 +274,20 @@ export const CustomerFormDialog: React.FC<CustomerFormDialogProps> = ({
   const isEditMode = dialogMode === "edit";
   const isViewMode = dialogMode === "view";
 
-  // Sửa response của fetchStores
   useEffect(() => {
     if (!open) return;
 
     const fetchStores = async () => {
       try {
 
-        const response: unknown = await storesApi.getAll({
+        const response: StoreResponse = await storesApi.getAll({
           limit: 100,
           isActive: true,
         });
 
         let stores: Store[] = [];
-        const unwrappedResponse = (response as AxiosResponseWrapper)?.data ?? response;
-        if (isPaginatedStoreResponse(unwrappedResponse)) {
-          stores = unwrappedResponse.data.data;
-        }
-        else if (Array.isArray(unwrappedResponse)) {
-          stores = unwrappedResponse as Store[];
+        if (response && response.data && Array.isArray(response.data.data)) {
+          stores = response.data.data;
         }
 
         setStoreList(stores);
@@ -344,18 +324,23 @@ export const CustomerFormDialog: React.FC<CustomerFormDialogProps> = ({
         status: customerData.status,
       };
     }
+    if (dialogMode === "add" && initialData) {
+      return {
+        ...initialFormData,
+        ...initialData,
+      };
+    }
     return initialFormData;
-  }, [customerData, isEditMode, isViewMode]);
+  }, [customerData, isEditMode, isViewMode, dialogMode, initialData]);
 
   useEffect(() => {
     setFormData(initialFormDataValue);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [customerData, dialogMode]);
+  }, [initialFormDataValue]);
 
-  const createMutation = useMutation({
+  const createMutation = useMutation<CustomerDetailResponse, Error, CreateCustomerDto>({
     mutationFn: createCustomer,
-    onSuccess: () => {
-      onSuccess("Customer created successfully!", "success");
+    onSuccess: (response) => {
+      onSuccess("Customer created successfully!", "success", response.data);
       queryClient.invalidateQueries({ queryKey: ["customers"] });
       queryClient.invalidateQueries({ queryKey: ["customerStats"] });
       onClose();
@@ -366,11 +351,11 @@ export const CustomerFormDialog: React.FC<CustomerFormDialogProps> = ({
     },
   });
 
-  const updateMutation = useMutation({
+  const updateMutation = useMutation<CustomerDetailResponse, Error, { id: number; customer: UpdateCustomerDto }>({
     mutationFn: (data: { id: number; customer: UpdateCustomerDto }) =>
       updateCustomer(data.id, data.customer),
-    onSuccess: () => {
-      onSuccess("Customer updated successfully!", "success");
+    onSuccess: (response) => {
+      onSuccess("Customer updated successfully!", "success", response.data);
       queryClient.invalidateQueries({ queryKey: ["customers"] });
       queryClient.invalidateQueries({ queryKey: ["customer", customerId] });
       queryClient.invalidateQueries({ queryKey: ["customerStats"] });
@@ -825,13 +810,11 @@ export default function CustomersPage() {
     severity: "success" | "error";
   } | null>(null);
 
-  // Áp dụng generic type cho danh sách khách hàng
   const {
-    // Dùng CustomerResponse (kiểu chuẩn)
     data: paginatedCustomers,
     isLoading: isLoadingCustomers,
     isError: isErrorCustomers,
-  } = useQuery<CustomerResponse>({ // <-- SỬA TÊN KIỂU Ở ĐÂY
+  } = useQuery<CustomerResponse>({ 
     queryKey: ["customers", page, rowsPerPage, filters, searchQuery],
     queryFn: () =>
       getCustomers({
@@ -844,12 +827,10 @@ export default function CustomersPage() {
     placeholderData: keepPreviousData,
   });
 
-  // Truy cập dữ liệu an toàn
   const customers = useMemo((): Customer[] => {
     return paginatedCustomers?.data?.data ?? [];
   }, [paginatedCustomers]);
 
-  // Truy cập tổng số an toàn
   const totalCustomers = paginatedCustomers?.data?.total ?? 0;
 
   const { data: customerStats, isLoading: isLoadingStats } =
@@ -944,14 +925,12 @@ export default function CustomersPage() {
     setPage(0);
   };
 
-  // SỬA LỖI AS ANY CÒN SÓT LẠI
   const handleFilterChange = (
     key: "customerType" | "status",
     value: string
   ) => {
     setFilters((prev) => ({
       ...prev,
-      // Ép kiểu giá trị thành CustomerType hoặc CustomerStatus
       [key]: value === "all" ? undefined : (value as CustomerType | CustomerStatus),
     }));
     setPage(0);
@@ -961,7 +940,6 @@ export default function CustomersPage() {
     setPage(0);
   };
 
-  // Thay thế bằng dữ liệu từ customerStats để phù hợp với API
   const totalRevenue = customerStats?.totalRevenue ?? 0;
 
   const stats = {
@@ -1266,7 +1244,7 @@ export default function CustomersPage() {
                             ) : null
                           }
                         >
-                          <Avatar
+                          {/* <Avatar
                             sx={{
                               bgcolor: alpha(PRIMARY_COLOR, 0.1),
                               color: PRIMARY_COLOR,
@@ -1276,7 +1254,7 @@ export default function CustomersPage() {
                             }}
                           >
                             {customer.fullName?.charAt(0) || "NULL"}
-                          </Avatar>
+                          </Avatar> */}
                         </Badge>
                         <Box>
                           <Typography variant="body2" fontWeight="600">

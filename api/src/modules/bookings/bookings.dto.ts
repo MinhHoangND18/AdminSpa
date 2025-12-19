@@ -1,15 +1,43 @@
 // src/bookings/dto/booking.dto.ts
-import { IsNotEmpty, IsNumber, IsDateString, IsString, IsEnum, IsOptional, IsBoolean, Matches, ValidateNested, IsEmail, MaxLength, IsArray } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsNumber,
+  IsDateString,
+  IsString,
+  IsEnum,
+  IsOptional,
+  IsBoolean,
+  Matches,
+  ValidateNested,
+  IsEmail,
+  MaxLength,
+  IsArray,
+} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { BookingStatus } from '../bookings/entities/booking.entity';
 import { NestedCreateInvoiceItemDto } from '../invoices/invoices.dto';
 
 export class CreateBookingDto {
-  @ApiProperty({ example: 1 })
-  @IsNotEmpty()
+  @ApiPropertyOptional({ example: 1 })
+  @IsOptional()
   @IsNumber()
-  customerId: number;
+  customerId?: number;
+
+  @ApiPropertyOptional({ example: 'John Doe' })
+  @IsOptional()
+  @IsString()
+  customerName?: string;
+
+  @ApiPropertyOptional({ example: '0123456789' })
+  @IsOptional()
+  @IsString()
+  customerPhone?: string;
+
+  @ApiPropertyOptional({ example: 'john@example.com' })
+  @IsOptional()
+  @IsEmail()
+  customerEmail?: string;
 
   @ApiProperty({ example: 1 })
   @IsNotEmpty()
@@ -25,7 +53,7 @@ export class CreateBookingDto {
   @IsNotEmpty()
   @IsString()
   @Matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, {
-    message: 'startTime must be in format HH:MM'
+    message: 'startTime must be in format HH:MM',
   })
   startTime: string;
 
@@ -33,7 +61,7 @@ export class CreateBookingDto {
   @IsOptional()
   @IsString()
   @Matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, {
-    message: 'endTime must be in format HH:MM'
+    message: 'endTime must be in format HH:MM',
   })
   endTime?: string;
 
@@ -61,6 +89,13 @@ export class CreateBookingDto {
   @IsOptional()
   @IsNumber()
   createdBy?: number;
+
+  @ApiPropertyOptional({ type: () => [NestedCreateInvoiceItemDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => NestedCreateInvoiceItemDto)
+  pendingInvoiceItems?: NestedCreateInvoiceItemDto[];
 }
 
 export class UpdateBookingDto extends PartialType(CreateBookingDto) {}
@@ -101,101 +136,100 @@ export class QueryBookingDto {
   limit?: number = 10;
 }
 
-
 // --- DTOs for creating a booking order ---
 
 class CustomerForBookingDto {
-    @ApiProperty({ maxLength: 100, example: 'Nguyễn Văn A' })
-    @IsString()
-    @IsNotEmpty()
-    @MaxLength(100)
-    fullName: string;
-  
-    @ApiProperty({ maxLength: 15, example: '0123456789' })
-    @IsString()
-    @IsNotEmpty()
-    @MaxLength(15)
-    phone: string;
-  
-    @ApiPropertyOptional({ maxLength: 100, example: 'customer@example.com' })
-    @IsEmail()
-    @IsOptional()
-    @MaxLength(100)
-    email?: string;
+  @ApiProperty({ maxLength: 100, example: 'Nguyễn Văn A' })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(100)
+  fullName: string;
+
+  @ApiProperty({ maxLength: 15, example: '0123456789' })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(15)
+  phone: string;
+
+  @ApiPropertyOptional({ maxLength: 100, example: 'customer@example.com' })
+  @IsEmail()
+  @IsOptional()
+  @MaxLength(100)
+  email?: string;
 }
 
 class BookingDataDto {
-    @ApiProperty({ example: 1 })
-    @IsNotEmpty()
-    @IsNumber()
-    storeId: number;
-  
-    @ApiProperty({ example: '2025-10-20' })
-    @IsNotEmpty()
-    @IsDateString()
-    bookingDate: string;
-  
-    @ApiProperty({ example: '09:00' })
-    @IsNotEmpty()
-    @IsString()
-    @Matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, {
-        message: 'startTime must be in format HH:MM'
-    })
-    startTime: string;
-  
-    @ApiPropertyOptional({ example: 'Special request: Window seat' })
-    @IsOptional()
-    @IsString()
-    notes?: string;
+  @ApiProperty({ example: 1 })
+  @IsNotEmpty()
+  @IsNumber()
+  storeId: number;
+
+  @ApiProperty({ example: '2025-10-20' })
+  @IsNotEmpty()
+  @IsDateString()
+  bookingDate: string;
+
+  @ApiProperty({ example: '09:00' })
+  @IsNotEmpty()
+  @IsString()
+  @Matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, {
+    message: 'startTime must be in format HH:MM',
+  })
+  startTime: string;
+
+  @ApiPropertyOptional({ example: 'Special request: Window seat' })
+  @IsOptional()
+  @IsString()
+  notes?: string;
 }
 
 class InvoiceDataDto {
-    @ApiProperty({ example: 1 })
-    @IsNotEmpty()
-    @IsNumber()
-    storeId: number;
+  @ApiProperty({ example: 1 })
+  @IsNotEmpty()
+  @IsNumber()
+  storeId: number;
 
-    @ApiProperty()
-    @IsNumber()
-    subtotal: number;
-  
-    @ApiProperty()
-    @IsNumber()
-    discountAmount: number;
-  
-    @ApiProperty()
-    @IsNumber()
-    taxAmount: number;
-  
-    @ApiProperty()
-    @IsNumber()
-    totalAmount: number;
+  @ApiProperty()
+  @IsNumber()
+  subtotal: number;
 
-    @ApiPropertyOptional()
-    @IsOptional()
-    @IsString()
-    notes?: string;
-  
-    @ApiProperty({ type: () => [NestedCreateInvoiceItemDto] })
-    @IsArray()
-    @ValidateNested({ each: true })
-    @Type(() => NestedCreateInvoiceItemDto)
-    items: NestedCreateInvoiceItemDto[];
+  @ApiProperty()
+  @IsNumber()
+  discountAmount: number;
+
+  @ApiProperty()
+  @IsNumber()
+  taxAmount: number;
+
+  @ApiProperty()
+  @IsNumber()
+  totalAmount: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  notes?: string;
+
+  @ApiProperty({ type: () => [NestedCreateInvoiceItemDto] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => NestedCreateInvoiceItemDto)
+  items: NestedCreateInvoiceItemDto[];
 }
-  
+
 export class CreateBookingOrderDto {
-    @ApiProperty()
-    @ValidateNested()
-    @Type(() => CustomerForBookingDto)
-    customer: CustomerForBookingDto;
-  
-    @ApiProperty()
-    @ValidateNested()
-    @Type(() => BookingDataDto)
-    booking: BookingDataDto;
-  
-    @ApiProperty()
-    @ValidateNested()
-    @Type(() => InvoiceDataDto)
-    invoice: InvoiceDataDto;
+  @ApiProperty()
+  @ValidateNested()
+  @Type(() => CustomerForBookingDto)
+  customer: CustomerForBookingDto;
+
+  @ApiProperty()
+  @ValidateNested()
+  @Type(() => BookingDataDto)
+  booking: BookingDataDto;
+
+  @ApiProperty()
+  @ValidateNested()
+  @Type(() => InvoiceDataDto)
+  invoice: InvoiceDataDto;
 }

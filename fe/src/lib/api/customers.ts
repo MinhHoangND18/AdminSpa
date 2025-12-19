@@ -1,9 +1,9 @@
 import { API_ENDPOINTS } from '@/constants/api-endpoints';
 import { CreateCustomerDto, Customer, UpdateCustomerDto, CustomerResponse } from '@/types/customer';
 import api from './axios';
-// interface CustomerDetailResponse {
-//   data: Customer;
-// }
+interface CustomerDetailResponse {
+  data: Customer;
+}
 export interface CustomerStats {
   totalCustomers: number;
   newCustomers: number;
@@ -32,18 +32,18 @@ export const getCustomerStats = async (storeId?: number): Promise<CustomerStats>
   return data as CustomerStats;
 };
 
-export const getCustomer = async (id: number) => {
-  const { data } = await api.get(`${API_ENDPOINTS.CUSTOMERS}/${id}`);
+export const getCustomer = async (id: number): Promise<CustomerDetailResponse> => {
+  const { data } = await api.get<CustomerDetailResponse>(`${API_ENDPOINTS.CUSTOMERS}/${id}`);
   return data;
 };
 
-export const createCustomer = async (customer: CreateCustomerDto) => {
-  const { data } = await api.post(API_ENDPOINTS.CUSTOMERS, customer);
+export const createCustomer = async (customer: CreateCustomerDto): Promise<CustomerDetailResponse> => {
+  const { data } = await api.post<CustomerDetailResponse>(API_ENDPOINTS.CUSTOMERS, customer);
   return data;
 };
 
-export const updateCustomer = async (id: number, customer: UpdateCustomerDto) => {
-  const { data } = await api.patch(`${API_ENDPOINTS.CUSTOMERS}/${id}`, customer);
+export const updateCustomer = async (id: number, customer: UpdateCustomerDto): Promise<CustomerDetailResponse> => {
+  const { data } = await api.patch<CustomerDetailResponse>(`${API_ENDPOINTS.CUSTOMERS}/${id}`, customer);
   return data;
 };
 

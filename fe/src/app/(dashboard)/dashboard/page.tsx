@@ -50,7 +50,7 @@ import {
 } from 'recharts';
 
 // Primary colors
-const PRIMARY_COLOR = '#14b8a6';
+const PRIMARY_COLOR = '#3b82f6';
 const PRIMARY_LIGHT = '#2dd4bf';
 const PRIMARY_DARK = '#0f766e';
 const ACCENT_COLOR = '#ec4899';

@@ -89,7 +89,7 @@ const isAxiosError = (error: unknown): error is AxiosErrorResponse => {
   );
 };
 
-const PRIMARY_COLOR = "#14b8a6";
+const PRIMARY_COLOR = "#3b82f6";
 const PRIMARY_DARK = "#0f766e";
 const SUCCESS_COLOR = "#10b981";
 const ERROR_COLOR = "#ef4444";

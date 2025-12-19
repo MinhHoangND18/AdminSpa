@@ -1,6 +1,7 @@
 // types/booking.ts
 import { Customer as CustomerType } from './customer';
 import { Invoice } from './invoice';
+import { ItemType } from './invoice-item';
 
 export enum BookingStatus {
     PENDING = 'pending',
@@ -24,6 +25,18 @@ export interface Store {
     name: string;
     address: string;
 }
+export interface PendingInvoiceItem {
+    id: number; 
+    itemType: ItemType;
+    itemId: number;
+    itemName: string;
+    quantity: number;
+    unitPrice: number;
+    discount?: number;
+    totalPrice: number;
+    staffId?: number;
+    staff_name?: string;
+}
 
 
 export interface Booking {
@@ -33,6 +46,7 @@ export interface Booking {
     customerName?: string;
     customerPhone?: string;
     customerEmail?: string;
+    pendingInvoiceItems?: PendingInvoiceItem[];
     storeId: number;
     store?: Store;
     bookingDate: string; 
@@ -59,9 +73,8 @@ export interface BookingResponse {
     };
 }
 
-// Payload khi tạo mới (CreateBookingDto)
 export interface CreateBookingPayload {
-    customerId: number;
+    customerId?: number;
     storeId: number;
     bookingDate: string;
     startTime: string;
@@ -70,6 +83,7 @@ export interface CreateBookingPayload {
     source?: string;
     notes?: string;
     confirm?: boolean;
+    pendingInvoiceItems?: CreatePendingInvoiceItemPayload[];
 }
 
 // Payload khi cập nhật (UpdateBookingDto)
@@ -83,4 +97,14 @@ export interface BookingFilters {
     storeId?: number;
     bookingDate?: string;
     status?: BookingStatus;
+}
+export interface CreatePendingInvoiceItemPayload {
+    itemType: ItemType;
+    itemId: number;
+    itemName?: string;
+    quantity: number;
+    unitPrice: number;
+    discount?: number;
+    totalPrice: number;
+    staffId?: number | null;
 }

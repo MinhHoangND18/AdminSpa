@@ -11,9 +11,9 @@ export interface CustomerResponse {
 }
 
 export enum Gender {
-  MALE = 'MALE',
-  FEMALE = 'FEMALE',
-  OTHER = 'OTHER',
+  MALE = 'male',
+  FEMALE = 'female',
+  OTHER = 'other',
 }
 export enum CustomerType {
   NEW = 'new',

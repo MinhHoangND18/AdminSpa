@@ -32,12 +32,24 @@ export class Booking {
   @PrimaryGeneratedColumn('increment', { type: 'bigint' })
   id: number;
 
-  @Column({ type: 'bigint', name: 'customer_id', nullable: false })
+  @Column({ type: 'bigint', name: 'customer_id', nullable: true })
   customerId: number;
 
-  @ManyToOne(() => Customer)
+  @ManyToOne(() => Customer, { nullable: true })
   @JoinColumn({ name: 'customer_id' })
   customer: Customer;
+
+  @Column({ type: 'varchar', length: 255, name: 'customer_name', nullable: true })
+  customerName: string;
+
+  @Column({ type: 'varchar', length: 50, name: 'customer_phone', nullable: true })
+  customerPhone: string;
+
+  @Column({ type: 'varchar', length: 255, name: 'customer_email', nullable: true })
+  customerEmail: string;
+
+  @Column({ type: 'json', name: 'pending_invoice_items', nullable: true })
+  pendingInvoiceItems: any[];
 
   @Column({ type: 'bigint', name: 'store_id', nullable: false })
   storeId: number;

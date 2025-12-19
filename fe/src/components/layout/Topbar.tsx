@@ -20,8 +20,7 @@ import {
   Notifications as NotificationsIcon,
 } from '@mui/icons-material';
 
-// --- COPY DANH SÁCH MENU TỪ SIDEBAR SANG ĐỂ MAPPING ---
-// (Lưu ý: Tốt nhất bạn nên tách cái mảng này ra 1 file riêng ví dụ: constants/menu.ts rồi import vào cả 2 nơi)
+
 const MENU_TITLES = [
   { text: 'Dashboard', path: '/dashboard' },
   { text: 'Stores', path: '/stores' },
@@ -36,30 +35,30 @@ const MENU_TITLES = [
 ];
 
 interface TopBarProps {
-  selectedMenu?: string; // Đánh dấu là optional vì giờ chúng ta tự tính toán
+  selectedMenu?: string; 
   onDrawerToggle: () => void;
   drawerWidth: number;
 }
 
 export default function TopBar({
-  selectedMenu: propSelectedMenu, // Đổi tên prop để tránh nhầm lẫn
+  selectedMenu: propSelectedMenu, 
   onDrawerToggle,
   drawerWidth,
 }: TopBarProps) {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const router = useRouter();
-  const pathname = usePathname(); // <--- 2. LẤY URL HIỆN TẠI
-  const { user, loading } = useAuth(); // Get user from AuthContext
+  const pathname = usePathname();
+  const { user, loading } = useAuth();
 
 
-  // <--- 3. TÍNH TOÁN TIÊU ĐỀ DỰA TRÊN URL
+ 
   const currentTitle = useMemo(() => {
-    // Tìm item nào có path khớp với đầu của pathname hiện tại
+   
     const activeItem = MENU_TITLES.find(item =>
       item.path !== '/#' && pathname.startsWith(item.path)
     );
 
-    // Nếu tìm thấy thì lấy text, nếu không thì fallback về Dashboard hoặc prop cũ
+ 
     return activeItem ? activeItem.text : (propSelectedMenu || 'Dashboard');
   }, [pathname, propSelectedMenu]);
 
@@ -103,9 +102,9 @@ export default function TopBar({
           variant="h6"
           noWrap
           component="div"
-          sx={{ flexGrow: 1, fontWeight: 600, color: "#14b8a6" }}
+          sx={{ flexGrow: 1, fontWeight: 600, color: "#1957bd" }}
         >
-          {currentTitle} {/* <--- 4. HIỂN THỊ TITLE ĐÃ TÍNH TOÁN */}
+          {currentTitle} 
         </Typography>
 
         {!loading && user && (
@@ -114,15 +113,15 @@ export default function TopBar({
               label={user.role.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
               size="small"
               color="primary"
-              sx={{ fontWeight: 500, bgcolor: '#14b8a6' }}
+              sx={{ fontWeight: 500, bgcolor: '#1957bd' }}
             />
 
-            <IconButton sx={{ color: '#14b8a6' }}>
+            <IconButton sx={{ color: '#1957bd' }}>
               <NotificationsIcon />
             </IconButton>
 
             <IconButton onClick={handleMenu} sx={{ ml: 1 }}>
-              <Avatar sx={{ width: 36, height: 36, bgcolor: '#14b8a6' }}>
+              <Avatar sx={{ width: 36, height: 36, bgcolor: '#1957bd' }}>
                 {(user.username || 'A').charAt(0).toUpperCase()}
               </Avatar>
             </IconButton>

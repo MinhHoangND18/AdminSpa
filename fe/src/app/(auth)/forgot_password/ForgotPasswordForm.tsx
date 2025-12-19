@@ -20,7 +20,7 @@ import {
 import api from '@/lib/api/axios';
 
 // Màu chủ đạo
-const PRIMARY_COLOR = '#14b8a6';
+const PRIMARY_COLOR = '#3b82f6';
 const PRIMARY_DARK = '#0f766e';
 const SUCCESS_COLOR = '#10b981';
 

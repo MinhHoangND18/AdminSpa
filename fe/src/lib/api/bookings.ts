@@ -72,12 +72,12 @@ export const cancelBooking = async (id: number) => {
 };
 
 export const startService = async (id: number) => {
-  const { data } = await api.post(`${API_ENDPOINTS.BOOKINGS}/${id}/start`);
+  const { data } = await api.patch(`${API_ENDPOINTS.BOOKINGS}/${id}/start`);
   return data;
 };
 
 export const completeService = async (id: number, invoiceData: CompleteServicePayload) => {
-  const { data } = await api.post(`${API_ENDPOINTS.BOOKINGS}/${id}/complete`, invoiceData);
+  const { data } = await api.patch(`${API_ENDPOINTS.BOOKINGS}/${id}/complete`, invoiceData);
   return data;
 };
 

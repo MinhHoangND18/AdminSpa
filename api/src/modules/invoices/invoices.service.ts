@@ -32,7 +32,7 @@ export class InvoicesService {
   ) {}
 
   async create(createInvoiceDto: CreateInvoiceDto): Promise<Invoice> {
-    const { items, ...invoiceData } = createInvoiceDto;
+    const { items, bookingId, ...invoiceData } = createInvoiceDto;
 
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
@@ -55,6 +55,10 @@ export class InvoicesService {
       }
 
       const invoice = queryRunner.manager.create(Invoice, invoiceData);
+      if (bookingId) {
+        invoice.bookingId = bookingId;
+      }
+      
       if (invoice.paidAmount && invoice.paidAmount >= invoice.totalAmount) {
         invoice.paymentStatus = PaymentStatus.PAID;
       }

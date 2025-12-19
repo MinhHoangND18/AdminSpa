@@ -60,10 +60,10 @@ interface SidebarProps {
 }
 
 //Teal/Cyan
-const PRIMARY_COLOR = '#14b8a6';
-const PRIMARY_LIGHT = '#2dd4bf';
-const PRIMARY_DARK = '#0f766e';
-const ACCENT_COLOR = '#ec4899';
+// const PRIMARY_COLOR = '#3b82f6';
+// const PRIMARY_LIGHT = '#2dd4bf';
+// const PRIMARY_DARK = '#0f766e';
+// const ACCENT_COLOR = '#ec4899';
 
 // Purple
 // const PRIMARY_COLOR = '#a855f7';
@@ -71,9 +71,9 @@ const ACCENT_COLOR = '#ec4899';
 // const PRIMARY_DARK = '#7e22ce';
 
 // Blue 
-// const PRIMARY_COLOR = '#3b82f6';
-// const PRIMARY_LIGHT = '#60a5fa';
-// const PRIMARY_DARK = '#1e40af';
+const PRIMARY_COLOR = '#3b82f6';
+const PRIMARY_LIGHT = '#60a5fa';
+const PRIMARY_DARK = '#1e40af';
 
 // Green 
 // const PRIMARY_COLOR = '#10b981';
@@ -91,8 +91,7 @@ export default function Sidebar({
   const isSelected = (itemPath: string) => {
     // Nếu là trang dashboard, phải khớp chính xác
     if (itemPath === '/dashboard' && pathname === '/dashboard') return true;
-    // Các trang khác có thể dùng startsWith để active cả trang con (ví dụ /stores/create vẫn active Stores)
-    // Lưu ý: cần xử lý trường hợp path là '/#' của settings để tránh lỗi
+   
     if (itemPath !== '/#' && pathname.startsWith(itemPath)) return true;
     return false;
   };

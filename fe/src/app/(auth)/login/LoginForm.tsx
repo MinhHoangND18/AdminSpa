@@ -24,7 +24,7 @@ import api from '@/lib/api/axios';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { User } from '@/types/user';
 
-const PRIMARY_COLOR = '#14b8a6';
+const PRIMARY_COLOR = '#3b82f6';
 const PRIMARY_DARK = '#0f766e';
 
 interface LoginFormValues {

@@ -84,7 +84,7 @@ const isAxiosError = (error: unknown): error is AxiosErrorResponse => {
     ('response' in error || 'message' in error)
   );
 };
-const PRIMARY_COLOR = "#14b8a6";
+const PRIMARY_COLOR = "#3b82f6";
 const PRIMARY_DARK = "#0f766e";
 const SUCCESS_COLOR = "#10b981";
 const ERROR_COLOR = "#ef4444";
@@ -885,7 +885,7 @@ export default function UsersPage() {
               <TableHead>
                 <TableRow sx={{ bgcolor: alpha(PRIMARY_COLOR, 0.05) }}>
                   <TableCell sx={{ fontWeight: 700 }}>User</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>Full Name</TableCell>
+                  {/* <TableCell sx={{ fontWeight: 700 }}>Full Name</TableCell> */}
                   <TableCell sx={{ fontWeight: 700 }}>Role</TableCell>
                   {/* <TableCell sx={{ fontWeight: 700 }}>Staff</TableCell> */}
                   <TableCell sx={{ fontWeight: 700 }}>Store</TableCell>
@@ -947,11 +947,11 @@ export default function UsersPage() {
                           </Box>
                         </Box>
                       </TableCell>
-                      <TableCell>
+                      {/* <TableCell>
                         <Typography variant="body2">
                           {user.fullname}
                         </Typography>
-                      </TableCell>
+                      </TableCell> */}
                       <TableCell>
                         <Chip
                           icon={getRoleIcon(user.role)}

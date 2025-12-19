@@ -54,7 +54,7 @@ import {getStores} from "@/lib/api/stores";
 import { Store, StoreFormData, } from "@/types/store";
 // import { get } from "axios";
 
-const PRIMARY_COLOR = "#14b8a6";
+const PRIMARY_COLOR = "#3b82f6";
 const PRIMARY_DARK = "#0f766e";
 const SUCCESS_COLOR = "#10b981";
 const ERROR_COLOR = "#ef4444";

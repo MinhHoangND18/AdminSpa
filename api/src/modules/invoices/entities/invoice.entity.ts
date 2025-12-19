@@ -23,7 +23,9 @@ export enum DiscountType {
 
 export enum PaymentStatus {
   PENDING = 'pending',
-  PAID = 'paid'
+  PAID = 'paid',
+  PARTIALLY_PAID = 'partially_paid',
+  CANCELLED = 'cancelled'
 }
 
 @Entity('invoices')

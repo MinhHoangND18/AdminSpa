@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -18,14 +18,29 @@ import { InvoicesModule } from './modules/invoices/invoices.module';
 import { ServiceCategoriesModule } from './modules/service_categories/service_categories.module';
 //import { PaymentsModule } from './modules/payments/payments.module';
 //import { PromotionsModule } from './modules/promotions/promotions.module';
-
+import { join } from 'path';
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: ".env",
     }),
-    TypeOrmModule.forRoot(databaseConfig),
+    TypeOrmModule.forRootAsync({
+      imports: [ConfigModule],
+      useFactory: (configService: ConfigService) => {
+        return {
+          type: 'mysql',
+          host: configService.get('DB_HOST'),
+          port: +configService.get('DB_PORT'),
+          username: configService.get('DB_USERNAME'),
+          password: configService.get('DB_PASSWORD'),
+          database: configService.get('DB_DATABASE'),
+          entities: [join(__dirname, '**', '*.entity.{ts,js}')],
+          synchronize: false,
+        };
+      },
+      inject: [ConfigService],
+    }),
     AuthModule,
     UsersModule,
     PermissionsModule,
@@ -42,4 +57,4 @@ import { ServiceCategoriesModule } from './modules/service_categories/service_ca
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule { }
