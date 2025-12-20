@@ -19,6 +19,14 @@ import { Staff as StaffType } from "@/types/staff";
 import { ItemType } from "@/types/invoice-item";
 import { Service as ServiceType } from "@/types/service";
 import { Product as ProductType } from "@/types/product";
+import { createTheme, ThemeProvider } from "@mui/material/styles";
+const blueTheme = createTheme({
+    palette: {
+        primary: {
+            main: "#3b82f6",
+        },
+    },
+});
 
 
 const PRIMARY_COLOR = "#3b82f6";
@@ -55,7 +63,6 @@ export default function BookingDetail({
     const [discountDialogOpen, setDiscountDialogOpen] = useState(false);
     const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
 
-    // State cho discount toàn đơn hàng
     const [orderDiscount, setOrderDiscount] = useState(booking.orderDiscount || 0);
     const [tempOrderDiscount, setTempOrderDiscount] = useState(booking.orderDiscount || 0);
     const [discountReason, setDiscountReason] = useState(booking.discountReason || "");
@@ -77,8 +84,6 @@ export default function BookingDetail({
         const subtotal = booking.pendingInvoiceItems?.reduce(
             (sum, item) => sum + (item.unitPrice * item.quantity - (item.discount || 0)), 0
         ) || 0;
-
-        // Sử dụng orderDiscount thay vì tính từ items
         const totalDiscount = orderDiscount || 0;
 
         const afterDiscount = subtotal - totalDiscount;
@@ -183,7 +188,7 @@ export default function BookingDetail({
     }, [currentItem.itemType, products, services]);
 
     return (
-        <Box sx={{ minHeight: "100vh", bgcolor: "#f4f6f8", pb: 5 }}>
+        <ThemeProvider theme={blueTheme}> <Box sx={{ minHeight: "100vh", bgcolor: "#f4f6f8", pb: 5 }}>
             <Paper elevation={0} sx={{ p: 0, borderRadius: 0, bgcolor: "#fff" }}>
                 <Stack direction="row" justifyContent="space-between" alignItems="center">
                     <Stack direction="row" spacing={2} alignItems="center">
@@ -645,6 +650,7 @@ export default function BookingDetail({
                     </Button>
                 </DialogActions>
             </Dialog>
-        </Box>
+        </Box></ThemeProvider>
+
     );
 }

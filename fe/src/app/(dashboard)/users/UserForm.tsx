@@ -431,7 +431,10 @@ export default function UsersPage() {
         availableStores={availableStores}
         assignableRoles={assignableRoles}
         getRoleLabel={getRoleLabel}
-        onBack={() => setShowDetail(false)}
+        onBack={() => {
+          setShowDetail(false);
+          setSelectedUser(null);
+        }}
         onSave={handleSaveUser}
         loading={loading}
       />
@@ -1074,13 +1077,31 @@ export default function UsersPage() {
                         </Box>
                       </TableCell>
                       <TableCell align="center">
-                        <IconButton
+                        <Button
+                          variant="contained"
                           size="small"
-                          onClick={(e) => handleMenuOpen(e, user)}
+                          startIcon={<Edit sx={{ fontSize: '18px !important' }} />}
+                          onClick={() => {
+                            setSelectedUser(user);
+                            setDialogMode("edit");
+                            setShowDetail(true);
+                          }}
                           disabled={!canModifyUser(user)}
+                          sx={{
+                            bgcolor: '#f39c12',
+                            '&:hover': { bgcolor: '#e67e22' },
+                            textTransform: 'none',
+                            fontWeight: 600,
+                            borderRadius: '6px',
+                            px: 2,
+                            minWidth: '80px',
+                            boxShadow: 'none',
+                            height: '32px',
+                            color: '#fff'
+                          }}
                         >
-                          <MoreVert />
-                        </IconButton>
+                          Edit
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))

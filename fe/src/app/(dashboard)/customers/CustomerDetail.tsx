@@ -16,12 +16,19 @@ import {
     Customer, CustomerFormData, CreateCustomerDto, UpdateCustomerDto
 } from "@/types/customer";
 import { Store } from "@/types/store";
+import { createTheme, ThemeProvider } from "@mui/material/styles";
+const blueTheme = createTheme({
+    palette: {
+        primary: {
+            main: "#3b82f6",
+        },
+    },
+});
 
 interface CustomerDetailProps {
     mode: "add" | "edit" | "view";
     initialData?: Customer | null;
     storeList: Store[];
-    // Sửa lỗi any: Sử dụng DTO cụ thể
     onSave: (data: CreateCustomerDto | UpdateCustomerDto) => Promise<void>;
     onBack: () => void;
     loading?: boolean;
@@ -56,14 +63,11 @@ export default function CustomerDetail({
         status: initialData?.status || CustomerStatus.ACTIVE,
     }));
 
-    // Sửa lỗi any cho TextField
     const handleTextChange = (field: keyof CustomerFormData) => (
         e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
     ) => {
         setFormData(prev => ({ ...prev, [field]: e.target.value }));
     };
-
-    // Sửa lỗi any cho Select
     const handleSelectChange = (field: keyof CustomerFormData) => (
         e: SelectChangeEvent<string>
     ) => {
@@ -71,7 +75,6 @@ export default function CustomerDetail({
     };
 
     const handleSave = async () => {
-        // Chuyển đổi storeId sang number trước khi gửi lên API
         const submissionData = {
             ...formData,
             storeId: formData.storeId ? parseInt(formData.storeId) : undefined
@@ -80,7 +83,7 @@ export default function CustomerDetail({
     };
 
     return (
-        <Box sx={{ p: { xs: 2, md: 2 } }}>
+        <ThemeProvider theme={blueTheme}><Box sx={{ p: { xs: 2, md: 2 } }}>
             <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Stack direction="row" spacing={2} alignItems="center">
                     <IconButton onClick={onBack} sx={{ bgcolor: 'background.paper', boxShadow: 1 }}>
@@ -237,6 +240,7 @@ export default function CustomerDetail({
                     </Button>
                 </Box>
             )}
-        </Box>
+        </Box></ThemeProvider>
+        
     );
 }

@@ -56,6 +56,7 @@ import { usersApi } from "@/lib/api/users";
 import { User } from "@/types/user";
 import { storesApi } from "@/lib/api/stores";
 import { Store, StoreFormData, StoreResponse } from "@/types/store";
+import StoreDetail from "./StoreDetail";
 interface AxiosErrorResponse {
   response?: {
     data?: {
@@ -161,7 +162,7 @@ export default function StoresPage() {
     queryFn: fetchManagers,
     staleTime: 5 * 60 * 1000,
   });
-
+  const [showDetail, setShowDetail] = useState(false);
 
 
   // const fetchManagers = async (): Promise<User[]> => {
@@ -318,33 +319,32 @@ export default function StoresPage() {
     setOpenDialog(true);
   };
 
-  const handleEdit = () => {
-    if (selectedStore) {
-      setDialogMode("edit");
+  const handleEdit = (store: Store) => {
+    setSelectedStore(store);
+    setDialogMode("edit");
 
-      const matchedManager = availableManagers.find(
-        (manager) => manager.username === selectedStore.manager_name
-      );
+    const matchedManager = availableManagers.find(
+      (manager) => manager.username === store.manager_name
+    );
 
-      setFormData({
-        code: selectedStore.code,
-        name: selectedStore.name,
-        domain: selectedStore.domain || "",
-        address: selectedStore.address,
-        phone: selectedStore.phone || "",
-        email: selectedStore.email || "",
-        description: selectedStore.description || "",
-        openingHours: selectedStore.openingHours || "",
-        latitude: selectedStore.latitude?.toString() || "",
-        longitude: selectedStore.longitude?.toString() || "",
-        manager_id: matchedManager ? String(matchedManager.id) : "",
-        isActive: selectedStore.isActive,
-      });
-      setOpenDialog(true);
-    }
+    setFormData({
+      code: store.code,
+      name: store.name,
+      domain: store.domain || "",
+      address: store.address,
+      phone: store.phone || "",
+      email: store.email || "",
+      description: store.description || "",
+      openingHours: store.openingHours || "",
+      latitude: store.latitude?.toString() || "",
+      longitude: store.longitude?.toString() || "",
+      manager_id: matchedManager ? String(matchedManager.id) : "",
+      isActive: store.isActive,
+    });
+
+    setShowDetail(true);
     handleMenuClose();
   };
-
   const handleView = () => {
     if (selectedStore) {
       setDialogMode("view");
@@ -441,6 +441,32 @@ export default function StoresPage() {
           Error: {error?.message || "Check your API connection."}
         </Typography>
       </Alert>
+    );
+  }
+
+  if (showDetail) {
+    return (
+      <StoreDetail
+        mode={dialogMode}
+        initialData={selectedStore}
+        managers={availableManagers}
+        onBack={() => {
+          setShowDetail(false);
+          setSelectedStore(null);
+        }}
+        onSave={async (data) => {
+          const dataToSend = {
+            ...data,
+            latitude: data.latitude ? parseFloat(data.latitude) : undefined,
+            longitude: data.longitude ? parseFloat(data.longitude) : undefined,
+            manager_id: data.manager_id ? parseInt(data.manager_id) : undefined,
+          } as Partial<Store>;
+
+          storeMutation.mutate(dataToSend);
+          setShowDetail(false);
+        }}
+        loading={storeMutation.isPending}
+      />
     );
   }
 
@@ -560,12 +586,26 @@ export default function StoresPage() {
                           mr: 1,
                         }}
                       />
-                      <IconButton
+                      <Button
+                        variant="contained"
                         size="small"
-                        onClick={(e) => handleMenuOpen(e, store)}
+                        startIcon={<Edit sx={{ fontSize: '18px !important' }} />}
+                        onClick={() => handleEdit(store)}
+                        sx={{
+                          bgcolor: '#f39c12',
+                          '&:hover': { bgcolor: '#e67e22' },
+                          textTransform: 'none',
+                          fontWeight: 600,
+                          borderRadius: '6px',
+                          px: 2,
+                          minWidth: '80px',
+                          boxShadow: 'none',
+                          height: '32px',
+                          color: '#fff'
+                        }}
                       >
-                        <MoreVert />
-                      </IconButton>
+                        Edit
+                      </Button>
                     </Box>
                   </Box>
                   <Typography variant="h6" fontWeight="bold" gutterBottom>
@@ -683,198 +723,7 @@ export default function StoresPage() {
         )}
       </Grid>
 
-      {/* Menu */}
-      <Menu
-        anchorEl={anchorEl}
-        open={Boolean(anchorEl)}
-        onClose={handleMenuClose}
-      >
-        {/* <MenuItem onClick={handleView} disabled={loading}>
-          <Visibility sx={{ mr: 1, fontSize: 20 }} />
-          View Details
-        </MenuItem> */}
-        <MenuItem onClick={handleEdit} disabled={loading}>
-          <Edit sx={{ mr: 1, fontSize: 20 }} />
-          Edit
-        </MenuItem>
-        <MenuItem
-          onClick={handleDeleteClick}
-          sx={{ color: ERROR_COLOR }}
-          disabled={loading}
-        >
-          <Delete sx={{ mr: 1, fontSize: 20 }} />
-          Delete
-        </MenuItem>
-      </Menu>
-
-      {/* Add/Edit Dialog */}
-      <Dialog
-        open={openDialog}
-        onClose={handleDialogClose}
-        maxWidth="md"
-        fullWidth
-      >
-        <DialogTitle>
-          {dialogMode === "add"
-            ? "Add New Store"
-            : dialogMode === "edit"
-              ? "Edit Store"
-              : "Store Details"}
-        </DialogTitle>
-        <DialogContent dividers>
-          <Grid container spacing={3} sx={{ mt: 0.5 }}>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <TextField
-                label="Store Code *"
-                fullWidth
-                value={formData.code}
-                onChange={handleFormChange("code")}
-                disabled={dialogMode === "view"}
-                required
-              />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <TextField
-                label="Store Name *"
-                fullWidth
-                value={formData.name}
-                onChange={handleFormChange("name")}
-                disabled={dialogMode === "view"}
-                required
-              />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <TextField
-                label="Domain"
-                fullWidth
-                value={formData.domain}
-                onChange={handleFormChange("domain")}
-                disabled={dialogMode === "view"}
-              />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <TextField
-                label="Phone"
-                fullWidth
-                value={formData.phone}
-                onChange={handleFormChange("phone")}
-                disabled={dialogMode === "view"}
-              />
-            </Grid>
-            <Grid size={{ xs: 12 }}>
-              <TextField
-                label="Address *"
-                fullWidth
-                value={formData.address}
-                onChange={handleFormChange("address")}
-                disabled={dialogMode === "view"}
-                required
-              />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <TextField
-                label="Email"
-                fullWidth
-                type="email"
-                value={formData.email}
-                onChange={handleFormChange("email")}
-                disabled={dialogMode === "view"}
-              />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <TextField
-                label="Opening Hours"
-                fullWidth
-                value={formData.openingHours}
-                onChange={handleFormChange("openingHours")}
-                disabled={dialogMode === "view"}
-              />
-            </Grid>
-            <Grid size={{ xs: 12 }}>
-              <TextField
-                label="Description"
-                fullWidth
-                multiline
-                rows={3}
-                value={formData.description}
-                onChange={handleFormChange("description")}
-                disabled={dialogMode === "view"}
-              />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <TextField
-                label="Latitude"
-                fullWidth
-                type="number"
-                value={formData.latitude}
-                onChange={handleFormChange("latitude")}
-                disabled={dialogMode === "view"}
-              />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <TextField
-                label="Longitude"
-                fullWidth
-                type="number"
-                value={formData.longitude}
-                onChange={handleFormChange("longitude")}
-                disabled={dialogMode === "view"}
-              />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <FormControl fullWidth>
-                <InputLabel>Manager</InputLabel>
-                <Select
-                  label="Manager"
-                  value={formData.manager_id || ""}
-                  onChange={handleFormChange("manager_id")}
-                  disabled={dialogMode === "view"}
-                >
-                  <MenuItem value="">
-                    <em>Unassigned</em>
-                  </MenuItem>
-                  {availableManagers.map((manager) => (
-                    <MenuItem key={manager.id} value={String(manager.id)}>
-                      {manager.username} 
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={formData.isActive}
-                    onChange={handleSwitchChange}
-                    disabled={dialogMode === "view"}
-                  />
-                }
-                label="Active"
-              />
-            </Grid>
-          </Grid>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleDialogClose} sx={{ color: PRIMARY_COLOR }}>
-            {dialogMode === "view" ? "Close" : "Cancel"}
-          </Button>
-          {dialogMode !== "view" && (
-            <Button
-              onClick={handleSubmit}
-              variant="contained"
-              disabled={loading}
-              sx={{
-                bgcolor: PRIMARY_COLOR,
-                "&:hover": { bgcolor: PRIMARY_DARK },
-              }}
-            >
-              {dialogMode === "add" ? "Add Store" : "Save Changes"}
-            </Button>
-          )}
-        </DialogActions>
-      </Dialog>
-
+    
       {/* Delete Confirmation Dialog */}
       <Dialog
         open={deleteConfirmOpen}

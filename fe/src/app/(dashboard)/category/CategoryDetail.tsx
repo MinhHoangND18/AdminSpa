@@ -17,6 +17,14 @@ import {
   CreateServiceCategoryDto,
   UpdateServiceCategoryDto
 } from '@/types';
+import { createTheme, ThemeProvider } from "@mui/material/styles";
+const blueTheme = createTheme({
+  palette: {
+    primary: {
+      main: "#3b82f6",
+    },
+  },
+});
 
 interface CategoryDetailProps {
   mode: 'add' | 'edit' | 'view';
@@ -76,8 +84,8 @@ export default function CategoryDetail({
   };
 
   return (
-    <Box sx={{ p: { xs: 2, md: 3 } }}>
-      {/* Header: Chỉ giữ nút quay lại và Tiêu đề */}
+    <ThemeProvider theme={blueTheme}>   <Box sx={{ p: { xs: 2, md: 3 } }}>
+      {/* Header */}
       <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <Stack direction="row" spacing={2} alignItems="center">
           <IconButton onClick={onBack} sx={{ bgcolor: 'background.paper', boxShadow: 1 }}>
@@ -108,9 +116,9 @@ export default function CategoryDetail({
               </Avatar>
             </Box>
             <Typography variant="h6" fontWeight="bold">{formData.name || "Category Name"}</Typography>
-            <Chip 
-              label={formData.status.toUpperCase()} 
-              size="small" 
+            <Chip
+              label={formData.status.toUpperCase()}
+              size="small"
               color={formData.status === 'active' ? "success" : "error"}
               sx={{ mt: 1, fontWeight: 'bold' }}
             />
@@ -118,14 +126,14 @@ export default function CategoryDetail({
         </Grid>
 
         {/* Right Side: Form Content */}
-        <Grid size={{xs: 12, md: 8}}>
+        <Grid size={{ xs: 12, md: 8 }}>
           <Paper sx={{ p: 3, borderRadius: 2 }}>
             <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 1 }}>
               <Description sx={{ color: '#3b82f6' }} fontSize="small" /> Category Information
             </Typography>
-            
+
             <Grid container spacing={2.5}>
-              <Grid size={{xs: 12}}>
+              <Grid size={{ xs: 12 }}>
                 <TextField
                   fullWidth label="Category Name *"
                   value={formData.name} onChange={handleChange("name")}
@@ -133,21 +141,21 @@ export default function CategoryDetail({
                 />
               </Grid>
 
-              <Grid size={{xs: 12, sm: 6}}>
+              <Grid size={{ xs: 12, sm: 6 }}>
                 <TextField
                   fullWidth label="Slug *"
                   value={formData.slug} onChange={handleChange("slug")}
                   disabled={isView} error={!!errors.slug} helperText={errors.slug}
-                  InputProps={{ startAdornment: <InputAdornment position="start"><LinkIcon fontSize="small"/></InputAdornment> }}
+                  InputProps={{ startAdornment: <InputAdornment position="start"><LinkIcon fontSize="small" /></InputAdornment> }}
                 />
               </Grid>
 
-              <Grid size={{xs: 12, sm: 6}}>
+              <Grid size={{ xs: 12, sm: 6 }}>
                 <FormControl fullWidth disabled={isView}>
                   <InputLabel>Status</InputLabel>
-                  <Select 
-                    value={formData.status} 
-                    label="Status" 
+                  <Select
+                    value={formData.status}
+                    label="Status"
                     onChange={handleChange("status")}
                   >
                     <MenuItem value="active">Active</MenuItem>
@@ -156,16 +164,16 @@ export default function CategoryDetail({
                 </FormControl>
               </Grid>
 
-              <Grid size={{xs: 12}}>
+              <Grid size={{ xs: 12 }}>
                 <TextField
                   fullWidth label="Image URL"
                   value={formData.imageUrl} onChange={handleChange("imageUrl")}
                   disabled={isView}
-                  InputProps={{ startAdornment: <InputAdornment position="start"><ImageIcon fontSize="small"/></InputAdornment> }}
+                  InputProps={{ startAdornment: <InputAdornment position="start"><ImageIcon fontSize="small" /></InputAdornment> }}
                 />
               </Grid>
 
-              <Grid size={{xs: 12}}>
+              <Grid size={{ xs: 12 }}>
                 <TextField
                   fullWidth label="Description" multiline rows={4}
                   value={formData.description} onChange={handleChange("description")}
@@ -177,7 +185,7 @@ export default function CategoryDetail({
                 <Grid size={{ xs: 12 }}>
                   <Divider sx={{ my: 2, borderStyle: 'dashed' }} />
                   <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
-                   
+
                     <Button
                       variant="contained"
                       startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <Save />}
@@ -194,6 +202,7 @@ export default function CategoryDetail({
           </Paper>
         </Grid>
       </Grid>
-    </Box>
+    </Box></ThemeProvider>
+
   );
 }

@@ -11,10 +11,18 @@ import { Save, ArrowBack, Person } from "@mui/icons-material";
 import {
   Invoice, DiscountType, PaymentStatus, CreateInvoiceDto, UpdateInvoiceDto
 } from "@/types/invoice";
-import { InvoiceItem } from "@/types/invoice-item"; //
+import { InvoiceItem } from "@/types/invoice-item"; 
 import { Customer as CustomerType } from "@/types/customer";
 import { Store as StoreType } from "@/types/store";
 import { Staff as StaffType } from "@/types/staff";
+import { createTheme, ThemeProvider } from "@mui/material/styles";
+const blueTheme = createTheme({
+    palette: {
+        primary: {
+            main: "#3b82f6",
+        },
+    },
+});
 
 interface InvoiceDetailProps {
   mode: "add" | "edit" | "view";
@@ -42,8 +50,6 @@ export default function InvoiceDetail({
     notes: initialData?.notes || "",
     payment_status: initialData?.paymentStatus || PaymentStatus.PENDING,
   });
-
-  // Thay đổi any thành InvoiceItem[]
   const [items, setItems] = useState<InvoiceItem[]>(initialData?.items || []);
 
   const handleFormChange = (field: string) => (
@@ -80,7 +86,7 @@ export default function InvoiceDetail({
   }, [items, formData.discount_amount, formData.discount_type]);
 
   const handleSave = async () => {
-    // Mapping data khớp với CreateInvoiceDto
+
     const submissionData: CreateInvoiceDto = {
       voucher: initialData?.voucher || `INV-${Date.now()}`,
       customerId: Number(formData.customer_id),
@@ -108,7 +114,8 @@ export default function InvoiceDetail({
   };
 
   return (
-    <Box sx={{ p: { xs: 2, md: 2 } }}>
+
+    <ThemeProvider theme={blueTheme}>  <Box sx={{ p: { xs: 2, md: 2 } }}>
       <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <Stack direction="row" spacing={2} alignItems="center">
           <IconButton onClick={onBack} sx={{ bgcolor: 'background.paper', boxShadow: 1 }}>
@@ -126,7 +133,7 @@ export default function InvoiceDetail({
       </Box>
 
       <Grid container spacing={3}>
-        {/* Bảng Items bên trái */}
+        {/* Bảng Items */}
         <Grid size={{ xs: 12, md: 8 }}>
           <Paper sx={{ p: 3, borderRadius: 2, height: '100%' }}>
             <Typography variant="h6" fontWeight="bold" sx={{ mb: 2 }}>Invoice Items</Typography>
@@ -171,7 +178,7 @@ export default function InvoiceDetail({
           </Paper>
         </Grid>
 
-        {/* Thông tin khách hàng bên phải */}
+        {/* Thông tin khách hàng */}
         <Grid size={{ xs: 12, md: 4 }}>
           <Paper sx={{ p: 3, borderRadius: 2, mb: 3 }}>
             <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -224,7 +231,7 @@ export default function InvoiceDetail({
         </Grid>
       </Grid>
 
-      {/* Button Save ở góc dưới bên phải */}
+      {/* Button Save  */}
       {!isView && (
         <Box sx={{ mt: 4, display: 'flex', justifyContent: 'flex-end' }}>
           <Button
@@ -238,6 +245,7 @@ export default function InvoiceDetail({
           </Button>
         </Box>
       )}
-    </Box>
+    </Box></ThemeProvider>
+  
   );
 }

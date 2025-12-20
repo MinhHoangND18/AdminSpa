@@ -249,13 +249,15 @@ export default function StaffPage() {
     setShowDetail(true);
   };
 
-  const handleEdit = () => {
-    if (selectedStaff) {
-      setDialogMode("edit");
-      setShowDetail(true);
-    }
-    handleMenuClose();
-  };
+  const handleEdit = (staffMember?: Staff) => {
+  const target = staffMember || selectedStaff;
+  if (target) {
+    setSelectedStaff(target);
+    setDialogMode("edit");
+    setShowDetail(true);
+  }
+  handleMenuClose();
+};
 
   const handleSaveStaff = async (submitData: StaffFormData) => {
     try {
@@ -847,13 +849,30 @@ export default function StaffPage() {
                       />
                     </TableCell>
                     <TableCell align="center">
-                      <IconButton
+                      <Button
+                        variant="contained"
                         size="small"
-                        onClick={(e) => handleMenuOpen(e, staffMember)}
+                        startIcon={<Edit sx={{ fontSize: '18px !important' }} />}
+                        onClick={() => {
+                          setSelectedStaff(staffMember);
+                          setDialogMode("edit");
+                          setShowDetail(true);
+                        }}
                         disabled={!canManageStaff}
+                        sx={{
+                          bgcolor: '#f39c12', 
+                          '&:hover': { bgcolor: '#e67e22' },
+                          textTransform: 'none',
+                          fontWeight: 600,
+                          borderRadius: '6px',
+                          px: 2,
+                          minWidth: '80px',
+                          boxShadow: 'none',
+                          height: '32px'
+                        }}
                       >
-                        <MoreVert />
-                      </IconButton>
+                        Edit
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))
@@ -895,225 +914,8 @@ export default function StaffPage() {
       </Card>
 
       {/* Menu */}
-      <Menu
-        anchorEl={anchorEl}
-        open={Boolean(anchorEl)}
-        onClose={handleMenuClose}
-      >
-        {/* <MenuItem onClick={handleView}>
-          <Visibility sx={{ mr: 1, fontSize: 20 }} />
-          View Details
-        </MenuItem> */}
-        <MenuItem onClick={handleEdit} disabled={!canManageStaff}>
-          <Edit sx={{ mr: 1, fontSize: 20 }} />
-          Edit
-        </MenuItem>
-        <MenuItem
-          onClick={handleDelete}
-          sx={{ color: ERROR_COLOR }}
-          disabled={!canManageStaff}
-        >
-          <Delete sx={{ mr: 1, fontSize: 20 }} />
-          Delete
-        </MenuItem>
-      </Menu>
-
-      {/* Add/Edit Dialog */}
-      <Dialog
-        open={openDialog}
-        onClose={handleDialogClose}
-        maxWidth="md"
-        fullWidth
-      >
-        <DialogTitle>
-          {dialogMode === "add"
-            ? "Add New Staff"
-            : dialogMode === "edit"
-              ? "Edit Staff"
-              : "Staff Details"}
-        </DialogTitle>
-        <DialogContent dividers>
-          <Grid container spacing={3} sx={{ mt: 0.5 }}>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <TextField
-                label="Full Name *"
-                fullWidth
-                value={formData.full_name}
-                onChange={handleFormChange("full_name")}
-                disabled={dialogMode === "view"}
-              />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <TextField
-                label="Phone *"
-                fullWidth
-                value={formData.phone}
-                onChange={handleFormChange("phone")}
-                disabled={dialogMode === "view"}
-              />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <TextField
-                label="Email"
-                fullWidth
-                type="email"
-                value={formData.email}
-                onChange={handleFormChange("email")}
-                disabled={dialogMode === "view"}
-              />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <FormControl fullWidth disabled={dialogMode === "view"}>
-                <InputLabel>Gender</InputLabel>
-                <Select
-                  value={formData.gender}
-                  label="Gender"
-                  onChange={handleFormChange("gender")}
-                >
-                  <MenuItem value="male">Male</MenuItem>
-                  <MenuItem value="female">Female</MenuItem>
-                  <MenuItem value="other">Other</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <TextField
-                label="Birthday"
-                fullWidth
-                type="date"
-                value={formData.birthday}
-                onChange={handleFormChange("birthday")}
-                disabled={dialogMode === "view"}
-                InputLabelProps={{ shrink: true }}
-              />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <FormControl fullWidth disabled={dialogMode === "view"}>
-                <InputLabel id="store-select-label">Store *</InputLabel>
-                <Select
-                  labelId="store-select-label"
-                  label="Store *"
-                  value={formData.store_id || ""}
-                  onChange={(e) => {
-                    setFormData({
-                      ...formData,
-                      store_id: Number(e.target.value),
-                    });
-                  }}
-                >
-                  <MenuItem value="">
-                    <em>Select a store</em>
-                  </MenuItem>
-
-                  {storeList.map((store) => (
-                    <MenuItem key={store.id} value={store.id}>
-                      {store.name}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid size={{ xs: 12 }}>
-              <TextField
-                label="Address"
-                fullWidth
-                value={formData.address}
-                onChange={handleFormChange("address")}
-                disabled={dialogMode === "view"}
-              />
-            </Grid>
-
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <TextField
-                label="Hire Date"
-                fullWidth
-                type="date"
-                value={formData.hire_date}
-                onChange={handleFormChange("hire_date")}
-                disabled={dialogMode === "view"}
-                InputLabelProps={{ shrink: true }}
-              />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <FormControl fullWidth disabled={dialogMode === "view"}>
-                <InputLabel>Salary Type</InputLabel>
-                <Select
-                  value={formData.salary_type}
-                  label="Salary Type"
-                  onChange={handleFormChange("salary_type")}
-                >
-                  <MenuItem value="fixed">Fixed Salary</MenuItem>
-                  <MenuItem value="hourly">Hourly Rate</MenuItem>
-                  <MenuItem value="commission">Commission</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <TextField
-                label="Base Salary"
-                fullWidth
-                type="number"
-                value={formData.base_salary}
-                onChange={handleFormChange("base_salary")}
-                disabled={dialogMode === "view"}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">$</InputAdornment>
-                  ),
-                }}
-              />
-            </Grid>
-            {formData.salary_type === "commission" && (
-              <Grid size={{ xs: 12, sm: 6 }}>
-                <TextField
-                  label="Commission Rate"
-                  fullWidth
-                  type="number"
-                  value={formData.commission_rate}
-                  onChange={handleFormChange("commission_rate")}
-                  disabled={dialogMode === "view"}
-                  InputProps={{
-                    endAdornment: (
-                      <InputAdornment position="end">%</InputAdornment>
-                    ),
-                  }}
-                />
-              </Grid>
-            )}
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <FormControl fullWidth disabled={dialogMode === "view"}>
-                <InputLabel>Status</InputLabel>
-                <Select
-                  value={formData.status}
-                  label="Status"
-                  onChange={handleFormChange("status")}
-                >
-                  <MenuItem value="active">Active</MenuItem>
-                  <MenuItem value="inactive">Inactive</MenuItem>
-                  <MenuItem value="on_leave">On Leave</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-          </Grid>
-        </DialogContent>
-        <DialogActions sx={{ padding: '16px 24px' }}>
-          <Button onClick={handleDialogClose} sx={{ color: PRIMARY_COLOR }}>
-            {dialogMode === "view" ? "Close" : "Cancel"}
-          </Button>
-          {dialogMode !== "view" && (
-            <Button
-              onClick={handleSubmit}
-              variant="contained"
-              sx={{
-                bgcolor: PRIMARY_COLOR,
-                "&:hover": { bgcolor: PRIMARY_DARK },
-              }}
-            >
-              {dialogMode === "add" ? "Add Staff" : "Save Changes"}
-            </Button>
-          )}
-        </DialogActions>
-      </Dialog>
+     
+    
 
       {/* Delete Confirmation Dialog */}
       <Dialog

@@ -14,12 +14,19 @@ import {
 import {
   Service, ServiceCategory, ServiceStatus, CreateServiceDto, UpdateServiceDto
 } from '@/types';
+import { createTheme, ThemeProvider } from "@mui/material/styles";
+const blueTheme = createTheme({
+    palette: {
+        primary: {
+            main: "#3b82f6",
+        },
+    },
+});
 
 interface ServiceDetailProps {
   mode: 'add' | 'edit' | 'view';
   initialData?: Service | null;
   categories: ServiceCategory[];
-  // Sửa lỗi any: Sử dụng Union type của Create và Update DTO
   onSave: (data: CreateServiceDto | UpdateServiceDto) => Promise<void>;
   onBack: () => void;
   loading?: boolean;
@@ -44,7 +51,6 @@ export default function ServiceDetail({
 
   const [errors, setErrors] = useState<Partial<Record<string, string>>>({});
 
-  // Sửa lỗi Property 'type' does not exist: Tách biệt hàm xử lý TextField và Select/Switch
   const handleTextFieldChange = (field: string) => (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
@@ -90,7 +96,7 @@ export default function ServiceDetail({
   };
 
   return (
-    <Box sx={{ p: { xs: 2, md: 2 } }}>
+    <ThemeProvider theme={blueTheme}><Box sx={{ p: { xs: 2, md: 2 } }}>
       <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <Stack direction="row" spacing={2} alignItems="center">
           <IconButton onClick={onBack} sx={{ bgcolor: 'background.paper', boxShadow: 1 }}>
@@ -255,6 +261,7 @@ export default function ServiceDetail({
           </Button>
         </Box>
       )}
-    </Box>
+    </Box></ThemeProvider>
+    
   );
 }

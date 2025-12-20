@@ -17,7 +17,14 @@ import {
 import { Store as StoreType } from "@/types/store";
 import { User, UserFormData, UserResponse, UserRole } from "@/types/user";
 import { Store as StoreData } from "@/types/store";
-
+import { createTheme, ThemeProvider } from "@mui/material/styles";
+const blueTheme = createTheme({
+    palette: {
+        primary: {
+            main: "#3b82f6",
+        },
+    },
+});
 interface StaffDetailProps {
     mode: "add" | "edit" | "view";
     initialData?: Staff | null;
@@ -97,7 +104,7 @@ export default function StaffDetail({
     const isView = mode === "view";
 
     return (
-        <Box sx={{ px: 2, py: 0 }}>
+        <ThemeProvider theme={blueTheme}>  <Box sx={{ px: 2, py: 0 }}>
             <Stack direction="row" alignItems="center" spacing={2} sx={{ mb: 3 }}>
                 <IconButton onClick={onBack} sx={{ bgcolor: 'background.paper', boxShadow: 1 }}>
                     <ArrowBack />
@@ -130,7 +137,7 @@ export default function StaffDetail({
                                         '&:hover': { bgcolor: 'primary.dark' }
                                     }}
                                 >
-                                    <PhotoCamera fontSize="small"  />
+                                    <PhotoCamera fontSize="small" />
                                 </IconButton>
                             )}
                         </Box>
@@ -268,7 +275,6 @@ export default function StaffDetail({
 
                         {mode !== "view" && (
                             <Box sx={{ mt: 4, pt: 2, display: 'flex', justifyContent: 'flex-end', gap: 2, borderTop: `1px solid ${alpha("#000", 0.05)}` }}>
-                                <Button variant="outlined" color="inherit" onClick={onBack}>Cancel</Button>
                                 <Button
                                     variant="contained" startIcon={<Save />}
                                     onClick={handleSave} disabled={loading}
@@ -282,5 +288,7 @@ export default function StaffDetail({
                 </Grid>
             </Grid>
         </Box>
+        </ThemeProvider>
+
     );
 }
