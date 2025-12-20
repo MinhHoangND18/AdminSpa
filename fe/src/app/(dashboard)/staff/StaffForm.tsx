@@ -250,14 +250,14 @@ export default function StaffPage() {
   };
 
   const handleEdit = (staffMember?: Staff) => {
-  const target = staffMember || selectedStaff;
-  if (target) {
-    setSelectedStaff(target);
-    setDialogMode("edit");
-    setShowDetail(true);
-  }
-  handleMenuClose();
-};
+    const target = staffMember || selectedStaff;
+    if (target) {
+      setSelectedStaff(target);
+      setDialogMode("edit");
+      setShowDetail(true);
+    }
+    handleMenuClose();
+  };
 
   const handleSaveStaff = async (submitData: StaffFormData) => {
     try {
@@ -684,33 +684,33 @@ export default function StaffPage() {
       </Grid>
 
       {/* Actions Bar */}
-      <Card sx={{ mb: 3 }}>
-        <CardContent>
-          <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+      <Card sx={{ mb: 3}}>
+        <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
+          <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap", alignItems: "center" }}>
             <TextField
+              size="small"
               placeholder="Search staff..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              sx={{ flex: 1, minWidth: 250 }}
+              sx={{ flex: 1, minWidth: 200 }}
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
-                    <Search sx={{ color: PRIMARY_COLOR }} />
+                    <Search sx={{ color: PRIMARY_COLOR, fontSize: 20 }} />
                   </InputAdornment>
                 ),
               }}
             />
-            <FormControl sx={{ minWidth: 150 }}>
+
+            <FormControl sx={{ minWidth: 140 }} size="small">
               <InputLabel>Status</InputLabel>
               <Select
                 value={filterStatus}
                 label="Status"
-                onChange={(e) =>
-                  setFilterStatus(e.target.value as StaffStatus | "all")
-                }
+                onChange={(e) => setFilterStatus(e.target.value as StaffStatus | "all")}
                 startAdornment={
                   <InputAdornment position="start">
-                    <FilterList sx={{ color: PRIMARY_COLOR }} />
+                    <FilterList sx={{ color: PRIMARY_COLOR, fontSize: 18 }} />
                   </InputAdornment>
                 }
               >
@@ -720,16 +720,20 @@ export default function StaffPage() {
                 <MenuItem value="on_leave">On Leave</MenuItem>
               </Select>
             </FormControl>
+
             <Button
               variant="contained"
+              size="small"
               startIcon={<Add />}
               onClick={handleAddNew}
               disabled={!canManageStaff}
               sx={{
+                height: 40,
                 bgcolor: PRIMARY_COLOR,
                 "&:hover": { bgcolor: PRIMARY_DARK },
                 textTransform: "none",
                 fontWeight: 600,
+                px: 3
               }}
             >
               Add New Staff
@@ -860,7 +864,7 @@ export default function StaffPage() {
                         }}
                         disabled={!canManageStaff}
                         sx={{
-                          bgcolor: '#f39c12', 
+                          bgcolor: '#f39c12',
                           '&:hover': { bgcolor: '#e67e22' },
                           textTransform: 'none',
                           fontWeight: 600,
@@ -913,9 +917,7 @@ export default function StaffPage() {
         />
       </Card>
 
-      {/* Menu */}
-     
-    
+
 
       {/* Delete Confirmation Dialog */}
       <Dialog

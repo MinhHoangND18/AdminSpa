@@ -250,11 +250,11 @@ export default function BookingsPage() {
 
       {/* SEARCH & ACTION */}
       <Stack direction="row" spacing={2} sx={{ mb: 3 }}>
-        <Card sx={{ flexGrow: 1, p: 0, borderRadius: 2, border: "1px solid #E2E8F0" }} elevation={0}>
+        <Card sx={{ flexGrow: 1, p: 0, borderRadius: 1, border: "1px solid #E2E8F0" }} elevation={0}>
           <TextField
             fullWidth
             size="small"
-
+               placeholder="Search bookings by customer name or phone..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             InputProps={{
@@ -264,7 +264,7 @@ export default function BookingsPage() {
           />
         </Card>
 
-        <Button
+        {/* <Button
           variant="contained"
           startIcon={<Add />}
           sx={{
@@ -273,10 +273,10 @@ export default function BookingsPage() {
           }}
         >
           New Booking
-        </Button>
+        </Button> */}
       </Stack>
 
-      {/* TABLE - CỐ ĐỊNH LAYOUT ĐỂ KHÔNG BỊ NHẢY KHI LOAD DATA */}
+      {/* TABLE  */}
       <Card sx={{ borderRadius: 0, border: "1px solid #E2E8F0" }} elevation={0}>
         <TableContainer>
           <Table sx={{ tableLayout: "fixed" }}>

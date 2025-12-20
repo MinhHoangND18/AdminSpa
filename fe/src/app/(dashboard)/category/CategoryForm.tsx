@@ -414,23 +414,27 @@ export default function CategoryForm() {
 
       {/* Actions Bar */}
       <Card sx={{ mb: 3 }}>
-        <CardContent>
-          <Stack direction="row" alignItems="center" flexWrap="wrap" gap={2}>
+        <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
+          <Stack direction="row" alignItems="center" flexWrap="wrap" gap={1.5}>
             <TextField
+              size="small"
               placeholder="Search categories..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-              sx={{ flex: 1, minWidth: 250 }}
+              sx={{ flex: 1, minWidth: 200 }}
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
-                    <IconButton onClick={handleSearch}><Search sx={{ color: PRIMARY_COLOR }} /></IconButton>
+                    <IconButton size="small" onClick={handleSearch}>
+                      <Search sx={{ color: PRIMARY_COLOR, fontSize: 20 }} />
+                    </IconButton>
                   </InputAdornment>
                 ),
               }}
             />
-            <FormControl sx={{ minWidth: 150 }}>
+
+            <FormControl sx={{ minWidth: 140 }} size="small">
               <InputLabel>Status</InputLabel>
               <Select
                 value={filters.isActive === undefined ? 'all' : filters.isActive ? 'active' : 'inactive'}
@@ -445,16 +449,19 @@ export default function CategoryForm() {
                 <MenuItem value="inactive">Inactive</MenuItem>
               </Select>
             </FormControl>
+
             <Button
               variant="contained"
+              size="small"
               startIcon={<Add />}
               onClick={handleAddNew}
               sx={{
-                height: 55,
+                height: 40,
                 bgcolor: PRIMARY_COLOR,
                 '&:hover': { bgcolor: PRIMARY_DARK },
                 textTransform: 'none',
                 fontWeight: 600,
+                px: 3
               }}
             >
               Add New Category

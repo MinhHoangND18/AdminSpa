@@ -691,22 +691,22 @@ export default function InvoicesPage() {
   };
 
   const handleSaveInvoice = async (submissionData: CreateInvoiceDto | UpdateInvoiceDto) => {
-  try {
-    setLoading(true);
-    if (dialogMode === "add") {
-      await createInvoice(submissionData as CreateInvoiceDto);
-    } else if (dialogMode === "edit" && selectedInvoice) {
-      await updateInvoice(selectedInvoice.id, submissionData as UpdateInvoiceDto);
+    try {
+      setLoading(true);
+      if (dialogMode === "add") {
+        await createInvoice(submissionData as CreateInvoiceDto);
+      } else if (dialogMode === "edit" && selectedInvoice) {
+        await updateInvoice(selectedInvoice.id, submissionData as UpdateInvoiceDto);
+      }
+      fetchInvoices();
+      setShowDetail(false);
+    } catch (err) {
+      console.error(err);
+      alert("Error saving invoice");
+    } finally {
+      setLoading(false);
     }
-    fetchInvoices();
-    setShowDetail(false);
-  } catch (err) {
-    console.error(err);
-    alert("Error saving invoice");
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   useEffect(() => {
     setCurrentItem((prev) => ({
@@ -1232,51 +1232,50 @@ export default function InvoicesPage() {
       </Grid>
 
       {/* Actions Bar */}
-      <Card sx={{ mb: 3 }}>
-        <CardContent>
+      <Card sx={{ mb: 3 }}> 
+        <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}> 
           <Box
             sx={{
               display: "flex",
-              gap: 2,
+              gap: 1.5, 
               flexWrap: "wrap",
               alignItems: "center",
             }}
           >
             <TextField
-              placeholder="Search by invoice code, customer name, phone..."
+              size="small" 
+              placeholder="Search by invoice code..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              sx={{ flex: 1, minWidth: 250 }}
+              sx={{ flex: 1, minWidth: 200 }} 
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
-                    <Search sx={{ color: PRIMARY_COLOR }} />
+                    <Search sx={{ color: PRIMARY_COLOR, fontSize: 20 }} /> 
                   </InputAdornment>
                 ),
               }}
             />
-            <FormControl sx={{ minWidth: 150 }}>
+
+            <FormControl sx={{ minWidth: 130 }} size="small"> 
               <InputLabel>Payment Status</InputLabel>
               <Select
                 value={filterStatus}
                 label="Payment Status"
-                onChange={(e) =>
-                  setFilterStatus(e.target.value as PaymentStatus | "all")
-                }
+                onChange={(e) => setFilterStatus(e.target.value as PaymentStatus | "all")}
               >
                 <MenuItem value="all">All Status</MenuItem>
                 <MenuItem value="paid">Paid</MenuItem>
                 <MenuItem value="pending">Pending</MenuItem>
               </Select>
             </FormControl>
-            <FormControl sx={{ minWidth: 180 }}>
+
+            <FormControl sx={{ minWidth: 150 }} size="small">
               <InputLabel>Store</InputLabel>
               <Select
                 value={filterStore}
                 label="Store"
-                onChange={(e) =>
-                  setFilterStore(e.target.value as number | "all")
-                }
+                onChange={(e) => setFilterStore(e.target.value as number | "all")}
               >
                 <MenuItem value="all">All Stores</MenuItem>
                 {stores.map((store) => (
@@ -1286,16 +1285,19 @@ export default function InvoicesPage() {
                 ))}
               </Select>
             </FormControl>
+
             <Button
               variant="contained"
+              size="small"
               startIcon={<Add />}
               onClick={handleAddNew}
               sx={{
-                height: 40,
+                height: 40, 
                 bgcolor: PRIMARY_COLOR,
                 "&:hover": { bgcolor: PRIMARY_DARK },
                 textTransform: "none",
                 fontWeight: 600,
+                px: 3, 
               }}
             >
               Create Invoice
@@ -1425,7 +1427,7 @@ export default function InvoicesPage() {
                         startIcon={<Edit sx={{ fontSize: '18px !important' }} />}
                         onClick={() => handleEdit(invoice)}
                         sx={{
-                          bgcolor: '#f39c12', 
+                          bgcolor: '#f39c12',
                           '&:hover': { bgcolor: '#e67e22' },
                           textTransform: 'none',
                           fontWeight: 600,

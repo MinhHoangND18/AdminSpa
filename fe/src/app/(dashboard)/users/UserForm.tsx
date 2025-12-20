@@ -566,7 +566,7 @@ export default function UsersPage() {
       const dataToSend: Partial<Omit<UserFormData, 'staff_id' | 'store_id'>> & {
         staff_id: number | null;
         store_id: number | null;
-        password?: string; // Tạm thời thêm password là tùy chọn
+        password?: string;
       } = {
         ...formData,
         staff_id: formData.staff_id ? parseInt(formData.staff_id) : null,
@@ -631,8 +631,6 @@ export default function UsersPage() {
   const canModifyUser = (targetUser: User) => {
     if (!currentUser) return false;
     if (targetUser.id === Number(currentUser.id)) return true;
-    //if (currentUser.role === "super_admin") return true;
-
     const currentUserIndex = roleHierarchy.indexOf(currentUser.role);
     const targetUserIndex = roleHierarchy.indexOf(targetUser.role);
 
@@ -828,38 +826,36 @@ export default function UsersPage() {
         </Grid>
 
         <Card sx={{ mb: 3 }}>
-          <CardContent>
+          <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
             <Box
               sx={{
                 display: "flex",
-                gap: 2,
+                gap: 1.5,
                 flexWrap: "wrap",
+                alignItems: "center",
               }}
             >
               <TextField
+                size="small"
                 placeholder="Search users..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                sx={{ flex: 1, minWidth: 250 }}
+                sx={{ flex: 1, minWidth: 200 }}
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
-                      <Search sx={{ color: PRIMARY_COLOR }} />
+                      <Search sx={{ color: PRIMARY_COLOR, fontSize: 20 }} />
                     </InputAdornment>
                   ),
                 }}
               />
-              <FormControl sx={{ minWidth: 150 }}>
+
+              <FormControl sx={{ minWidth: 130 }} size="small">
                 <InputLabel>Role</InputLabel>
                 <Select
                   value={filterRole}
                   label="Role"
-                  onChange={(e) =>
-                    setFilterRole(e.target.value as UserRole | "all")
-                  }
-                  sx={{
-                    "& .MuiSelect-select": { paddingRight: "75px !important" },
-                  }}
+                  onChange={(e) => setFilterRole(e.target.value as UserRole | "all")}
                 >
                   <MenuItem value="all">All Roles</MenuItem>
                   <MenuItem value="super_admin">Super Admin</MenuItem>
@@ -869,7 +865,8 @@ export default function UsersPage() {
                   <MenuItem value="staff">Staff</MenuItem>
                 </Select>
               </FormControl>
-              <FormControl sx={{ minWidth: 150 }}>
+
+              <FormControl sx={{ minWidth: 130 }} size="small">
                 <InputLabel>Status</InputLabel>
                 <Select
                   value={filterStatus}
@@ -879,9 +876,6 @@ export default function UsersPage() {
                       e.target.value as "all" | "active" | "inactive" | "locked"
                     )
                   }
-                  sx={{
-                    "& .MuiSelect-select": { paddingRight: "75px !important" },
-                  }}
                 >
                   <MenuItem value="all">All Status</MenuItem>
                   <MenuItem value="active">Active</MenuItem>
@@ -889,15 +883,19 @@ export default function UsersPage() {
                   <MenuItem value="locked">Locked</MenuItem>
                 </Select>
               </FormControl>
+
               <Button
                 variant="contained"
+                size="small"
                 startIcon={<Add />}
                 onClick={handleAddNew}
                 sx={{
+                  height: 40,
                   bgcolor: PRIMARY_COLOR,
                   "&:hover": { bgcolor: PRIMARY_DARK },
                   textTransform: "none",
                   fontWeight: 600,
+                  px: 3,
                 }}
               >
                 Add New User

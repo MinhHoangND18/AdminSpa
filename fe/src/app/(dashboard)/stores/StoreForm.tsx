@@ -512,30 +512,34 @@ export default function StoresPage() {
 
       {/* Actions Bar */}
       <Card sx={{ mb: 3 }}>
-        <CardContent>
-          <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+        <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
+          <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap", alignItems: "center" }}>
             <TextField
+              size="small"
               placeholder="Search stores..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              sx={{ flex: 1, minWidth: 250 }}
+              sx={{ flex: 1, minWidth: 200 }}
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
-                    <Search sx={{ color: PRIMARY_COLOR }} />
+                    <Search sx={{ color: PRIMARY_COLOR, fontSize: 20 }} />
                   </InputAdornment>
                 ),
               }}
             />
             <Button
               variant="contained"
+              size="small"
               startIcon={<Add />}
               onClick={handleAddNew}
               sx={{
+                height: 40,
                 bgcolor: PRIMARY_COLOR,
                 "&:hover": { bgcolor: PRIMARY_DARK },
                 textTransform: "none",
                 fontWeight: 600,
+                px: 3
               }}
             >
               Add New Store
@@ -723,7 +727,7 @@ export default function StoresPage() {
         )}
       </Grid>
 
-    
+
       {/* Delete Confirmation Dialog */}
       <Dialog
         open={deleteConfirmOpen}

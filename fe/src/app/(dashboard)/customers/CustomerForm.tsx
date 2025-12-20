@@ -406,22 +406,26 @@ export default function CustomersPage() {
       </Grid>
 
       <Card sx={{ mb: 3 }}>
-        <CardContent>
-          <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+        <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
+          <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap", alignItems: "center" }}>
             <TextField
+              size="small"
               placeholder="Search by name, phone, email..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              sx={{ flex: 1, minWidth: 250 }}
+              sx={{ flex: 1, minWidth: 200 }}
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
-                    <IconButton onClick={() => setPage(0)}><Search sx={{ color: PRIMARY_COLOR }} /></IconButton>
+                    <IconButton size="small" onClick={() => setPage(0)}>
+                      <Search sx={{ color: PRIMARY_COLOR, fontSize: 20 }} />
+                    </IconButton>
                   </InputAdornment>
                 ),
               }}
             />
-            <FormControl sx={{ minWidth: 150 }}>
+
+            <FormControl sx={{ minWidth: 130 }} size="small">
               <InputLabel>Type</InputLabel>
               <Select
                 value={filters.customerType || "all"}
@@ -434,7 +438,8 @@ export default function CustomersPage() {
                 <MenuItem value={CustomerType.VIP}>VIP</MenuItem>
               </Select>
             </FormControl>
-            <FormControl sx={{ minWidth: 150 }}>
+
+            <FormControl sx={{ minWidth: 130 }} size="small">
               <InputLabel>Status</InputLabel>
               <Select
                 value={filters.status || "all"}
@@ -447,7 +452,21 @@ export default function CustomersPage() {
                 <MenuItem value={CustomerStatus.BLOCKED}>Blocked</MenuItem>
               </Select>
             </FormControl>
-            <Button variant="contained" startIcon={<Add />} onClick={handleAddNew} sx={{ bgcolor: PRIMARY_COLOR, "&:hover": { bgcolor: PRIMARY_DARK }, fontWeight: 600 }}>
+
+            <Button
+              variant="contained"
+              size="small"
+              startIcon={<Add />}
+              onClick={handleAddNew}
+              sx={{
+                height: 40,
+                bgcolor: PRIMARY_COLOR,
+                "&:hover": { bgcolor: PRIMARY_DARK },
+                textTransform: "none",
+                fontWeight: 600,
+                px: 3
+              }}
+            >
               Add New Customer
             </Button>
           </Box>
