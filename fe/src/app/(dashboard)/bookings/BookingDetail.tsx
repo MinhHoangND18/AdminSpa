@@ -12,7 +12,7 @@ import { Delete, Inventory, ExpandLess, ExpandMore } from "@mui/icons-material";
 import {
     PlayArrow, Store, Add, ArrowBack,
     Print, Edit, History, Storefront,
-    Done, Cancel
+    Done, Cancel, Close
 } from "@mui/icons-material";
 import { Booking, BookingStatus, PendingInvoiceItem } from "@/types/booking";
 import { Staff as StaffType } from "@/types/staff";
@@ -52,7 +52,15 @@ export default function BookingDetail({
 }: BookingDetailProps) {
     const [note, setNote] = useState("");
     const [itemDialogOpen, setItemDialogOpen] = useState(false);
+    const [discountDialogOpen, setDiscountDialogOpen] = useState(false);
     const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
+
+    // State cho discount toàn đơn hàng
+    const [orderDiscount, setOrderDiscount] = useState(booking.orderDiscount || 0);
+    const [tempOrderDiscount, setTempOrderDiscount] = useState(booking.orderDiscount || 0);
+    const [discountReason, setDiscountReason] = useState(booking.discountReason || "");
+    const [tempDiscountReason, setTempDiscountReason] = useState(booking.discountReason || "");
+
     const initialItemFormData = {
         itemType: ItemType.SERVICE,
         itemId: "",
@@ -67,12 +75,11 @@ export default function BookingDetail({
 
     const financialSummary = useMemo(() => {
         const subtotal = booking.pendingInvoiceItems?.reduce(
-            (sum, item) => sum + (item.unitPrice * item.quantity), 0
+            (sum, item) => sum + (item.unitPrice * item.quantity - (item.discount || 0)), 0
         ) || 0;
 
-        const totalDiscount = booking.pendingInvoiceItems?.reduce(
-            (sum, item) => sum + (item.discount || 0), 0
-        ) || 0;
+        // Sử dụng orderDiscount thay vì tính từ items
+        const totalDiscount = orderDiscount || 0;
 
         const afterDiscount = subtotal - totalDiscount;
 
@@ -82,14 +89,17 @@ export default function BookingDetail({
         const finalAmount = afterDiscount + taxAmount;
 
         return { subtotal, totalDiscount, taxAmount, finalAmount };
-    }, [booking.pendingInvoiceItems]);
+    }, [booking.pendingInvoiceItems, orderDiscount]);
+
     const handleOpenAddDialog = () => {
+        if (booking.status === BookingStatus.COMPLETED) return;
         setEditingItemIndex(null);
         setCurrentItem(initialItemFormData);
         setItemDialogOpen(true);
     };
 
     const handleOpenEditItem = (index: number) => {
+        if (booking.status === BookingStatus.COMPLETED) return;
         const item = booking.pendingInvoiceItems![index];
         setCurrentItem({
             itemType: item.itemType,
@@ -102,6 +112,13 @@ export default function BookingDetail({
         });
         setEditingItemIndex(index);
         setItemDialogOpen(true);
+    };
+
+    const handleOpenDiscountDialog = () => {
+        if (booking.status === BookingStatus.COMPLETED) return;
+        setTempOrderDiscount(orderDiscount);
+        setTempDiscountReason(discountReason);
+        setDiscountDialogOpen(true);
     };
 
     const handleSaveItem = () => {
@@ -134,8 +151,19 @@ export default function BookingDetail({
         setItemDialogOpen(false);
     };
 
-    const selectableItems = useMemo(() => {
+    const handleSaveDiscount = () => {
+        setOrderDiscount(tempOrderDiscount);
+        setDiscountReason(tempDiscountReason);
+        setDiscountDialogOpen(false);
 
+        // TODO: Gọi API để cập nhật discount lên server
+        // await updateBookingDiscount(booking.id, { 
+        //   orderDiscount: tempOrderDiscount, 
+        //   discountReason: tempDiscountReason 
+        // });
+    };
+
+    const selectableItems = useMemo(() => {
         const currentServices = services || [];
         const currentProducts = products || [];
         if (currentItem.itemType === ItemType.PRODUCT) {
@@ -153,9 +181,9 @@ export default function BookingDetail({
             discount: s.discountPrice ? (s.price - s.discountPrice) : 0,
         }));
     }, [currentItem.itemType, products, services]);
+
     return (
         <Box sx={{ minHeight: "100vh", bgcolor: "#f4f6f8", pb: 5 }}>
-
             <Paper elevation={0} sx={{ p: 0, borderRadius: 0, bgcolor: "#fff" }}>
                 <Stack direction="row" justifyContent="space-between" alignItems="center">
                     <Stack direction="row" spacing={2} alignItems="center">
@@ -164,20 +192,27 @@ export default function BookingDetail({
                         </IconButton>
                         <Typography variant="h6" fontWeight={700}>Booking Details #BK{booking.id}</Typography>
                     </Stack>
-
                 </Stack>
             </Paper>
 
             <Box sx={{ py: 2 }}>
                 <Grid container spacing={3}>
-
                     <Grid size={{ xs: 12, md: 9 }}>
                         <Stack spacing={3}>
                             <Paper sx={{ borderRadius: 0, overflow: 'hidden' }} elevation={0}>
                                 <Box sx={{ px: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #f4f6f8' }}>
                                     <Typography variant="subtitle1" fontWeight={700}>Services Items</Typography>
                                     <Stack direction="row" spacing={1}>
-                                        <Button startIcon={<Add />} size="small" variant="contained" onClick={handleOpenAddDialog} sx={{ bgcolor: "#3b82f6", borderRadius: 0 }}>ADD Items</Button>
+                                        <Button
+                                            startIcon={<Add />}
+                                            size="small"
+                                            variant="contained"
+                                            onClick={handleOpenAddDialog}
+                                            disabled={booking.status === BookingStatus.COMPLETED}
+                                            sx={{ bgcolor: "#3b82f6", borderRadius: 0 }}
+                                        >
+                                            ADD Items
+                                        </Button>
                                     </Stack>
                                 </Box>
                                 <TableContainer sx={{ py: 2 }}>
@@ -216,7 +251,6 @@ export default function BookingDetail({
                                 </TableContainer>
                             </Paper>
 
-
                             <Paper sx={{ py: 0, px: 1, borderRadius: 0 }} elevation={0}>
                                 <Grid container spacing={4}>
                                     <Grid size={{ xs: 12, md: 7 }}>
@@ -244,8 +278,24 @@ export default function BookingDetail({
                                                 <Typography variant="body2">Subtotal</Typography>
                                                 <Typography variant="body2" fontWeight={600}>{financialSummary.subtotal.toLocaleString()}₫</Typography>
                                             </Stack>
-                                            <Stack direction="row" justifyContent="space-between">
-                                                <Typography variant="body2">Total Discount</Typography>
+                                            <Stack
+                                                direction="row"
+                                                justifyContent="space-between"
+                                                onClick={handleOpenDiscountDialog}
+                                                sx={{
+                                                    cursor: booking.status === BookingStatus.COMPLETED ? 'default' : 'pointer',
+                                                    pointerEvents: booking.status === BookingStatus.COMPLETED ? 'none' : 'auto',
+                                                    '&:hover': booking.status !== BookingStatus.COMPLETED ? {
+                                                        bgcolor: alpha(PRIMARY_COLOR, 0.05),
+                                                        borderRadius: 1,
+                                                        px: 1,
+                                                        mx: -1
+                                                    } : {}
+                                                }}
+                                            >
+                                                <Typography variant="body2" sx={{ color: PRIMARY_COLOR }}>
+                                                    Discount {discountReason && `(${discountReason})`}
+                                                </Typography>
                                                 <Typography variant="body2" fontWeight={600} color="success.main">-{financialSummary.totalDiscount.toLocaleString()}₫</Typography>
                                             </Stack>
                                             <Stack direction="row" justifyContent="space-between">
@@ -280,13 +330,11 @@ export default function BookingDetail({
                         </Stack>
                     </Grid>
 
-
                     <Grid size={{ xs: 12, md: 3 }}>
                         <Stack spacing={3}>
                             <Paper sx={{ borderRadius: 0, overflow: 'hidden' }} elevation={0}>
                                 <Box sx={{ p: 1.5, display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #eee' }}>
                                     <Typography variant="body1" fontWeight={800}>Customer</Typography>
-
                                 </Box>
                                 <Box sx={{ p: 1 }}>
                                     <Stack direction="row" spacing={3} sx={{ mb: 2 }} >
@@ -350,23 +398,51 @@ export default function BookingDetail({
                     </Grid>
                 </Grid>
             </Box>
-            <Dialog open={itemDialogOpen} onClose={() => setItemDialogOpen(false)} maxWidth="sm" fullWidth>
-                <DialogTitle sx={{ fontWeight: 700 }}>
-                    {editingItemIndex !== null ? "Edit Item" : "Add Service/Product"}
+
+            {/* Dialog thêm/sửa item */}
+            <Dialog
+                open={itemDialogOpen}
+                onClose={() => setItemDialogOpen(false)}
+                maxWidth="sm"
+                fullWidth
+                PaperProps={{ sx: { borderRadius: 2 } }}
+            >
+                <DialogTitle sx={{ fontWeight: 700, bgcolor: alpha(PRIMARY_COLOR, 0.05), py: 2 }}>
+                    {editingItemIndex !== null ? "Edit Item Details" : "Add Service or Product"}
                 </DialogTitle>
-                <DialogContent dividers>
-                    <Stack spacing={3} sx={{ mt: 1 }}>
-                        <FormControl fullWidth>
-                            <InputLabel>Type</InputLabel>
-                            <Select
-                                value={currentItem.itemType}
-                                label="Type"
-                                onChange={(e) => setCurrentItem({ ...currentItem, itemType: e.target.value as ItemType, itemId: "" })}
-                            >
-                                <MenuItem value="service">Service</MenuItem>
-                                <MenuItem value="product">Product</MenuItem>
-                            </Select>
-                        </FormControl>
+
+                <DialogContent dividers sx={{ p: 3 }}>
+                    <Stack spacing={3}>
+                        <Grid container spacing={2}>
+                            <Grid size={{ xs: 12, sm: 6 }}>
+                                <FormControl fullWidth size="small">
+                                    <InputLabel>Category Type</InputLabel>
+                                    <Select
+                                        value={currentItem.itemType}
+                                        label="Category Type"
+                                        onChange={(e) => setCurrentItem({ ...currentItem, itemType: e.target.value as ItemType, itemId: "" })}
+                                    >
+                                        <MenuItem value="service">Service</MenuItem>
+                                        <MenuItem value="product">Product</MenuItem>
+                                    </Select>
+                                </FormControl>
+                            </Grid>
+                            <Grid size={{ xs: 12, sm: 6 }}>
+                                <FormControl fullWidth size="small">
+                                    <InputLabel>Assign Staff</InputLabel>
+                                    <Select
+                                        value={currentItem.staffId}
+                                        label="Assign Staff"
+                                        onChange={(e) => setCurrentItem({ ...currentItem, staffId: e.target.value === "" ? "" : Number(e.target.value) })}
+                                    >
+                                        <MenuItem value=""><em>Not Assigned</em></MenuItem>
+                                        {staff.map((s) => (
+                                            <MenuItem key={s.id} value={s.id}>{s.full_name}</MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                            </Grid>
+                        </Grid>
 
                         <Autocomplete
                             options={selectableItems}
@@ -383,59 +459,190 @@ export default function BookingDetail({
                                     });
                                 }
                             }}
-                            renderInput={(params) => <TextField {...params} label="Select Item" />}
+                            renderInput={(params) => <TextField {...params} label="Search Service/Product" size="small" />}
                         />
 
-                        <Grid container spacing={2}>
-                            <Grid size={{ xs: 6 }}>
-                                <TextField
-                                    fullWidth
-                                    label="Quantity"
-                                    type="number"
-                                    value={currentItem.quantity}
-                                    onChange={(e) => setCurrentItem({ ...currentItem, quantity: Number(e.target.value) })}
-                                />
+                        <Paper variant="outlined" sx={{ p: 2, bgcolor: "#fafafa", borderStyle: 'dashed' }}>
+                            <Grid container spacing={2}>
+                                <Grid size={{ xs: 12 }}>
+                                    <Typography variant="caption" color="text.secondary" fontWeight={700}>PRICING DETAILS</Typography>
+                                </Grid>
+                                <Grid size={{ xs: 12, sm: 6 }}>
+                                    <TextField
+                                        fullWidth
+                                        label="Unit Price (₫)"
+                                        type="number"
+                                        size="small"
+                                        value={currentItem.unitPrice}
+                                        onChange={(e) => setCurrentItem({ ...currentItem, unitPrice: Number(e.target.value) })}
+                                    />
+                                </Grid>
+                                <Grid size={{ xs: 12, sm: 6 }}>
+                                    <TextField
+                                        fullWidth
+                                        label="Item Discount (₫)"
+                                        type="number"
+                                        size="small"
+                                        value={currentItem.discount}
+                                        onChange={(e) => setCurrentItem({ ...currentItem, discount: Number(e.target.value) })}
+                                    />
+                                </Grid>
+                                <Grid size={{ xs: 12, sm: 6 }}>
+                                    <TextField
+                                        fullWidth
+                                        label="Quantity"
+                                        type="number"
+                                        size="small"
+                                        value={currentItem.quantity}
+                                        onChange={(e) => setCurrentItem({ ...currentItem, quantity: Number(e.target.value) })}
+                                    />
+                                </Grid>
                             </Grid>
-                            <Grid size={{ xs: 6 }}>
-                                <TextField
-                                    fullWidth
-                                    label="Discount (₫)"
-                                    type="number"
-                                    value={currentItem.discount}
-                                    onChange={(e) => setCurrentItem({ ...currentItem, discount: Number(e.target.value) })}
-                                />
-                            </Grid>
-                        </Grid>
-
-                        <FormControl fullWidth>
-                            <InputLabel>Assign Staff</InputLabel>
-                            <Select
-                                value={currentItem.staffId}
-                                label="Assign Staff"
-                                onChange={(e) => setCurrentItem({ ...currentItem, staffId: e.target.value === "" ? "" : Number(e.target.value) })}
-                            >
-                                <MenuItem value="">None</MenuItem>
-                                {staff.map((s) => (
-                                    <MenuItem key={s.id} value={s.id}>{s.full_name}</MenuItem>
-                                ))}
-                            </Select>
-                        </FormControl>
+                        </Paper>
                     </Stack>
                 </DialogContent>
-                <DialogActions sx={{ p: 2, justifyContent: 'space-between' }}>
-                    <Box>
+
+                <DialogActions sx={{ p: 2.5, bgcolor: "#fcfcfc" }}>
+                    <Box sx={{ flexGrow: 1 }}>
                         {editingItemIndex !== null && (
                             <Button color="error" startIcon={<Delete />} onClick={() => handleDeleteItem(editingItemIndex)}>
-                                Delete
+                                Remove Item
                             </Button>
                         )}
                     </Box>
-                    <Stack direction="row" spacing={1}>
-                        <Button onClick={() => setItemDialogOpen(false)}>Cancel</Button>
-                        <Button variant="contained" onClick={handleSaveItem} sx={{ bgcolor: PRIMARY_COLOR }}>
-                            Save Changes
+                    <Stack direction="row" spacing={1.5}>
+                        <Button onClick={() => setItemDialogOpen(false)} variant="outlined" color="inherit">
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="contained"
+                            onClick={handleSaveItem}
+                            sx={{ bgcolor: PRIMARY_COLOR, px: 3, fontWeight: 700 }}
+                            disabled={!currentItem.itemId || currentItem.quantity <= 0}
+                        >
+                            {editingItemIndex !== null ? "Update Item" : "Add to Invoice"}
                         </Button>
                     </Stack>
+                </DialogActions>
+            </Dialog>
+
+            {/* Dialog cập nhật discount toàn đơn */}
+            <Dialog
+                open={discountDialogOpen}
+                onClose={() => setDiscountDialogOpen(false)}
+                maxWidth="sm"
+                fullWidth
+                PaperProps={{
+                    sx: {
+                        borderRadius: 0,
+                        position: 'absolute',
+                        top: 80,
+
+                        m: 0
+                    }
+                }}
+            >
+                <DialogTitle sx={{
+                    fontWeight: 700,
+                    bgcolor: "#fff",
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    pb: 1.5,
+                    pt: 2
+                }}>
+                    Cập nhật khuyến mãi
+                    <IconButton
+                        onClick={() => setDiscountDialogOpen(false)}
+                        size="small"
+                        sx={{ color: 'text.secondary' }}
+                    >
+                        <Close />
+                    </IconButton>
+                </DialogTitle>
+
+                <DialogContent sx={{ pt: 2, pb: 2 }}>
+                    <Stack spacing={2}>
+                        <Box>
+                            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                                Giá trị khuyến mại
+                            </Typography>
+                            <TextField
+                                fullWidth
+                                type="number"
+                                size="small"
+                                value={tempOrderDiscount}
+                                onChange={(e) => setTempOrderDiscount(Number(e.target.value))}
+                                InputProps={{
+                                    endAdornment: (
+                                        <Box sx={{
+                                            bgcolor: '#1976d2',
+                                            color: 'white',
+                                            px: 1.5,
+                                            py: 0.5,
+                                            borderRadius: 0,
+                                            ml: 1
+                                        }}>
+                                            <Typography variant="body2" fontWeight={600}>
+                                                đ
+                                            </Typography>
+                                        </Box>
+                                    ),
+                                }}
+                                sx={{
+                                    '& .MuiOutlinedInput-root': {
+                                        borderRadius: 0,
+                                    }
+                                }}
+                            />
+                        </Box>
+
+                        <Box>
+                            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                                Lý do
+                            </Typography>
+                            <TextField
+                                fullWidth
+                                size="small"
+                                placeholder="Giảm giá sản phẩm, khách hàng thân thiết"
+                                value={tempDiscountReason}
+                                onChange={(e) => setTempDiscountReason(e.target.value)}
+                                multiline
+                                rows={2}
+                                sx={{
+                                    '& .MuiOutlinedInput-root': {
+                                        borderRadius: 0,
+                                    }
+                                }}
+                            />
+                        </Box>
+                    </Stack>
+                </DialogContent>
+
+                <DialogActions sx={{ p: 2, pt: 1.5, justifyContent: 'space-between' }}>
+                    <Button
+                        onClick={() => setDiscountDialogOpen(false)}
+                        variant="outlined"
+                        color="inherit"
+                        sx={{ borderRadius: 0, px: 3 }}
+                    >
+                        Đóng
+                    </Button>
+                    <Button
+                        variant="contained"
+                        onClick={handleSaveDiscount}
+                        sx={{
+                            bgcolor: '#5bc0de',
+                            borderRadius: 0,
+                            px: 3,
+                            fontWeight: 600,
+                            '&:hover': {
+                                bgcolor: '#46b8da'
+                            }
+                        }}
+                    >
+                        Cập nhật
+                    </Button>
                 </DialogActions>
             </Dialog>
         </Box>

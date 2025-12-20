@@ -141,6 +141,7 @@ const ERROR_COLOR = "#ef4444";
 const WARNING_COLOR = "#f59e0b";
 const INFO_COLOR = "#3b82f6";
 const PURPLE_COLOR = "#a855f7";
+const EDIT_COLOR = "#f39c12";
 
 type DiscountType = "amount" | "percent";
 type PaymentStatus = "pending" | "paid";
@@ -611,7 +612,7 @@ export default function InvoicesPage() {
     setAnchorEl(null);
   };
 
-const handleAddNew = () => {
+  const handleAddNew = () => {
     setDialogMode("add");
     setSelectedInvoice(null);
     setShowDetail(true);
@@ -678,39 +679,34 @@ const handleAddNew = () => {
     setSelectedInvoice(invoice);
     setIsItemsLoading(true);
     try {
-        const items = await getItemsByInvoiceId(invoice.id);
-        setSelectedInvoice({ ...invoice, items });
-        setDialogMode("edit");
-        setShowDetail(true);
+      const items = await getItemsByInvoiceId(invoice.id);
+      setSelectedInvoice({ ...invoice, items });
+      setDialogMode("edit");
+      setShowDetail(true);
     } catch (err) {
-        alert("Failed to load invoice items");
+      alert("Failed to load invoice items");
     } finally {
-        setIsItemsLoading(false);
+      setIsItemsLoading(false);
     }
   };
 
-  const handleSaveInvoice = async (submissionData: any) => {
-    try {
-      setLoading(true);
-      if (dialogMode === "add") {
-        await createInvoice({
-            ...submissionData,
-            voucher: `INV-${Date.now()}`,
-            createdBy: 1 
-        });
-      } else if (dialogMode === "edit" && selectedInvoice) {
-        await updateInvoice(selectedInvoice.id, submissionData);
-    
-      }
-      fetchInvoices();
-      setShowDetail(false);
-    } catch (err) {
-      console.error(err);
-      alert("Error saving invoice");
-    } finally {
-      setLoading(false);
+  const handleSaveInvoice = async (submissionData: CreateInvoiceDto | UpdateInvoiceDto) => {
+  try {
+    setLoading(true);
+    if (dialogMode === "add") {
+      await createInvoice(submissionData as CreateInvoiceDto);
+    } else if (dialogMode === "edit" && selectedInvoice) {
+      await updateInvoice(selectedInvoice.id, submissionData as UpdateInvoiceDto);
     }
-  };
+    fetchInvoices();
+    setShowDetail(false);
+  } catch (err) {
+    console.error(err);
+    alert("Error saving invoice");
+  } finally {
+    setLoading(false);
+  }
+};
 
   useEffect(() => {
     setCurrentItem((prev) => ({
@@ -825,21 +821,21 @@ const handleAddNew = () => {
 
   const handleFormChange =
     (field: keyof InvoiceFormData) =>
-    (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-      setFormData({
-        ...formData,
-        [field]: event.target.value as InvoiceFormData[typeof field],
-      });
-    };
+      (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+        setFormData({
+          ...formData,
+          [field]: event.target.value as InvoiceFormData[typeof field],
+        });
+      };
 
   const handleItemChange =
     (field: keyof InvoiceItemFormData) =>
-    (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-      setCurrentItem({
-        ...currentItem,
-        [field]: event.target.value as InvoiceItemFormData[typeof field],
-      });
-    };
+      (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+        setCurrentItem({
+          ...currentItem,
+          [field]: event.target.value as InvoiceItemFormData[typeof field],
+        });
+      };
 
   const addItem = () => {
     if (currentItem.item_name && parseFloat(currentItem.unit_price) > 0) {
@@ -1034,10 +1030,10 @@ const handleAddNew = () => {
 
   const invoiceToView: Invoice | null = selectedInvoice
     ? {
-        ...selectedInvoice,
-        items: itemsForView.length > 0 ? itemsForView : selectedInvoice.items,
-        tax_amount: selectedInvoice.tax_amount,
-      }
+      ...selectedInvoice,
+      items: itemsForView.length > 0 ? itemsForView : selectedInvoice.items,
+      tax_amount: selectedInvoice.tax_amount,
+    }
     : null;
 
   const handleItemSelection = (item: SelectableItem | null) => {
@@ -1388,38 +1384,7 @@ const handleAddNew = () => {
                         {formatCurrency(invoice.subtotal)}
                       </Typography>
                     </TableCell>
-                    {/* <TableCell>
-                                            {invoice.discount_amount > 0 ? (
-                                                <Box>
-                                                    <Typography
-                                                        variant="body2"
-                                                        color={SUCCESS_COLOR}
-                                                        fontWeight="600"
-                                                    >
-                                                        -{formatCurrency(invoice.discount_amount)}
-                                                    </Typography>
-                                                    {invoice.discount_type === "percent" && (
-                                                        <Typography
-                                                            variant="caption"
-                                                            color="text.secondary"
-                                                        >
-                                                            (
-                                                            {((parseFloat(
-                                                                invoice.discount_amount.toString()
-                                                            ) || 0) *
-                                                                100) /
-                                                                (parseFloat(invoice.subtotal.toString()) ||
-                                                                    100)}
-                                                            %)
-                                                        </Typography>
-                                                    )}
-                                                </Box>
-                                            ) : (
-                                                <Typography variant="body2" color="text.secondary">
-                                                    No discount
-                                                </Typography>
-                                            )}
-                                        </TableCell> */}
+
                     <TableCell>
                       <Typography variant="body2">
                         {formatCurrency(invoice.tax_amount)}
@@ -1454,12 +1419,25 @@ const handleAddNew = () => {
                       />
                     </TableCell>
                     <TableCell align="center">
-                      <IconButton
+                      <Button
+                        variant="contained"
                         size="small"
-                        onClick={(e) => handleMenuOpen(e, invoice)}
+                        startIcon={<Edit sx={{ fontSize: '18px !important' }} />}
+                        onClick={() => handleEdit(invoice)}
+                        sx={{
+                          bgcolor: '#f39c12', 
+                          '&:hover': { bgcolor: '#e67e22' },
+                          textTransform: 'none',
+                          fontWeight: 600,
+                          borderRadius: '6px',
+                          px: 2,
+                          minWidth: '80px',
+                          boxShadow: 'none',
+                          height: '32px'
+                        }}
                       >
-                        <MoreVert />
-                      </IconButton>
+                        Edit
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))
@@ -1479,8 +1457,8 @@ const handleAddNew = () => {
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
                         {searchQuery ||
-                        filterStatus !== "all" ||
-                        filterStore !== "all"
+                          filterStatus !== "all" ||
+                          filterStore !== "all"
                           ? "Try adjusting your search or filters"
                           : "Get started by creating your first invoice"}
                       </Typography>
@@ -1503,7 +1481,7 @@ const handleAddNew = () => {
       </Card>
 
       {/* Menu for invoice actions */}
-     <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleMenuClose}>
+      <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleMenuClose}>
         <MenuItem onClick={handleViewItems}>
           <Inventory sx={{ mr: 1, fontSize: 20 }} />
           View Items
@@ -1533,590 +1511,6 @@ const handleAddNew = () => {
         </MenuItem>
       </Menu>
 
-      {/* Create/Edit Dialog */}
-      <Dialog
-        open={openDialog}
-        onClose={handleDialogClose}
-        maxWidth="xl"
-        fullWidth
-      >
-        <DialogTitle>
-          {dialogMode === "add"
-            ? "Create New Invoice"
-            : dialogMode === "edit"
-            ? "Edit Invoice"
-            : "Invoice Details"}
-        </DialogTitle>
-        <DialogContent dividers>
-          {dialogMode === "view" && invoiceToView ? (
-            <Grid container spacing={3} sx={{ mt: 0.5 }}>
-              <Grid size={{ xs: 12 }}>
-                <Box
-                  sx={{ display: "flex", alignItems: "center", gap: 2, mb: 3 }}
-                >
-                  <Avatar
-                    sx={{
-                      bgcolor: alpha(PRIMARY_COLOR, 0.1),
-                      color: PRIMARY_COLOR,
-                      width: 80,
-                      height: 80,
-                    }}
-                  >
-                    <Receipt sx={{ fontSize: 32 }} />
-                  </Avatar>
-                  <Box>
-                    <Typography variant="h5" fontWeight="bold">
-                      {invoiceToView.voucher}
-                    </Typography>
-                    <Box sx={{ display: "flex", gap: 1, mt: 1 }}>
-                      <Chip
-                        label={getPaymentStatusLabel(
-                          invoiceToView.payment_status
-                        )}
-                        size="small"
-                        sx={{
-                          bgcolor: alpha(
-                            getPaymentStatusColor(invoiceToView.payment_status),
-                            0.1
-                          ),
-                          color: getPaymentStatusColor(
-                            invoiceToView.payment_status
-                          ),
-                        }}
-                      />
-                      <Chip
-                        label={invoiceToView.store?.name || ""}
-                        size="small"
-                        variant="outlined"
-                      />
-                    </Box>
-                  </Box>
-                </Box>
-              </Grid>
-
-              <Grid size={{ xs: 12, sm: 6 }}>
-                <Typography variant="caption" color="text.secondary">
-                  Customer
-                </Typography>
-                <Typography variant="body1" fontWeight="600">
-                  {invoiceToView.customer?.fullName ||
-                    `ID: ${invoiceToView.customer_id}`}
-                </Typography>
-              </Grid>
-              <Grid size={{ xs: 12, sm: 6 }}>
-                <Typography variant="caption" color="text.secondary">
-                  Phone
-                </Typography>
-                <Typography variant="body1">
-                  {invoiceToView.customer?.phone || "N/A"}
-                </Typography>
-              </Grid>
-              <Grid size={{ xs: 12, sm: 6 }}>
-                <Typography variant="caption" color="text.secondary">
-                  Store
-                </Typography>
-                <Typography variant="body1" fontWeight="600">
-                  {invoiceToView.store?.name || `ID: ${invoiceToView.store_id}`}
-                </Typography>
-              </Grid>
-              <Grid size={{ xs: 12, sm: 6 }}>
-                <Typography variant="caption" color="text.secondary">
-                  Booking
-                </Typography>
-                <Typography variant="body1">
-                  {invoiceToView.booking ? invoiceToView.voucher : "No booking"}
-                </Typography>
-              </Grid>
-
-              <Grid size={{ xs: 12 }}>
-                <Typography variant="h6" sx={{ mb: 2, mt: 2 }}>
-                  Invoice Items
-                </Typography>
-                <TableContainer component={Paper} variant="outlined">
-                  <Table>
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Item</TableCell>
-                        <TableCell>Type</TableCell>
-                        <TableCell>Staff</TableCell>
-                        <TableCell align="right">Qty</TableCell>
-                        <TableCell align="right">Unit Price</TableCell>
-                        <TableCell align="right">Discount</TableCell>
-                        <TableCell align="right">Total</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {invoiceToView.items?.map((item) => (
-                        <TableRow key={item.id}>
-                          <TableCell>
-                            <Box
-                              sx={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 1,
-                              }}
-                            >
-                              <Avatar
-                                sx={{
-                                  bgcolor: alpha(
-                                    getItemTypeColor(item.itemType as ItemType),
-                                    0.1
-                                  ),
-                                  color: getItemTypeColor(
-                                    item.itemType as ItemType
-                                  ),
-                                  width: 32,
-                                  height: 32,
-                                }}
-                              >
-                                {getItemTypeIcon(item.itemType as ItemType)}
-                              </Avatar>
-                              <Box>
-                                <Typography variant="body2" fontWeight="600">
-                                  {item.itemName}
-                                </Typography>
-                              </Box>
-                            </Box>
-                          </TableCell>
-                          <TableCell>
-                            <Chip
-                              label={item.itemType}
-                              size="small"
-                              sx={{
-                                bgcolor: alpha(
-                                  getItemTypeColor(item.itemType as ItemType),
-                                  0.1
-                                ),
-                                color: getItemTypeColor(
-                                  item.itemType as ItemType
-                                ),
-                                textTransform: "capitalize",
-                              }}
-                            />
-                          </TableCell>
-                          <TableCell>{item.staff_name || "-"}</TableCell>
-                          <TableCell align="right">{item.quantity}</TableCell>
-                          <TableCell align="right">
-                            {formatCurrency(item.unitPrice)}
-                          </TableCell>
-                          <TableCell
-                            align="right"
-                            sx={{ color: SUCCESS_COLOR }}
-                          >
-                            -{formatCurrency(item.discount)}
-                          </TableCell>
-                          <TableCell align="right" sx={{ fontWeight: 600 }}>
-                            {formatCurrency(item.totalPrice)}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              </Grid>
-
-              <Grid size={{ xs: 12 }}>
-                <Box
-                  sx={{ display: "flex", justifyContent: "flex-end", mt: 2 }}
-                >
-                  <Box sx={{ minWidth: 300 }}>
-                    <Stack spacing={1}>
-                      <Box
-                        sx={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                        }}
-                      >
-                        <Typography>Subtotal:</Typography>
-                        <Typography fontWeight="600">
-                          {formatCurrency(invoiceToView.subtotal)}
-                        </Typography>
-                      </Box>
-                      {/* {invoiceToView.discount_amount > 0 && (
-                                                <Box
-                                                    sx={{
-                                                        display: "flex",
-                                                        justifyContent: "space-between",
-                                                    }}
-                                                >
-                                                    <Typography color={SUCCESS_COLOR}>
-                                                        Discount{" "}
-                                                        {invoiceToView.discount_type === "percent"
-                                                            ? `(${invoiceToView.discount_amount}%)`
-                                                            : ""}
-                                                        :
-                                                    </Typography>
-                                                    <Typography color={SUCCESS_COLOR} fontWeight="600">
-                                                        -{formatCurrency(invoiceToView.discount_amount)}
-                                                    </Typography>
-                                                </Box>
-                                            )} */}
-                      <Box
-                        sx={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                        }}
-                      >
-                        <Typography>Tax:</Typography>
-                        <Typography fontWeight="600">
-                          {formatCurrency(invoiceToView.tax_amount)}
-                        </Typography>
-                      </Box>
-                      <Divider />
-                      <Box
-                        sx={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                        }}
-                      >
-                        <Typography variant="h6">Total Amount:</Typography>
-                        <Typography variant="h6" color={PRIMARY_COLOR}>
-                          {formatCurrency(invoiceToView.total_amount)}
-                        </Typography>
-                      </Box>
-                      <Box
-                        sx={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                        }}
-                      >
-                        <Typography>Paid Amount:</Typography>
-                        <Typography
-                          fontWeight="600"
-                          color={
-                            invoiceToView.payment_status === "paid"
-                              ? SUCCESS_COLOR
-                              : WARNING_COLOR
-                          }
-                        >
-                          {formatCurrency(invoiceToView.paid_amount)}
-                        </Typography>
-                      </Box>
-                    </Stack>
-                  </Box>
-                </Box>
-              </Grid>
-
-              {invoiceToView.notes && (
-                <Grid size={{ xs: 12 }}>
-                  <Typography variant="caption" color="text.secondary">
-                    Notes
-                  </Typography>
-                  <Typography variant="body1" sx={{ whiteSpace: "pre-wrap" }}>
-                    {invoiceToView.notes}
-                  </Typography>
-                </Grid>
-              )}
-
-              <Grid size={{ xs: 12, sm: 6 }}>
-                <Typography variant="caption" color="text.secondary">
-                  Created At
-                </Typography>
-                <Typography variant="body1">
-                  {new Date(invoiceToView.created_at).toLocaleString()}
-                </Typography>
-              </Grid>
-              <Grid size={{ xs: 12, sm: 6 }}>
-                <Typography variant="caption" color="text.secondary">
-                  Last Updated
-                </Typography>
-                <Typography variant="body1">
-                  {new Date(invoiceToView.updated_at).toLocaleString()}
-                </Typography>
-              </Grid>
-            </Grid>
-          ) : (
-            <Grid container spacing={3} sx={{ mt: 0.5 }}>
-              <Grid size={{ xs: 12, sm: 6 }}>
-                <FormControl fullWidth required>
-                  <InputLabel>Customer</InputLabel>
-                  <Select
-                    value={formData.customer_id}
-                    label="Customer"
-                    onChange={(e) =>
-                      setFormData({ ...formData, customer_id: e.target.value })
-                    }
-                  >
-                    {customers.map((customer) => (
-                      <MenuItem key={customer.id} value={customer.id}>
-                        {customer.fullName} - {customer.phone}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid size={{ xs: 12, sm: 6 }}>
-                <FormControl fullWidth required>
-                  <InputLabel>Store</InputLabel>
-                  <Select
-                    value={formData.store_id}
-                    label="Store"
-                    onChange={(e) =>
-                      setFormData({ ...formData, store_id: e.target.value })
-                    }
-                  >
-                    {stores.map((store) => (
-                      <MenuItem key={store.id} value={store.id}>
-                        {store.name}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid size={{ xs: 12, sm: 6 }}>
-                <TextField
-                  fullWidth
-                  label="Booking"
-                  value={formatVoucherToBK(selectedInvoice?.voucher)}
-                  InputProps={{
-                    readOnly: true,
-                  }}
-                  helperText="Booking information"
-                />
-              </Grid>
-
-              <Grid size={{ xs: 12, sm: 6 }}>
-                <FormControl fullWidth>
-                  <InputLabel>Payment Status</InputLabel>{" "}
-                  <Select
-                    value={formData.payment_status}
-                    label="Payment Status"
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        payment_status: e.target.value as PaymentStatus,
-                      })
-                    }
-                  >
-                    <MenuItem value="pending">Pending</MenuItem>
-                    <MenuItem value="paid">Paid</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
-
-              <Grid size={{ xs: 12 }}>
-                {items.length > 0 && (
-                  <TableContainer component={Paper} variant="outlined">
-                    <Table>
-                      <TableHead>
-                        <TableRow>
-                          <TableCell>Item</TableCell>
-                          <TableCell>Type</TableCell>
-                          <TableCell>Staff</TableCell>
-                          <TableCell align="right">Qty</TableCell>
-                          <TableCell align="right">Unit Price</TableCell>
-                          <TableCell align="right">Discount</TableCell>
-                          <TableCell align="right">Total</TableCell>
-                        </TableRow>
-                      </TableHead>
-
-                      <TableBody>
-                        {items.map((item, index) => (
-                          <TableRow key={index}>
-                            <TableCell>
-                              <Typography variant="body2" fontWeight="600">
-                                {item.item_name}
-                              </Typography>
-                            </TableCell>
-                            <TableCell>
-                              <Chip
-                                label={item.item_type}
-                                size="small"
-                                sx={{
-                                  bgcolor: alpha(
-                                    getItemTypeColor(item.item_type),
-                                    0.1
-                                  ),
-                                  color: getItemTypeColor(item.item_type),
-                                  textTransform: "capitalize",
-                                }}
-                              />
-                            </TableCell>
-                            <TableCell>
-                              {staff.find(
-                                (s) => s.id === parseInt(item.staff_id)
-                              )?.full_name || "-"}
-                            </TableCell>
-                            <TableCell align="right">{item.quantity}</TableCell>
-                            <TableCell align="right">
-                              {formatCurrency(parseFloat(item.unit_price))}
-                            </TableCell>
-                            <TableCell
-                              align="right"
-                              sx={{ color: SUCCESS_COLOR }}
-                            >
-                              -{formatCurrency(parseFloat(item.discount))}
-                            </TableCell>
-                            <TableCell align="right" sx={{ fontWeight: 600 }}>
-                              {formatCurrency(
-                                parseFloat(item.unit_price) *
-                                  parseInt(item.quantity) -
-                                  parseFloat(item.discount)
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </TableContainer>
-                )}
-              </Grid>
-
-              {/* <Grid size={{ xs: 12, sm: 4 }}>
-                <TextField
-                  fullWidth
-                  label="Discount Amount"
-                  type="number"
-                  value={formData.discount_amount}
-                  onChange={handleFormChange("discount_amount")}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">₫</InputAdornment>
-                    ),
-                  }}
-                />
-              </Grid>
-              <Grid size={{ xs: 12, sm: 4 }}>
-                <FormControl fullWidth>
-                  <InputLabel>Discount Type</InputLabel>
-                  <Select
-                    value={formData.discount_type}
-                    label="Discount Type"
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        discount_type: e.target.value as DiscountType,
-                      })
-                    }
-                  >
-                    <MenuItem value="">No Discount</MenuItem>
-                    <MenuItem value="amount">Amount</MenuItem>
-                    <MenuItem value="percent">Percentage</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid> */}
-              {/* <Grid size={{ xs: 12, sm: 4 }}>
-                                <TextField
-                                    fullWidth
-                                    label="Tax Amount"
-                                    type="number"
-                                    value={formData.tax_amount}
-                                    onChange={handleFormChange("tax_amount")}
-                                    InputProps={{
-                                        startAdornment: (
-                                            <InputAdornment position="start">₫</InputAdornment>
-                                        ),
-                                    }}
-                                />
-                            </Grid> */}
-
-              <Grid size={{ xs: 12 }}>
-                <Box
-                  sx={{ display: "flex", justifyContent: "flex-end", mt: 2 }}
-                >
-                  <Box
-                    sx={{
-                      minWidth: 300,
-                      p: 2,
-                      bgcolor: alpha(PRIMARY_COLOR, 0.05),
-                      borderRadius: 1,
-                    }}
-                  >
-                    <Stack spacing={1}>
-                      <Box
-                        sx={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                        }}
-                      >
-                        <Typography>Subtotal:</Typography>
-                        <Typography fontWeight="600">
-                          {formatCurrency(subtotal)}
-                        </Typography>
-                      </Box>
-                      {calculatedDiscountAmount > 0 && (
-                        <Box
-                          sx={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                          }}
-                        >
-                          <Typography color={SUCCESS_COLOR}>
-                            Discount{" "}
-                            {formData.discount_type === "percent"
-                              ? `(${formData.discount_amount}%)`
-                              : ""}
-                            :
-                          </Typography>
-                          <Typography color={SUCCESS_COLOR} fontWeight="600">
-                            -{formatCurrency(calculatedDiscountAmount)}
-                          </Typography>
-                        </Box>
-                      )}
-                      <Box
-                        sx={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                        }}
-                      >
-                        <Typography>Tax:</Typography>
-                        <Typography fontWeight="600">
-                          {formatCurrency(calculatedTaxAmount)}
-                        </Typography>
-                      </Box>
-                      <Divider />
-                      <Box
-                        sx={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                        }}
-                      >
-                        <Typography variant="h6">Total Amount:</Typography>
-                        <Typography variant="h6" color={PRIMARY_COLOR}>
-                          {formatCurrency(total)}
-                        </Typography>
-                      </Box>
-                    </Stack>
-                  </Box>
-                </Box>
-              </Grid>
-
-              <Grid size={{ xs: 12 }}>
-                <TextField
-                  fullWidth
-                  label="Notes"
-                  multiline
-                  rows={3}
-                  value={formData.notes}
-                  onChange={handleFormChange("notes")}
-                  placeholder="Add any notes or special instructions..."
-                />
-              </Grid>
-            </Grid>
-          )}
-        </DialogContent>
-        <DialogActions sx={{ px: 4, py: 2 }}>
-          {dialogMode !== "view" && (
-            <>
-              <Button onClick={handleDialogClose}>Cancel</Button>
-              <Button
-                onClick={handleSubmit}
-                variant="contained"
-                disabled={items.length === 0}
-                sx={{
-                  bgcolor: PRIMARY_COLOR,
-                  "&:hover": { bgcolor: PRIMARY_DARK },
-                }}
-              >
-                {dialogMode === "add" ? "Create Invoice" : "Save Changes"}
-              </Button>
-            </>
-          )}
-          {dialogMode === "view" && (
-            <Button onClick={handleDialogClose}>Close</Button>
-          )}
-        </DialogActions>
-      </Dialog>
 
       <Dialog
         open={openItemsDialog}

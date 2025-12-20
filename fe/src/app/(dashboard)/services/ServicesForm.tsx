@@ -81,6 +81,7 @@ import {
 } from '@/types';
 import ServiceDetail from './ServiceDetail';
 
+
 // Colors
 const PRIMARY_COLOR = '#3b82f6';
 const PRIMARY_DARK = '#0f766e';
@@ -89,6 +90,7 @@ const ERROR_COLOR = '#ef4444';
 const WARNING_COLOR = '#f59e0b';
 const INFO_COLOR = '#3b82f6';
 const PURPLE_COLOR = '#a855f7';
+const EDIT_COLOR = "#f39c12"
 
 interface ServiceFormData {
   name: string;
@@ -161,7 +163,7 @@ export default function ServicesPage() {
   const [validationErrors, setValidationErrors] = useState<Partial<Record<keyof ServiceFormData, string>>>({});
   const [loading, setLoading] = useState(false);
   const [showDetail, setShowDetail] = useState(false);
-  
+
   const initialFormData: ServiceFormData = {
     name: '',
     categoryId: '',
@@ -318,13 +320,12 @@ export default function ServicesPage() {
     setShowDetail(true);
   };
 
-  const handleEdit = () => {
-    if (selectedService) {
-      setDialogMode('edit');
-      setShowDetail(true);
-    }
-    handleMenuClose();
-  };
+  const handleEdit = (service: Service) => {
+  setSelectedService(service);
+  setDialogMode('edit');
+  setShowDetail(true);
+  handleMenuClose();
+};
 
   const handleView = () => {
     if (selectedService) {
@@ -342,16 +343,23 @@ export default function ServicesPage() {
     setDeleteConfirmOpen(true);
     handleMenuClose();
   };
-  const handleSave = async (submissionData: any) => {
-    if (dialogMode === 'add') {
-      await createMutation.mutateAsync(submissionData);
-    } else if (dialogMode === 'edit' && selectedService) {
-      await updateMutation.mutateAsync({ id: selectedService.id, data: submissionData });
+  const handleSave = async (submissionData: CreateServiceDto | UpdateServiceDto) => {
+    try {
+      if (dialogMode === 'add') {
+        await createMutation.mutateAsync(submissionData as CreateServiceDto);
+      } else if (dialogMode === 'edit' && selectedService) {
+
+        await updateMutation.mutateAsync({
+          id: selectedService.id,
+          data: submissionData as UpdateServiceDto
+        });
+      }
+      setShowDetail(false);
+    } catch (error) {
+      console.error("Failed to save service:", error);
     }
-    setShowDetail(false);
   };
 
-  // --- Logic Render ---
   if (showDetail) {
     return (
       <ServiceDetail
@@ -424,10 +432,10 @@ export default function ServicesPage() {
   };
 
   const isAnyLoading =
-  isLoadingServices ||
-  createMutation.isPending ||
-  updateMutation.isPending ||
-  deleteMutation.isPending;
+    isLoadingServices ||
+    createMutation.isPending ||
+    updateMutation.isPending ||
+    deleteMutation.isPending;
   return (
     <>
       <Backdrop
@@ -476,7 +484,7 @@ export default function ServicesPage() {
                     Active Services
                   </Typography>
                   <Typography variant="h4" fontWeight="bold">
-                    { stats.active}
+                    {stats.active}
                   </Typography>
                 </Box>
                 <Avatar sx={{ bgcolor: alpha(SUCCESS_COLOR, 0.1), width: 56, height: 56 }}>
@@ -495,7 +503,7 @@ export default function ServicesPage() {
                     Combo Packages
                   </Typography>
                   <Typography variant="h4" fontWeight="bold">
-                    { stats.combo}
+                    {stats.combo}
                   </Typography>
                 </Box>
                 <Avatar sx={{ bgcolor: alpha(PURPLE_COLOR, 0.1), width: 56, height: 56 }}>
@@ -623,7 +631,7 @@ export default function ServicesPage() {
               </TableRow>
             </TableHead>
             <TableBody>
-              { isError ? (
+              {isError ? (
                 <TableRow>
                   <TableCell colSpan={8} align="center" sx={{ py: 10 }}>
                     <Alert severity="error">Failed to load services.</Alert>
@@ -725,9 +733,25 @@ export default function ServicesPage() {
                       />
                     </TableCell>
                     <TableCell align="center">
-                      <IconButton size="small" onClick={(e) => handleMenuOpen(e, service)}>
-                        <MoreVert />
-                      </IconButton>
+                      <Button
+                        variant="contained"
+                        size="small"
+                        startIcon={<Edit sx={{ fontSize: '18px !important' }} />}
+                        onClick={() => handleEdit(service)}
+                        sx={{
+                          bgcolor: '#f39c12',
+                          '&:hover': { bgcolor: '#e67e22' },
+                          textTransform: 'none',
+                          fontWeight: 600,
+                          borderRadius: '6px',
+                          px: 2,
+                          minWidth: '80px',
+                          boxShadow: 'none',
+                          height: '32px'
+                        }}
+                      >
+                        Edit
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))
@@ -762,21 +786,7 @@ export default function ServicesPage() {
         />
       </Card>
 
-      {/* Menu */}
-      <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleMenuClose}>
-        {/* <MenuItem onClick={handleView}>
-          <Visibility sx={{ mr: 1, fontSize: 20 }} />
-          View Details
-        </MenuItem> */}
-        <MenuItem onClick={handleEdit}>
-          <Edit sx={{ mr: 1, fontSize: 20 }} />
-          Edit
-        </MenuItem>
-        <MenuItem onClick={handleDelete} sx={{ color: ERROR_COLOR }}>
-          <Delete sx={{ mr: 1, fontSize: 20 }} />
-          Delete
-        </MenuItem>
-      </Menu>
+    
 
       {/* Add/Edit Dialog */}
       <Dialog open={openDialog} onClose={handleDialogClose} maxWidth="md" fullWidth>

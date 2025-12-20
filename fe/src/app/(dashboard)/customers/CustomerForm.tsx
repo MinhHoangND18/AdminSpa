@@ -263,16 +263,29 @@ export default function CustomersPage() {
     setSnackbar({ open: true, message, severity });
   };
 
-  const handleSave = async (formData: CustomerFormData) => {
+  const handleSave = async (data: CreateCustomerDto | UpdateCustomerDto) => {
     const dataToSubmit = {
-      ...formData,
-      storeId: formData.storeId ? parseInt(formData.storeId) : undefined,
+      ...data,
     };
+
     if (dialogMode === "edit" && selectedCustomerId) {
-      updateMutation.mutate({ id: selectedCustomerId, customer: dataToSubmit as UpdateCustomerDto });
+      updateMutation.mutate({
+        id: selectedCustomerId,
+        customer: dataToSubmit as UpdateCustomerDto
+      });
     } else {
       createMutation.mutate(dataToSubmit as CreateCustomerDto);
     }
+  };
+  const handleFilterChange = <K extends keyof typeof filters>(
+    key: K,
+    value: (typeof filters)[K] | "all"
+  ) => {
+    setFilters((prev) => ({
+      ...prev,
+      [key]: value === "all" ? undefined : value,
+    }));
+    setPage(0);
   };
 
   const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, customer: Customer) => {
@@ -413,7 +426,7 @@ export default function CustomersPage() {
               <Select
                 value={filters.customerType || "all"}
                 label="Type"
-                onChange={(e) => { setFilters({ ...filters, customerType: e.target.value === "all" ? undefined : e.target.value as any }); setPage(0); }}
+                onChange={(e) => handleFilterChange("customerType", e.target.value as CustomerType | "all")}
               >
                 <MenuItem value="all">All Types</MenuItem>
                 <MenuItem value={CustomerType.NEW}>New</MenuItem>
@@ -426,7 +439,7 @@ export default function CustomersPage() {
               <Select
                 value={filters.status || "all"}
                 label="Status"
-                onChange={(e) => { setFilters({ ...filters, status: e.target.value === "all" ? undefined : e.target.value as any }); setPage(0); }}
+                onChange={(e) => handleFilterChange("status", e.target.value as CustomerStatus | "all")}
               >
                 <MenuItem value="all">All Status</MenuItem>
                 <MenuItem value={CustomerStatus.ACTIVE}>Active</MenuItem>
@@ -441,7 +454,7 @@ export default function CustomersPage() {
         </CardContent>
       </Card>
 
-      {/* --- Giữ nguyên Customer Table --- */}
+
       <Card>
         <TableContainer>
           <Table>
@@ -466,7 +479,7 @@ export default function CustomersPage() {
                     <TableCell>
                       <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
                         <Badge overlap="circular" anchorOrigin={{ vertical: "bottom", horizontal: "right" }} badgeContent={customer.customerType === CustomerType.VIP ? <Star sx={{ fontSize: 16, color: PURPLE_COLOR, bgcolor: "white", borderRadius: "50%", p: 0.3 }} /> : null}>
-                          <Avatar sx={{ bgcolor: alpha(PRIMARY_COLOR, 0.1), color: PRIMARY_COLOR, width: 44, height: 44, fontWeight: 600 }}>{customer.fullName?.charAt(0)}</Avatar>
+
                         </Badge>
                         <Typography variant="body2" fontWeight="600">{customer.fullName}</Typography>
                       </Box>
@@ -485,7 +498,31 @@ export default function CustomersPage() {
                     </TableCell>
                     <TableCell>{customer.lastVisitDate ? <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}><CalendarToday sx={{ fontSize: 14, color: "text.secondary" }} /><Typography variant="body2">{new Date(customer.lastVisitDate).toLocaleDateString()}</Typography></Box> : "Never"}</TableCell>
                     <TableCell><Chip label={getStatusLabel(customer.status)} size="small" sx={{ bgcolor: alpha(getStatusColor(customer.status), 0.1), color: getStatusColor(customer.status), fontWeight: 600 }} /></TableCell>
-                    <TableCell align="center"><IconButton size="small" onClick={(e) => handleMenuOpen(e, customer)}><MoreVert /></IconButton></TableCell>
+                    <TableCell align="center">
+                      <Button
+                        variant="contained"
+                        size="small"
+                        startIcon={<Edit sx={{ fontSize: '18px !important' }} />}
+                        onClick={() => {
+                          setSelectedCustomerId(customer.id);
+                          setDialogMode("edit");
+                          setShowDetail(true);
+                        }}
+                        sx={{
+                          bgcolor: '#f39c12',
+                          '&:hover': { bgcolor: '#e67e22' },
+                          textTransform: 'none',
+                          fontWeight: 600,
+                          borderRadius: '6px',
+                          px: 2,
+                          minWidth: '80px',
+                          boxShadow: 'none',
+                          height: '32px'
+                        }}
+                      >
+                        Sửa
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))
               ) : (
@@ -497,7 +534,7 @@ export default function CustomersPage() {
         <TablePagination rowsPerPageOptions={[5, 10, 25, 50]} component="div" count={totalCustomers} rowsPerPage={rowsPerPage} page={page} onPageChange={(_, p) => setPage(p)} onRowsPerPageChange={(e) => { setRowsPerPage(parseInt(e.target.value, 10)); setPage(0); }} />
       </Card>
 
-      {/* --- Thay thế Dialog nội dung cũ bằng CustomerDetail --- */}
+
       <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="lg" fullWidth>
         <CustomerDetail
           mode={dialogMode}
@@ -509,9 +546,9 @@ export default function CustomersPage() {
         />
       </Dialog>
 
-     
+
       <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)}>
-        {/* <MenuItem onClick={handleView}><Visibility sx={{ mr: 1, fontSize: 20 }} /> View Details</MenuItem> */}
+
         <MenuItem onClick={handleEdit}><Edit sx={{ mr: 1, fontSize: 20 }} /> Edit</MenuItem>
         <MenuItem onClick={handleDelete} sx={{ color: ERROR_COLOR }}><Delete sx={{ mr: 1, fontSize: 20 }} /> Delete</MenuItem>
       </Menu>

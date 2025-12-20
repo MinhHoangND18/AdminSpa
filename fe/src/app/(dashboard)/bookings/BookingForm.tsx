@@ -80,11 +80,11 @@ export default function BookingsPage() {
     if (!booking) return;
 
     const subtotal = booking.pendingInvoiceItems?.reduce(
-        (sum, item) => sum + (item.unitPrice * item.quantity), 0
+      (sum, item) => sum + (item.unitPrice * item.quantity), 0
     ) || 0;
 
     const totalDiscount = booking.pendingInvoiceItems?.reduce(
-        (sum, item) => sum + (item.discount || 0), 0
+      (sum, item) => sum + (item.discount || 0), 0
     ) || 0;
 
     const afterDiscount = subtotal - totalDiscount;
@@ -95,38 +95,38 @@ export default function BookingsPage() {
     const finalAmount = afterDiscount + taxAmount;
 
     const invoiceData: CompleteServicePayload = {
-        storeId: booking.storeId,
-        subtotal: subtotal,
-        totalAmount: finalAmount,
-        discountAmount: totalDiscount,
-        taxAmount: taxAmount,
-        paymentStatus: 'pending',
-        items: booking.pendingInvoiceItems?.map(item => ({
-            itemType: item.itemType,
-            itemId: item.itemId,
-            itemName: item.itemName,
-            quantity: item.quantity,
-            unitPrice: item.unitPrice,
-            discount: item.discount || 0,
-            staffId: item.staffId,
-        })) || []
+      storeId: booking.storeId,
+      subtotal: subtotal,
+      totalAmount: finalAmount,
+      discountAmount: totalDiscount,
+      taxAmount: taxAmount,
+      paymentStatus: 'pending',
+      items: booking.pendingInvoiceItems?.map(item => ({
+        itemType: item.itemType,
+        itemId: item.itemId,
+        itemName: item.itemName,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        discount: item.discount || 0,
+        staffId: item.staffId,
+      })) || []
     };
 
     await completeService(id, invoiceData);
     await queryClient.invalidateQueries({ queryKey: ['bookings'] });
-    setSelectedId(null); 
+    setSelectedId(null);
   };
 
   const handleUpdateBookingItems = async (id: number, items: PendingInvoiceItem[]) => {
     const payloadItems: CreatePendingInvoiceItemPayload[] = items.map(item => ({
-        itemType: item.itemType,
-        itemId: item.itemId,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-        discount: item.discount,
-        totalPrice: item.totalPrice,
-        staffId: item.staffId,
-        itemName: item.itemName,
+      itemType: item.itemType,
+      itemId: item.itemId,
+      quantity: item.quantity,
+      unitPrice: item.unitPrice,
+      discount: item.discount,
+      totalPrice: item.totalPrice,
+      staffId: item.staffId,
+      itemName: item.itemName,
     }));
     await updateBooking(id, { pendingInvoiceItems: payloadItems });
     queryClient.invalidateQueries({ queryKey: ['bookings'] });
@@ -153,6 +153,27 @@ export default function BookingsPage() {
       );
     }
   }
+  const PRIMARY_COLOR = "#3b82f6";
+  const SUCCESS_COLOR = "#10b981";
+  const WARNING_COLOR = "#f59e0b";
+  const INFO_COLOR = "#8b5cf6";
+  const GRAY_COLOR = "#64748b";
+
+
+  const getTabColor = (tabValue: string) => {
+    switch (tabValue) {
+      case "ALL":
+        return PRIMARY_COLOR;
+      case BookingStatus.PENDING:
+        return WARNING_COLOR;
+      case BookingStatus.IN_PROGRESS:
+        return INFO_COLOR;
+      case BookingStatus.COMPLETED:
+        return SUCCESS_COLOR;
+      default:
+        return PRIMARY_COLOR;
+    }
+  };
 
   return (
     <Box sx={{ p: 3, bgcolor: "#F8FAFC", minHeight: "100vh" }}>
@@ -176,23 +197,54 @@ export default function BookingsPage() {
               textTransform: "none",
               fontSize: "1rem",
               borderRadius: 0,
-              transition: "background-color 0.3s",
+              transition: "all 0.3s",
             },
-            // Cấu hình khi Tab được chọn
             "& .Mui-selected": {
-              color: `${PRIMARY_COLOR} !important`,
-              backgroundColor: alpha(PRIMARY_COLOR, 0.2),
+              color: `${getTabColor(currentTab)} !important`,
+              backgroundColor: alpha(getTabColor(currentTab), 0.15),
             },
             "& .MuiTabs-indicator": {
-              bgcolor: PRIMARY_COLOR,
+              bgcolor: getTabColor(currentTab),
               height: 3
             }
           }}
         >
-          <Tab label="All" value="ALL" />
-          <Tab label="Pending" value={BookingStatus.PENDING} />
-          <Tab label="In Progress" value={BookingStatus.IN_PROGRESS} />
-          <Tab label="Completed" value={BookingStatus.COMPLETED} />
+          <Tab
+            label="All"
+            value="ALL"
+            sx={{
+              "&.Mui-selected": {
+                color: `${GRAY_COLOR} !important`,
+              }
+            }}
+          />
+          <Tab
+            label="Pending"
+            value={BookingStatus.PENDING}
+            sx={{
+              "&.Mui-selected": {
+                color: `${WARNING_COLOR} !important`,
+              }
+            }}
+          />
+          <Tab
+            label="In Progress"
+            value={BookingStatus.IN_PROGRESS}
+            sx={{
+              "&.Mui-selected": {
+                color: `${INFO_COLOR} !important`,
+              }
+            }}
+          />
+          <Tab
+            label="Completed"
+            value={BookingStatus.COMPLETED}
+            sx={{
+              "&.Mui-selected": {
+                color: `${SUCCESS_COLOR} !important`,
+              }
+            }}
+          />
         </Tabs>
       </Paper>
 
@@ -202,7 +254,7 @@ export default function BookingsPage() {
           <TextField
             fullWidth
             size="small"
-            // placeholder="Tìm theo tên khách, số điện thoại..."
+
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             InputProps={{
@@ -246,7 +298,7 @@ export default function BookingsPage() {
                     key={booking.id}
                     hover
                     onClick={() => setSelectedId(booking.id)}
-                    sx={{ cursor: "pointer", height: 72 }} 
+                    sx={{ cursor: "pointer", height: 72 }}
                   >
                     <TableCell>
                       <Chip

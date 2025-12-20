@@ -1,20 +1,17 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, ChangeEvent } from "react";
 import {
-  Grid, Box, Button, TextField, MenuItem, FormControl,
+  Grid, Box, Button, MenuItem, FormControl,
   InputLabel, Select, Paper, Stack, Typography, IconButton,
-  Divider, Avatar, alpha, Table, TableBody, TableCell,
-  TableContainer, TableHead, TableRow, Chip, InputAdornment
+  Divider, alpha, Table, TableBody, TableCell,
+  TableContainer, TableHead, TableRow, SelectChangeEvent
 } from "@mui/material";
+import { Save, ArrowBack, Person } from "@mui/icons-material";
 import {
-  Save, ArrowBack, Person, Receipt,
-  Add as AddIcon, Delete as DeleteIcon,
-  LocalOffer, Percent, AttachMoney
-} from "@mui/icons-material";
-import {
-  Invoice, DiscountType, PaymentStatus,
+  Invoice, DiscountType, PaymentStatus, CreateInvoiceDto, UpdateInvoiceDto
 } from "@/types/invoice";
+import { InvoiceItem } from "@/types/invoice-item"; //
 import { Customer as CustomerType } from "@/types/customer";
 import { Store as StoreType } from "@/types/store";
 import { Staff as StaffType } from "@/types/staff";
@@ -25,7 +22,7 @@ interface InvoiceDetailProps {
   customers: CustomerType[];
   stores: StoreType[];
   staff: StaffType[];
-  onSave: (data: any) => Promise<void>;
+  onSave: (data: CreateInvoiceDto | UpdateInvoiceDto) => Promise<void>; //
   onBack: () => void;
   loading?: boolean;
 }
@@ -37,22 +34,24 @@ export default function InvoiceDetail({
   const isView = mode === "view";
   
   const [formData, setFormData] = useState({
-    customer_id: initialData?.customerId?.toString() || "",
-    store_id: initialData?.storeId?.toString() || "",
-    booking_id: initialData?.bookingId?.toString() || "",
+    customer_id: initialData?.customerId || "",
+    store_id: initialData?.storeId || "",
+    booking_id: initialData?.bookingId || "",
     discount_amount: initialData?.discountAmount?.toString() || "0",
     discount_type: initialData?.discountType || "" as DiscountType | "",
     notes: initialData?.notes || "",
-    payment_status: initialData?.paymentStatus || "pending" as PaymentStatus,
+    payment_status: initialData?.paymentStatus || PaymentStatus.PENDING,
   });
 
-  const [items, setItems] = useState<any[]>(initialData?.items || []);
+  // Thay đổi any thành InvoiceItem[]
+  const [items, setItems] = useState<InvoiceItem[]>(initialData?.items || []);
 
-  const handleFormChange = (field: string) => (e: any) => {
+  const handleFormChange = (field: string) => (
+    e: SelectChangeEvent<string | number> | ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
     setFormData(prev => ({ ...prev, [field]: e.target.value }));
   };
 
-  // Logic tính toán bao gồm Discount (Đã bổ sung)
   const totals = useMemo(() => {
     const subtotal = items.reduce((sum, item) => 
       sum + (item.unitPrice * item.quantity - (item.discount || 0)), 0
@@ -62,9 +61,9 @@ export default function InvoiceDetail({
     const inputDiscount = parseFloat(formData.discount_amount) || 0;
     
     let calculatedDiscountAmount = 0;
-    if (formData.discount_type === "percent") {
+    if (formData.discount_type === DiscountType.PERCENT) {
       calculatedDiscountAmount = subtotal * (inputDiscount / 100);
-    } else if (formData.discount_type === "amount") {
+    } else if (formData.discount_type === DiscountType.AMOUNT) {
       calculatedDiscountAmount = inputDiscount;
     }
 
@@ -81,13 +80,29 @@ export default function InvoiceDetail({
   }, [items, formData.discount_amount, formData.discount_type]);
 
   const handleSave = async () => {
-    const submissionData = {
-      ...formData,
+    // Mapping data khớp với CreateInvoiceDto
+    const submissionData: CreateInvoiceDto = {
+      voucher: initialData?.voucher || `INV-${Date.now()}`,
+      customerId: Number(formData.customer_id),
+      storeId: Number(formData.store_id),
+      bookingId: formData.booking_id ? Number(formData.booking_id) : null,
       subtotal: totals.subtotal,
       totalAmount: totals.total,
       taxAmount: totals.tax,
-      discountAmount: totals.discountVal, 
-      items: items.map(item => ({ ...item }))
+      discountAmount: totals.discountVal,
+      discountType: formData.discount_type as DiscountType,
+      paymentStatus: formData.payment_status as PaymentStatus,
+      notes: formData.notes,
+      items: items.map(item => ({
+        itemType: item.itemType,
+        itemId: item.itemId,
+        itemName: item.itemName,
+        staffId: item.staffId ?? undefined,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        discount: item.discount,
+        totalPrice: item.totalPrice
+      }))
     };
     await onSave(submissionData);
   };
@@ -108,113 +123,12 @@ export default function InvoiceDetail({
             </Typography>
           </Box>
         </Stack>
-
-        {!isView && (
-          <Button
-            variant="contained"
-            startIcon={<Save />}
-            onClick={handleSave}
-            disabled={loading || !formData.customer_id || items.length === 0}
-            sx={{ px: 4, bgcolor: '#3b82f6', height: 45 }}
-          >
-            Confirm & Save
-          </Button>
-        )}
       </Box>
 
       <Grid container spacing={3}>
-        <Grid size={{ xs: 12, md: 4 }} >
-          <Paper sx={{ p: 3, borderRadius: 2, mb: 3 }}>
-            <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Person sx={{ color: '#3b82f6' }} fontSize="small" /> Customer Details
-            </Typography>
-            <Stack spacing={2}>
-              <FormControl fullWidth disabled={isView} size="small">
-                <InputLabel>Customer</InputLabel>
-                <Select value={formData.customer_id} label="Customer" onChange={handleFormChange("customer_id")}>
-                  {customers.map(c => <MenuItem key={c.id} value={c.id}>{c.fullName}</MenuItem>)}
-                </Select>
-              </FormControl>
-              <FormControl fullWidth disabled={isView} size="small">
-                <InputLabel>Store</InputLabel>
-                <Select value={formData.store_id} label="Store" onChange={handleFormChange("store_id")}>
-                  {stores.map(s => <MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>)}
-                </Select>
-              </FormControl>
-            </Stack>
-          </Paper>
-
-          <Paper sx={{ p: 3, borderRadius: 2, mb: 3 }}>
-            <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-              <LocalOffer sx={{ color: '#3b82f6' }} fontSize="small" /> Promotion & Discount
-            </Typography>
-            <Grid container spacing={2}>
-              <Grid size={{ xs: 7 }}>
-                <TextField
-                  fullWidth label="Discount Value" size="small"
-                  value={formData.discount_amount}
-                  onChange={handleFormChange("discount_amount")}
-                  disabled={isView}
-                  InputProps={{
-                    endAdornment: <InputAdornment position="end">
-                      {formData.discount_type === "percent" ? <Percent fontSize="small" /> : "₫"}
-                    </InputAdornment>
-                  }}
-                />
-              </Grid>
-              <Grid size={{ xs: 5 }}>
-                <FormControl fullWidth size="small" disabled={isView}>
-                  <InputLabel>Type</InputLabel>
-                  <Select 
-                    value={formData.discount_type} 
-                    label="Type" 
-                    onChange={handleFormChange("discount_type")}
-                  >
-                    <MenuItem value="">None</MenuItem>
-                    <MenuItem value="amount">Amount (₫)</MenuItem>
-                    <MenuItem value="percent">Percent (%)</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
-            </Grid>
-          </Paper>
-
-          {/* Summary Section */}
-          <Paper sx={{ p: 3, borderRadius: 2, bgcolor: alpha('#3b82f6', 0.02) }}>
-            <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 2 }}>Payment Summary</Typography>
-            <Stack spacing={1.5}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                <Typography color="text.secondary">Subtotal</Typography>
-                <Typography fontWeight="600">{new Intl.NumberFormat('vi-VN').format(totals.subtotal)} ₫</Typography>
-              </Box>
-              
-              {totals.discountVal > 0 && (
-                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <Typography color="success.main">Discount</Typography>
-                  <Typography color="success.main" fontWeight="600">
-                    -{new Intl.NumberFormat('vi-VN').format(totals.discountVal)} ₫
-                  </Typography>
-                </Box>
-              )}
-
-              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                <Typography color="text.secondary">Tax (8%)</Typography>
-                <Typography fontWeight="600">{new Intl.NumberFormat('vi-VN').format(totals.tax)} ₫</Typography>
-              </Box>
-              <Divider />
-              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                <Typography variant="h6">Total Amount</Typography>
-                <Typography variant="h6" >
-                    {new Intl.NumberFormat('vi-VN').format(totals.total)} ₫
-                </Typography>
-              </Box>
-            </Stack>
-          </Paper>
-        </Grid>
-
-        {/* Right Side: Items List */}
+        {/* Bảng Items bên trái */}
         <Grid size={{ xs: 12, md: 8 }}>
-          <Paper sx={{ p: 3, borderRadius: 2 }}>
+          <Paper sx={{ p: 3, borderRadius: 2, height: '100%' }}>
             <Typography variant="h6" fontWeight="bold" sx={{ mb: 2 }}>Invoice Items</Typography>
             <TableContainer>
               <Table size="small">
@@ -228,8 +142,8 @@ export default function InvoiceDetail({
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {items.map((item, index) => (
-                    <TableRow key={index}>
+                  {items.map((item) => (
+                    <TableRow key={item.id}>
                       <TableCell>
                         <Typography variant="body2" fontWeight="600">{item.itemName}</Typography>
                         <Typography variant="caption" color="text.secondary">{item.itemType}</Typography>
@@ -240,16 +154,90 @@ export default function InvoiceDetail({
                         {item.discount > 0 ? `-${new Intl.NumberFormat('vi-VN').format(item.discount)}` : '-'}
                       </TableCell>
                       <TableCell align="right" sx={{ fontWeight: 600 }}>
-                        {new Intl.NumberFormat('vi-VN').format(item.unitPrice * item.quantity - item.discount)}
+                        {new Intl.NumberFormat('vi-VN').format(item.totalPrice)}
                       </TableCell>
                     </TableRow>
                   ))}
+                  {items.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={5} align="center" sx={{ py: 3, color: 'text.secondary' }}>
+                        No items added yet
+                      </TableCell>
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
             </TableContainer>
           </Paper>
         </Grid>
+
+        {/* Thông tin khách hàng bên phải */}
+        <Grid size={{ xs: 12, md: 4 }}>
+          <Paper sx={{ p: 3, borderRadius: 2, mb: 3 }}>
+            <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Person sx={{ color: '#3b82f6' }} fontSize="small" /> Customer Details
+            </Typography>
+            <Stack spacing={2}>
+              <FormControl fullWidth disabled={isView} size="small">
+                <InputLabel>Customer</InputLabel>
+                <Select 
+                  value={formData.customer_id.toString()} 
+                  label="Customer" 
+                  onChange={handleFormChange("customer_id")}
+                >
+                  {customers.map(c => <MenuItem key={c.id} value={c.id}>{c.fullName}</MenuItem>)}
+                </Select>
+              </FormControl>
+              <FormControl fullWidth disabled={isView} size="small">
+                <InputLabel>Store</InputLabel>
+                <Select 
+                  value={formData.store_id.toString()} 
+                  label="Store" 
+                  onChange={handleFormChange("store_id")}
+                >
+                  {stores.map(s => <MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>)}
+                </Select>
+              </FormControl>
+            </Stack>
+          </Paper>
+
+          <Paper sx={{ p: 3, borderRadius: 2, bgcolor: alpha('#3b82f6', 0.02) }}>
+            <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 2 }}>Payment Summary</Typography>
+            <Stack spacing={1.5}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Typography color="text.secondary">Subtotal</Typography>
+                <Typography fontWeight="600">{new Intl.NumberFormat('vi-VN').format(totals.subtotal)} ₫</Typography>
+              </Box>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Typography color="text.secondary">Tax (8%)</Typography>
+                <Typography fontWeight="600">{new Intl.NumberFormat('vi-VN').format(totals.tax)} ₫</Typography>
+              </Box>
+              <Divider />
+              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Typography variant="h6">Total Amount</Typography>
+                <Typography variant="h6" color="primary.main">
+                    {new Intl.NumberFormat('vi-VN').format(totals.total)} ₫
+                </Typography>
+              </Box>
+            </Stack>
+          </Paper>
+        </Grid>
       </Grid>
+
+      {/* Button Save ở góc dưới bên phải */}
+      {!isView && (
+        <Box sx={{ mt: 4, display: 'flex', justifyContent: 'flex-end' }}>
+          <Button
+            variant="contained"
+            startIcon={<Save />}
+            onClick={handleSave}
+            disabled={loading || !formData.customer_id || items.length === 0}
+            sx={{ px: 6, bgcolor: '#3b82f6', height: 48, borderRadius: 2 }}
+          >
+            {loading ? "Saving..." : "Confirm & Save"}
+          </Button>
+        </Box>
+      )}
     </Box>
   );
 }

@@ -4,16 +4,16 @@ import React, { useState } from "react";
 import {
     Grid, Box, Button, TextField, MenuItem, FormControl,
     InputLabel, Select, Paper, Stack, Typography, IconButton,
-    Divider, Avatar, alpha, InputAdornment, CircularProgress, Chip
+    Divider, Avatar, alpha, InputAdornment, CircularProgress, Chip,
+    SelectChangeEvent
 } from "@mui/material";
 import {
     Save, ArrowBack, Person, Phone, Email,
-    Store as StoreIcon, PhotoCamera, Star,
-    Home, Cake, Wc
+    PhotoCamera, Description
 } from "@mui/icons-material";
 import {
     Gender, CustomerType, CustomerStatus,
-    Customer, CustomerFormData
+    Customer, CustomerFormData, CreateCustomerDto, UpdateCustomerDto
 } from "@/types/customer";
 import { Store } from "@/types/store";
 
@@ -21,7 +21,8 @@ interface CustomerDetailProps {
     mode: "add" | "edit" | "view";
     initialData?: Customer | null;
     storeList: Store[];
-    onSave: (data: CustomerFormData) => Promise<void>;
+    // Sửa lỗi any: Sử dụng DTO cụ thể
+    onSave: (data: CreateCustomerDto | UpdateCustomerDto) => Promise<void>;
     onBack: () => void;
     loading?: boolean;
 }
@@ -55,19 +56,31 @@ export default function CustomerDetail({
         status: initialData?.status || CustomerStatus.ACTIVE,
     }));
 
-    const handleChange = (field: keyof CustomerFormData) => (
-        e: React.ChangeEvent<HTMLInputElement | { value: unknown }>
+    // Sửa lỗi any cho TextField
+    const handleTextChange = (field: keyof CustomerFormData) => (
+        e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+    ) => {
+        setFormData(prev => ({ ...prev, [field]: e.target.value }));
+    };
+
+    // Sửa lỗi any cho Select
+    const handleSelectChange = (field: keyof CustomerFormData) => (
+        e: SelectChangeEvent<string>
     ) => {
         setFormData(prev => ({ ...prev, [field]: e.target.value }));
     };
 
     const handleSave = async () => {
-        await onSave(formData);
+        // Chuyển đổi storeId sang number trước khi gửi lên API
+        const submissionData = {
+            ...formData,
+            storeId: formData.storeId ? parseInt(formData.storeId) : undefined
+        };
+        await onSave(submissionData as CreateCustomerDto);
     };
 
     return (
-        <Box sx={{ p: { xs: 2, md: 3 } }}>
-            {/* Header - Giống StaffDetail */}
+        <Box sx={{ p: { xs: 2, md: 2 } }}>
             <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Stack direction="row" spacing={2} alignItems="center">
                     <IconButton onClick={onBack} sx={{ bgcolor: 'background.paper', boxShadow: 1 }}>
@@ -82,39 +95,92 @@ export default function CustomerDetail({
                         </Typography>
                     </Box>
                 </Stack>
-
-                {mode !== "view" && (
-                    <Button
-                        variant="contained"
-                        startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <Save />}
-                        onClick={handleSave}
-                        disabled={loading}
-                        sx={{ px: 4, bgcolor: '#3b82f6', height: 45 }}
-                    >
-                        {mode === "add" ? "Save Customer" : "Update Profile"}
-                    </Button>
-                )}
             </Box>
 
             <Grid container spacing={3}>
-                {/* Left Side: Profile Card */}
-                <Grid size={{xs:12,  md: 4}} >
-                    <Paper sx={{ p: 3, textAlign: 'center', borderRadius: 2 }}>
-                        <Box sx={{ position: 'relative', display: 'inline-block', mb: 2 }}>
-                            <Avatar
-                                sx={{ width: 120, height: 120, fontSize: '3rem', bgcolor: alpha('#3b82f6', 0.1), color: '#3b82f6', mx: 'auto' }}
-                            >
-                                {formData.fullName?.charAt(0) || <Person fontSize="large" />}
-                            </Avatar>
-                            {!isView && (
-                                <IconButton
-                                    sx={{ position: 'absolute', bottom: 0, right: 0, bgcolor: 'white', boxShadow: 2, '&:hover': { bgcolor: '#f5f5f5' } }}
-                                    size="small"
-                                >
-                                    <PhotoCamera fontSize="small" />
-                                </IconButton>
-                            )}
-                        </Box>
+                <Grid size={{ xs: 12, md: 8 }}>
+                    <Paper sx={{ p: 3, borderRadius: 2 }}>
+                        <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Description sx={{ color: '#3b82f6' }} /> Basic Information
+                        </Typography>
+                        <Grid container spacing={2.5} sx={{ mt: 0.5 }}>
+                            <Grid size={{ xs: 12, sm: 6 }}>
+                                <TextField
+                                    fullWidth label="Full Name" required
+                                    value={formData.fullName} onChange={handleTextChange("fullName")}
+                                    disabled={isView}
+                                />
+                            </Grid>
+                             <Grid size={{ xs: 12, sm: 6 }}>
+                                <TextField
+                                    fullWidth label="Phone Number" required
+                                    value={formData.phone} onChange={handleTextChange("phone")}
+                                    disabled={isView}
+                                />
+                            </Grid>
+                             <Grid size={{ xs: 12, sm: 6 }}>
+                                <TextField
+                                    fullWidth label="Email Address" type="email"
+                                    value={formData.email} onChange={handleTextChange("email")}
+                                    disabled={isView}
+                                />
+                            </Grid>
+                             <Grid size={{ xs: 12, sm: 6 }}>
+                                <FormControl fullWidth disabled={isView}>
+                                    <InputLabel>Gender</InputLabel>
+                                    <Select 
+                                        value={formData.gender} 
+                                        label="Gender" 
+                                        onChange={handleSelectChange("gender")}
+                                    >
+                                        <MenuItem value={Gender.MALE}>Male</MenuItem>
+                                        <MenuItem value={Gender.FEMALE}>Female</MenuItem>
+                                        <MenuItem value={Gender.OTHER}>Other</MenuItem>
+                                    </Select>
+                                </FormControl>
+                            </Grid>
+                             <Grid size={{ xs: 12, sm: 6 }}>
+                                <TextField
+                                    fullWidth label="Birthday" type="date"
+                                    value={formData.birthday} onChange={handleTextChange("birthday")}
+                                    disabled={isView} InputLabelProps={{ shrink: true }}
+                                />
+                            </Grid>
+                             <Grid size={{ xs: 12, sm: 6 }}>
+                                <FormControl fullWidth disabled={isView}>
+                                    <InputLabel>Store</InputLabel>
+                                    <Select 
+                                        value={formData.storeId} 
+                                        label="Store" 
+                                        onChange={handleSelectChange("storeId")}
+                                    >
+                                        {storeList.map(store => (
+                                            <MenuItem key={store.id} value={store.id.toString()}>{store.name}</MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                            </Grid>
+                             <Grid size={{ xs: 12 }}>
+                                <TextField
+                                    fullWidth label="Address"
+                                    value={formData.address} onChange={handleTextChange("address")}
+                                    disabled={isView} multiline rows={2}
+                                />
+                            </Grid>
+                            <Grid size={{ xs: 12 }}>
+                                <TextField
+                                    fullWidth label="Internal Notes" multiline rows={3}
+                                    value={formData.notes} onChange={handleTextChange("notes")}
+                                    disabled={isView} placeholder="Notes about preferences..."
+                                />
+                            </Grid>
+                        </Grid>
+                    </Paper>
+                </Grid>
+
+                <Grid size={{ xs: 12, md: 4 }}>
+                    <Paper sx={{ p: 1, textAlign: 'center', borderRadius: 2, mb: 2 }}>
+                      
                         <Typography variant="h6" fontWeight="bold">{formData.fullName || "Full Name"}</Typography>
                         <Chip 
                             label={formData.customerType.toUpperCase()} 
@@ -134,108 +200,43 @@ export default function CustomerDetail({
                             </Box>
                         </Stack>
                     </Paper>
-                </Grid>
 
-                {/* Right Side: Form Details */}
-                <Grid size={{ xs: 12, md: 8 }}>
                     <Paper sx={{ p: 3, borderRadius: 2 }}>
-                        <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <Person sx={{ color: '#3b82f6' }} /> Basic Information
-                        </Typography>
-                        <Grid container spacing={2.5} sx={{ mt: 0.5 }}>
-                            <Grid size={{ xs: 12, sm: 6 }}>
-                                <TextField
-                                    fullWidth label="Full Name" required
-                                    value={formData.fullName} onChange={handleChange("fullName")}
-                                    disabled={isView}
-                                />
-                            </Grid>
-                             <Grid size={{ xs: 12, sm: 6 }}>
-                                <TextField
-                                    fullWidth label="Phone Number" required
-                                    value={formData.phone} onChange={handleChange("phone")}
-                                    disabled={isView}
-                                />
-                            </Grid>
-                             <Grid size={{ xs: 12, sm: 6 }}>
-                                <TextField
-                                    fullWidth label="Email Address" type="email"
-                                    value={formData.email} onChange={handleChange("email")}
-                                    disabled={isView}
-                                />
-                            </Grid>
-                             <Grid size={{ xs: 12, sm: 6 }}>
-                                <FormControl fullWidth disabled={isView}>
-                                    <InputLabel>Gender</InputLabel>
-                                    <Select value={formData.gender} label="Gender" onChange={handleChange("gender") as any}>
-                                        <MenuItem value={Gender.MALE}>Male</MenuItem>
-                                        <MenuItem value={Gender.FEMALE}>Female</MenuItem>
-                                        <MenuItem value={Gender.OTHER}>Other</MenuItem>
-                                    </Select>
-                                </FormControl>
-                            </Grid>
-                             <Grid size={{ xs: 12, sm: 6 }}>
-                                <TextField
-                                    fullWidth label="Birthday" type="date"
-                                    value={formData.birthday} onChange={handleChange("birthday")}
-                                    disabled={isView} InputLabelProps={{ shrink: true }}
-                                />
-                            </Grid>
-                             <Grid size={{ xs: 12, sm: 6 }}>
-                                <FormControl fullWidth disabled={isView}>
-                                    <InputLabel>Store</InputLabel>
-                                    <Select value={formData.storeId} label="Store" onChange={handleChange("storeId") as any}>
-                                        {storeList.map(store => (
-                                            <MenuItem key={store.id} value={store.id.toString()}>{store.name}</MenuItem>
-                                        ))}
-                                    </Select>
-                                </FormControl>
-                            </Grid>
-                            
-                             <Grid size={{ xs: 12 }}>
-                                <Divider sx={{ my: 1 }}>
-                                    <Chip label="Account Status & Classification" size="small" variant="outlined" />
-                                </Divider>
-                            </Grid>
-
-                            <Grid size={{ xs: 12, sm: 6 }}>
-                                <FormControl fullWidth disabled={isView}>
-                                    <InputLabel>Customer Type</InputLabel>
-                                    <Select value={formData.customerType} label="Customer Type" onChange={handleChange("customerType") as any}>
-                                        <MenuItem value={CustomerType.NEW}>New</MenuItem>
-                                        <MenuItem value={CustomerType.REGULAR}>Regular</MenuItem>
-                                        <MenuItem value={CustomerType.VIP}>VIP</MenuItem>
-                                    </Select>
-                                </FormControl>
-                            </Grid>
-                             <Grid size={{ xs: 12, sm: 6 }}>
-                                <FormControl fullWidth disabled={isView}>
-                                    <InputLabel>Status</InputLabel>
-                                    <Select value={formData.status} label="Status" onChange={handleChange("status") as any}>
-                                        <MenuItem value={CustomerStatus.ACTIVE}>Active</MenuItem>
-                                        <MenuItem value={CustomerStatus.INACTIVE}>Inactive</MenuItem>
-                                        <MenuItem value={CustomerStatus.BLOCKED}>Blocked</MenuItem>
-                                    </Select>
-                                </FormControl>
-                            </Grid>
-                             <Grid size={{ xs: 12 }}>
-                                <TextField
-                                    fullWidth label="Address"
-                                    value={formData.address} onChange={handleChange("address")}
-                                    disabled={isView} multiline rows={2}
-                                />
-                            </Grid>
-                            <Grid size={{ xs: 12 }}>
-                                <TextField
-                                    fullWidth label="Internal Notes" multiline rows={3}
-                                    value={formData.notes} onChange={handleChange("notes")}
-                                    disabled={isView} placeholder="Notes about preferences..."
-                                />
-                            </Grid>
-                        </Grid>
+                        <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 2 }}>Classification</Typography>
+                        <Stack spacing={2}>
+                            <FormControl fullWidth disabled={isView} size="small">
+                                <InputLabel>Type</InputLabel>
+                                <Select value={formData.customerType} label="Type" onChange={handleSelectChange("customerType")}>
+                                    <MenuItem value={CustomerType.NEW}>New</MenuItem>
+                                    <MenuItem value={CustomerType.REGULAR}>Regular</MenuItem>
+                                    <MenuItem value={CustomerType.VIP}>VIP</MenuItem>
+                                </Select>
+                            </FormControl>
+                            <FormControl fullWidth disabled={isView} size="small">
+                                <InputLabel>Status</InputLabel>
+                                <Select value={formData.status} label="Status" onChange={handleSelectChange("status")}>
+                                    <MenuItem value={CustomerStatus.ACTIVE}>Active</MenuItem>
+                                    <MenuItem value={CustomerStatus.INACTIVE}>Inactive</MenuItem>
+                                    <MenuItem value={CustomerStatus.BLOCKED}>Blocked</MenuItem>
+                                </Select>
+                            </FormControl>
+                        </Stack>
                     </Paper>
                 </Grid>
             </Grid>
+            {!isView && (
+                <Box sx={{ mt: 4, display: 'flex', justifyContent: 'flex-end' }}>
+                    <Button
+                        variant="contained"
+                        startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <Save />}
+                        onClick={handleSave}
+                        disabled={loading}
+                        sx={{ px: 6, bgcolor: '#3b82f6', height: 48, borderRadius: 2 }}
+                    >
+                        {loading ? "Processing..." : (mode === "add" ? "Save Customer" : "Update Profile")}
+                    </Button>
+                </Box>
+            )}
         </Box>
     );
 }

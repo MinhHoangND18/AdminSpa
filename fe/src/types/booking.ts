@@ -60,6 +60,8 @@ export interface Booking {
     createdAt: string;
     updatedAt: string;
     invoices?: Invoice[];
+     orderDiscount?: number;       
+    discountReason?: string;
 }
 
 export interface BookingResponse {

@@ -72,6 +72,7 @@ const PRIMARY_DARK = '#0f766e';
 const SUCCESS_COLOR = '#10b981';
 const ERROR_COLOR = '#ef4444';
 const INFO_COLOR = '#3b82f6';
+const EDIT_COLOR = "#f39c12"
 
 interface CategoryFormData {
   name: string;
@@ -156,7 +157,7 @@ export default function CategoryForm() {
     placeholderData: (previousData) => previousData,
   });
 
-  
+
 
   const categories = useMemo((): ServiceCategory[] => {
     if (!paginatedCategories?.data) return [];
@@ -239,17 +240,16 @@ export default function CategoryForm() {
     setAnchorEl(null);
   };
 
-const handleAddNew = () => {
+  const handleAddNew = () => {
     setDialogMode('add');
     setSelectedCategory(null);
     setShowDetail(true);
   };
 
- const handleEdit = () => {
-    if (selectedCategory) {
-      setDialogMode('edit');
-      setShowDetail(true);
-    }
+  const handleEdit = (category: ServiceCategory) => {
+    setSelectedCategory(category);
+    setDialogMode('edit');
+    setShowDetail(true);
     handleMenuClose();
   };
   const handleBack = () => {
@@ -261,11 +261,14 @@ const handleAddNew = () => {
     setDeleteConfirmOpen(true);
     handleMenuClose();
   };
-  const handleSave = async (formData: any) => {
+  const handleSave = async (data: CreateServiceCategoryDto | UpdateServiceCategoryDto) => {
     if (dialogMode === 'add') {
-      await createMutation.mutateAsync(formData);
+      await createMutation.mutateAsync(data as CreateServiceCategoryDto);
     } else if (dialogMode === 'edit' && selectedCategory) {
-      await updateMutation.mutateAsync({ id: selectedCategory.id, data: formData });
+      await updateMutation.mutateAsync({
+        id: selectedCategory.id,
+        data: data as UpdateServiceCategoryDto
+      });
     }
     setShowDetail(false);
   };
@@ -333,12 +336,12 @@ const handleAddNew = () => {
     setRowsPerPage(parseInt(event.target.value, 10));
     setPage(0);
   };
- 
+
   const isAnyLoading =
-  isLoadingCategories ||        
-  createMutation.isPending ||   
-  updateMutation.isPending ||    
-  deleteMutation.isPending;
+    isLoadingCategories ||
+    createMutation.isPending ||
+    updateMutation.isPending ||
+    deleteMutation.isPending;
   return (
     <>
 
@@ -359,7 +362,7 @@ const handleAddNew = () => {
                     Total Categories
                   </Typography>
                   <Typography variant="h4" fontWeight="bold">
-                    { stats.total}
+                    {stats.total}
                   </Typography>
                 </Box>
                 <Avatar sx={{ bgcolor: alpha(PRIMARY_COLOR, 0.1), width: 56, height: 56 }}>
@@ -483,14 +486,14 @@ const handleAddNew = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              { isError ? (
+              {isError ? (
                 <TableRow>
                   <TableCell colSpan={6} align="center" sx={{ py: 10 }}>
                     <Alert severity="error">Failed to load categories. Please check console for details.</Alert>
                   </TableCell>
                 </TableRow>
               ) : categories.length > 0 ? (
-                categories.map((category) => (                                                  
+                categories.map((category) => (
                   <TableRow
                     key={category.id}
                     sx={{
@@ -534,7 +537,7 @@ const handleAddNew = () => {
                         }}
                       />
                     </TableCell>
-                  
+
                     <TableCell>
                       <Chip
                         label={getStatusLabel(category.status)}
@@ -552,9 +555,25 @@ const handleAddNew = () => {
                       </Typography>
                     </TableCell>
                     <TableCell align="center">
-                      <IconButton size="small" onClick={(e) => handleMenuOpen(e, category)}>
-                        <MoreVert />
-                      </IconButton>
+                      <Button
+                        variant="contained"
+                        size="small"
+                        startIcon={<Edit sx={{ fontSize: '18px !important' }} />}
+                        onClick={() => handleEdit(category)}
+                        sx={{
+                          bgcolor: '#f39c12',
+                          '&:hover': { bgcolor: '#e67e22' },
+                          textTransform: 'none',
+                          fontWeight: 600,
+                          borderRadius: '6px',
+                          px: 2,
+                          minWidth: '80px',
+                          boxShadow: 'none',
+                          height: '32px'
+                        }}
+                      >
+                        Edit
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))
@@ -588,156 +607,6 @@ const handleAddNew = () => {
           onRowsPerPageChange={handleChangeRowsPerPage}
         />
       </Card>
-
-      {/* Menu */}
-      <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleMenuClose}>
-        <MenuItem onClick={handleEdit}>
-          <Edit sx={{ mr: 1, fontSize: 20 }} />
-          Edit
-        </MenuItem>
-        <MenuItem onClick={handleDelete} sx={{ color: ERROR_COLOR }}>
-          <Delete sx={{ mr: 1, fontSize: 20 }} />
-          Delete
-        </MenuItem>
-      </Menu>
-
-      {/* Add/Edit Dialog */}
-      <Dialog open={openDialog} onClose={handleDialogClose} maxWidth="md" fullWidth>
-        <DialogTitle>
-          {dialogMode === 'add' ? 'Add New Category' : 'Edit Category'}
-        </DialogTitle>
-        <DialogContent dividers>
-          <Grid container spacing={3} sx={{ mt: 0.5 }}>
-            <Grid size={{ xs: 12 }}>
-              <TextField
-                fullWidth
-                label="Category Name"
-                value={formData.name}
-                onChange={handleFormChange('name')}
-                required
-                error={!!validationErrors.name}
-                helperText={validationErrors.name}
-              />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <TextField
-                fullWidth
-                label="Slug"
-                value={formData.slug}
-                onChange={handleFormChange('slug')}
-                required
-                error={!!validationErrors.slug}
-                helperText={validationErrors.slug || 'e.g., body-massage, facial-treatment'}
-                placeholder="category-slug"
-              />
-            </Grid>
-        
-            <Grid size={{ xs: 12 }}>
-              <TextField
-                fullWidth
-                label="Description"
-                multiline
-                rows={3}
-                value={formData.description}
-                onChange={handleFormChange('description')}
-                placeholder="Describe the category..."
-              />
-            </Grid>
-            <Grid size={{ xs: 12 }}>
-              <TextField
-                fullWidth
-                label="Image URL"
-                value={formData.imageUrl}
-                onChange={handleFormChange('imageUrl')}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <ImageIcon sx={{ color: 'text.secondary' }} />
-                    </InputAdornment>
-                  ),
-                }}
-              />
-            </Grid>
-            <Grid size={{ xs: 12 }}>
-              <FormControl fullWidth>
-                <InputLabel>Status</InputLabel>
-                <Select
-                  value={formData.status}
-                  label="Status"
-                  onChange={handleSelectChange('status')}
-                >
-                  <MenuItem value="active">Active</MenuItem>
-                  <MenuItem value="inactive">Inactive</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-          </Grid>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleDialogClose}>Cancel</Button>
-          <Button
-            onClick={handleSubmit}
-            variant="contained"
-            disabled={createMutation.isPending || updateMutation.isPending}
-            sx={{
-              bgcolor: PRIMARY_COLOR,
-              '&:hover': { bgcolor: PRIMARY_DARK },
-            }}
-          >
-            {createMutation.isPending || updateMutation.isPending ? (
-              <CircularProgress size={24} />
-            ) : (
-              dialogMode === 'add' ? 'Add Category' : 'Save Changes'
-            )}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Delete Confirmation Dialog */}
-      <Dialog open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)}>
-        <DialogTitle>Confirm Delete</DialogTitle>
-        <DialogContent>
-          <Alert severity="warning" sx={{ mb: 2 }}>
-            Are you sure you want to delete category {selectedCategory?.name}?
-            This action cannot be undone.
-          </Alert>
-          {selectedCategory && (
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 2 }}>
-              <Avatar
-                src={selectedCategory.imageUrl || undefined}
-                sx={{
-                  bgcolor: alpha(PRIMARY_COLOR, 0.1),
-                  color: PRIMARY_COLOR,
-                  width: 44,
-                  height: 44,
-                }}
-              >
-                <CategoryIcon />
-              </Avatar>
-              <Box>
-                <Typography variant="body1" fontWeight="600">
-                  {selectedCategory.name}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {selectedCategory.slug}
-                </Typography>
-              </Box>
-            </Box>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteConfirmOpen(false)}>Cancel</Button>
-          <Button
-            onClick={confirmDelete}
-            variant="contained"
-            disabled={deleteMutation.isPending}
-            sx={{ bgcolor: ERROR_COLOR, '&:hover': { bgcolor: '#dc2626' } }}
-          >
-            {deleteMutation.isPending ? <CircularProgress size={24} /> : 'Delete Category'}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
       {/* Snackbar for notifications */}
       <Snackbar
         open={snackbar?.open}

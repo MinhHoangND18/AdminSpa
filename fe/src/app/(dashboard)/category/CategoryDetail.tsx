@@ -4,7 +4,8 @@ import React, { useState } from 'react';
 import {
   Grid, Box, Button, TextField, MenuItem, FormControl,
   InputLabel, Select, Paper, Stack, Typography, IconButton,
-  Divider, Avatar, alpha, InputAdornment, CircularProgress, Chip
+  Divider, Avatar, alpha, InputAdornment, CircularProgress, Chip,
+  SelectChangeEvent
 } from '@mui/material';
 import {
   Save, ArrowBack, Category as CategoryIcon,
@@ -52,24 +53,20 @@ export default function CategoryDetail({
 
   const [errors, setErrors] = useState<Partial<Record<keyof CategoryFormData, string>>>({});
 
-  const handleChange = (field: keyof CategoryFormData) => (
-    e: React.ChangeEvent<HTMLInputElement | { value: unknown }>
-  ) => {
-    const value = e.target.value as string;
-    setFormData(prev => ({ ...prev, [field]: value }));
-    if (errors[field]) setErrors(prev => ({ ...prev, [field]: undefined }));
-  };
-
   const validate = () => {
     const newErrors: Partial<Record<keyof CategoryFormData, string>> = {};
-    if (!formData.name.trim()) newErrors.name = "Category Name is required";
-    if (!formData.slug.trim()) newErrors.slug = "Slug is required";
-    else if (!/^[a-z0-9-]+$/.test(formData.slug)) {
-        newErrors.slug = "Slug must contain only lowercase letters, numbers, and hyphens";
-    }
-
+    if (!formData.name.trim()) newErrors.name = 'Category name is required';
+    if (!formData.slug.trim()) newErrors.slug = 'Slug is required';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
+  };
+
+  const handleChange = (field: keyof CategoryFormData) => (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | SelectChangeEvent<string>
+  ) => {
+    const value = e.target.value;
+    setFormData(prev => ({ ...prev, [field]: value }));
+    if (errors[field]) setErrors(prev => ({ ...prev, [field]: undefined }));
   };
 
   const handleSave = async () => {
@@ -80,7 +77,7 @@ export default function CategoryDetail({
 
   return (
     <Box sx={{ p: { xs: 2, md: 3 } }}>
-      {/* Header tương tự Staff/Customer Detail */}
+      {/* Header: Chỉ giữ nút quay lại và Tiêu đề */}
       <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <Stack direction="row" spacing={2} alignItems="center">
           <IconButton onClick={onBack} sx={{ bgcolor: 'background.paper', boxShadow: 1 }}>
@@ -95,32 +92,17 @@ export default function CategoryDetail({
             </Typography>
           </Box>
         </Stack>
-
-        {!isView && (
-          <Button
-            variant="contained"
-            startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <Save />}
-            onClick={handleSave}
-            disabled={loading}
-            sx={{ px: 4, bgcolor: '#3b82f6', height: 45 }}
-          >
-            {mode === "add" ? "Save Category" : "Update Category"}
-          </Button>
-        )}
       </Box>
 
       <Grid container spacing={3}>
         {/* Left Side: Preview Card */}
-        <Grid item xs={12} md={4}>
+        <Grid size={{ xs: 12, md: 4 }}>
           <Paper sx={{ p: 3, textAlign: 'center', borderRadius: 2 }}>
             <Box sx={{ mb: 2 }}>
               <Avatar
                 src={formData.imageUrl}
                 variant="rounded"
-                sx={{ 
-                    width: 120, height: 120, mx: 'auto', 
-                    bgcolor: alpha('#3b82f6', 0.1), color: '#3b82f6' 
-                }}
+                sx={{ width: 120, height: 120, mx: 'auto', bgcolor: alpha('#3b82f6', 0.1), color: '#3b82f6' }}
               >
                 <CategoryIcon sx={{ fontSize: 60 }} />
               </Avatar>
@@ -132,10 +114,6 @@ export default function CategoryDetail({
               color={formData.status === 'active' ? "success" : "error"}
               sx={{ mt: 1, fontWeight: 'bold' }}
             />
-            <Divider sx={{ my: 3 }} />
-            <Typography variant="body2" color="text.secondary" textAlign="left">
-                <strong>Slug:</strong> {formData.slug || 'n/a'}
-            </Typography>
           </Paper>
         </Grid>
 
@@ -143,36 +121,42 @@ export default function CategoryDetail({
         <Grid size={{xs: 12, md: 8}}>
           <Paper sx={{ p: 3, borderRadius: 2 }}>
             <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Description sx={{ color: '#3b82f6' }}fontSize="small" /> Category Information
+              <Description sx={{ color: '#3b82f6' }} fontSize="small" /> Category Information
             </Typography>
             
             <Grid container spacing={2.5}>
-              <Grid size={{xs: 12}} >
+              <Grid size={{xs: 12}}>
                 <TextField
                   fullWidth label="Category Name *"
                   value={formData.name} onChange={handleChange("name")}
                   disabled={isView} error={!!errors.name} helperText={errors.name}
                 />
               </Grid>
+
               <Grid size={{xs: 12, sm: 6}}>
                 <TextField
                   fullWidth label="Slug *"
                   value={formData.slug} onChange={handleChange("slug")}
-                  disabled={isView} error={!!errors.slug} 
-                  helperText={errors.slug || "e.g., body-massage"}
+                  disabled={isView} error={!!errors.slug} helperText={errors.slug}
                   InputProps={{ startAdornment: <InputAdornment position="start"><LinkIcon fontSize="small"/></InputAdornment> }}
                 />
               </Grid>
-            <Grid size={{xs: 12, sm: 6}}>
+
+              <Grid size={{xs: 12, sm: 6}}>
                 <FormControl fullWidth disabled={isView}>
                   <InputLabel>Status</InputLabel>
-                  <Select value={formData.status} label="Status" onChange={handleChange("status") as any}>
+                  <Select 
+                    value={formData.status} 
+                    label="Status" 
+                    onChange={handleChange("status")}
+                  >
                     <MenuItem value="active">Active</MenuItem>
                     <MenuItem value="inactive">Inactive</MenuItem>
                   </Select>
                 </FormControl>
               </Grid>
-                 <Grid size={{xs: 12}}>
+
+              <Grid size={{xs: 12}}>
                 <TextField
                   fullWidth label="Image URL"
                   value={formData.imageUrl} onChange={handleChange("imageUrl")}
@@ -180,13 +164,32 @@ export default function CategoryDetail({
                   InputProps={{ startAdornment: <InputAdornment position="start"><ImageIcon fontSize="small"/></InputAdornment> }}
                 />
               </Grid>
-                 <Grid size={{xs: 12}}>
+
+              <Grid size={{xs: 12}}>
                 <TextField
                   fullWidth label="Description" multiline rows={4}
                   value={formData.description} onChange={handleChange("description")}
                   disabled={isView} placeholder="Describe the services in this category..."
                 />
               </Grid>
+
+              {!isView && (
+                <Grid size={{ xs: 12 }}>
+                  <Divider sx={{ my: 2, borderStyle: 'dashed' }} />
+                  <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
+                   
+                    <Button
+                      variant="contained"
+                      startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <Save />}
+                      onClick={handleSave}
+                      disabled={loading}
+                      sx={{ px: 4, bgcolor: '#3b82f6', height: 40 }}
+                    >
+                      {mode === "add" ? "Save Category" : "Update Category"}
+                    </Button>
+                  </Box>
+                </Grid>
+              )}
             </Grid>
           </Paper>
         </Grid>
