@@ -57,6 +57,14 @@ import { User } from "@/types/user";
 import { storesApi } from "@/lib/api/stores";
 import { Store, StoreFormData, StoreResponse } from "@/types/store";
 import StoreDetail from "./StoreDetail";
+import { createTheme, ThemeProvider } from "@mui/material/styles";
+const blueTheme = createTheme({
+  palette: {
+    primary: {
+      main: "#3b82f6",
+    },
+  },
+});
 interface AxiosErrorResponse {
   response?: {
     data?: {
@@ -99,7 +107,7 @@ const fetchStores = async (searchQuery: string): Promise<Store[]> => {
 // const [availableManagers, setAvailableManagers] = useState<User[]>([]);
 const fetchManagers = async (): Promise<User[]> => {
   const response = await usersApi.getAll({ role: "manager", limit: 1000 });
-  const managersArray = response?.data || [];
+  const managersArray = response?.data.data || [];
 
   if (Array.isArray(managersArray)) {
     return managersArray as User[];
@@ -163,6 +171,7 @@ export default function StoresPage() {
     staleTime: 5 * 60 * 1000,
   });
   const [showDetail, setShowDetail] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
 
   // const fetchManagers = async (): Promise<User[]> => {
@@ -221,34 +230,6 @@ export default function StoresPage() {
         return await storesApi.update(selectedStore.id, data);
       }
       return await storesApi.create(data);
-    },
-
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEY });
-      setSnackbar({
-        open: true,
-        message: `Store ${variables.id ? "updated" : "created"} successfully!`,
-        severity: "success",
-      });
-      handleDialogClose();
-    },
-    onError: (err: unknown) => {
-      let errorMessage: string = "An unexpected error occurred.";
-      if (isAxiosError(err)) {
-        const backendMessage = err.response?.data?.message;
-        if (Array.isArray(backendMessage)) {
-          errorMessage = backendMessage[0] || errorMessage;
-        } else if (typeof backendMessage === 'string') {
-          errorMessage = backendMessage;
-        }
-      } else if (err instanceof Error) {
-        errorMessage = err.message;
-      }
-      setSnackbar({
-        open: true,
-        message: `Action failed: ${errorMessage}`,
-        severity: "error",
-      });
     },
   });
 
@@ -316,17 +297,18 @@ export default function StoresPage() {
   const handleAddNew = () => {
     setDialogMode("add");
     setFormData(initialFormData);
-    setOpenDialog(true);
+    setSaveError(null);
+    setShowDetail(true);
   };
 
   const handleEdit = (store: Store) => {
     setSelectedStore(store);
     setDialogMode("edit");
+    setSaveError(null);
 
     const matchedManager = availableManagers.find(
-      (manager) => manager.username === store.manager_name
+      (manager) => manager.id === store.manager_id
     );
-
     setFormData({
       code: store.code,
       name: store.name,
@@ -338,7 +320,7 @@ export default function StoresPage() {
       openingHours: store.openingHours || "",
       latitude: store.latitude?.toString() || "",
       longitude: store.longitude?.toString() || "",
-      manager_id: matchedManager ? String(matchedManager.id) : "",
+      manager_id: matchedManager ? String(matchedManager.id) : (store.manager_id?.toString() || ""),
       isActive: store.isActive,
     });
 
@@ -453,25 +435,52 @@ export default function StoresPage() {
         onBack={() => {
           setShowDetail(false);
           setSelectedStore(null);
+          setSaveError(null);
         }}
         onSave={async (data) => {
-          const dataToSend = {
-            ...data,
-            latitude: data.latitude ? parseFloat(data.latitude) : undefined,
-            longitude: data.longitude ? parseFloat(data.longitude) : undefined,
-            manager_id: data.manager_id ? parseInt(data.manager_id) : undefined,
-          } as Partial<Store>;
+          try {
+            const dataToSend = {
+              ...data,
+              latitude: data.latitude ? parseFloat(data.latitude) : undefined,
+              longitude: data.longitude ? parseFloat(data.longitude) : undefined,
+              manager_id: data.manager_id ? parseInt(data.manager_id) : undefined,
+            } as Partial<Store>;
 
-          storeMutation.mutate(dataToSend);
-          setShowDetail(false);
+            const savedStore = await storeMutation.mutateAsync(dataToSend);
+
+            queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+            setSnackbar({
+              open: true,
+              message: `Store ${dialogMode === 'edit' ? 'updated' : 'created'} successfully!`,
+              severity: "success",
+            });
+
+            setShowDetail(false);
+            setSaveError(null);
+          } catch (err) {
+            let errorMessage: string = "An unexpected error occurred.";
+            if (isAxiosError(err)) {
+              const backendMessage = err.response?.data?.message;
+              if (Array.isArray(backendMessage)) {
+                errorMessage = backendMessage.join(', ');
+              } else if (typeof backendMessage === 'string') {
+                errorMessage = backendMessage;
+              }
+            } else if (err instanceof Error) {
+              errorMessage = err.message;
+            }
+            setSaveError(errorMessage);
+          }
         }}
         loading={storeMutation.isPending}
+        saveError={saveError}
       />
     );
   }
 
   return (
     <>
+      <ThemeProvider theme={blueTheme}>
       <Backdrop
         sx={{ color: "#fff", zIndex: (theme) => theme.zIndex.drawer + 1 }}
         open={loading}
@@ -781,6 +790,7 @@ export default function StoresPage() {
           {snackbar.message}
         </Alert>
       </Snackbar>
+      </ThemeProvider>
     </>
   );
 }

@@ -29,7 +29,7 @@ const blueTheme = createTheme({
 interface CategoryDetailProps {
   mode: 'add' | 'edit' | 'view';
   initialData?: ServiceCategory | null;
-  onSave: (data: CreateServiceCategoryDto | UpdateServiceCategoryDto) => Promise<void>;
+  onSave: (data: CategoryFormData) => Promise<void>;
   onBack: () => void;
   loading?: boolean;
 }

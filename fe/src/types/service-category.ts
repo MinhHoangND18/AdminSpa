@@ -7,6 +7,7 @@ export interface ServiceCategory {
   slug: string;
   description: string | null;
   imageUrl: string | null;
+  isActive: boolean;
   status: CategoryStatus;
   displayOrder: number;
   createdAt: string;

@@ -32,6 +32,7 @@ interface UserDetailProps {
     onSave: (data: UserFormData) => Promise<void>;
     onBack: () => void;
     loading?: boolean;
+    saveError?: string | null;
 }
 
 export default function UserDetail({
@@ -95,6 +96,11 @@ export default function UserDetail({
         if (!formData.fullname) newErrors.fullname = "Full name is required";
         if (!formData.role) newErrors.role = "Role assignment is required";
 
+        const rolesRequiringStore = ["store_admin", "manager", "receptionist"];
+        if (rolesRequiringStore.includes(formData.role) && !formData.store_id) {
+            newErrors.store_id = `This role must be assigned to a Store.`;
+        }
+
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     };
@@ -106,7 +112,7 @@ export default function UserDetail({
     };
 
     const isView = mode === "view";
-
+    
     return (
         <ThemeProvider theme={blueTheme}>
             <Box sx={{ p: 3 }}>
@@ -223,7 +229,7 @@ export default function UserDetail({
                                     </FormControl>
                                 </Grid>
                                 <Grid size={{ xs: 12, sm: 6 }}>
-                                    <FormControl fullWidth disabled={isView}>
+                                    <FormControl fullWidth disabled={isView} error={!!errors.store_id}>
                                         <InputLabel>Assigned Store/Branch</InputLabel>
                                         <Select
                                             value={formData.store_id} label="Assigned Store/Branch"
@@ -234,6 +240,7 @@ export default function UserDetail({
                                                 <MenuItem key={store.id} value={store.id.toString()}>{store.name}</MenuItem>
                                             ))}
                                         </Select>
+                                        {errors.store_id && <FormHelperText>{errors.store_id}</FormHelperText>}
                                     </FormControl>
                                 </Grid>
                             </Grid>

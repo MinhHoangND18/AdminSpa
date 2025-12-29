@@ -1,4 +1,4 @@
-// types/user.ts
+
 export type UserRole = 'super_admin' | 'store_admin' | 'manager' | 'staff' | 'receptionist';
 
 export interface User {

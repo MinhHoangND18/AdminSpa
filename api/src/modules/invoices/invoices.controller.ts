@@ -26,6 +26,7 @@ export class InvoicesController {
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 409, description: 'Voucher already exists' })
   create(@Body() createInvoiceDto: CreateInvoiceDto) {
+    console.log('Received DTO to create invoice:', createInvoiceDto);
     return this.invoicesService.create(createInvoiceDto);
   }
 

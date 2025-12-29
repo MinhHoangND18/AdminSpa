@@ -14,6 +14,7 @@ import {
   QueryBookingDto,
   CreateBookingOrderDto,
 } from './bookings.dto';
+import { CreateInvoiceDto } from '../invoices/invoices.dto';
 import { InvoicesService } from '../invoices/invoices.service';
 import { PaymentStatus } from '../invoices/entities/invoice.entity';
 import { CustomersService } from '../customers/customers.service';
@@ -28,7 +29,7 @@ export class BookingsService {
     private readonly invoicesService: InvoicesService,
     @Inject(CustomersService)
     private readonly customersService: CustomersService,
-  ) {}
+  ) { }
 
   async createBookingFromOrder(orderDto: CreateBookingOrderDto): Promise<Booking> {
     const { customer: customerData, booking: bookingData, invoice: invoiceData } = orderDto;
@@ -44,7 +45,7 @@ export class BookingsService {
       confirm: true,
       source: 'website',
     });
-    
+
     return await this.bookingRepository.save(booking);
   }
 
@@ -160,49 +161,7 @@ export class BookingsService {
     return this.bookingRepository.save(booking);
   }
 
-  private async _createInvoiceForCompletedBooking(booking: Booking): Promise<void> {
-    const existingInvoices = await this.invoicesService.findAll({ bookingId: booking.id, limit: 1 });
 
-    if (existingInvoices.data.length === 0 && booking.pendingInvoiceItems && booking.customerId) {
-      try {
-        const subtotal = booking.pendingInvoiceItems.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0);
-        const taxRate = 0.08;
-        const taxAmount = subtotal * taxRate;
-        const totalAmount = subtotal + taxAmount;
-              const encodeDateTime = (dateStr: string, timeStr: string): string => {
-          if (!dateStr || !timeStr) return "000000000000";
-          try {
-            const [year, month, day] = dateStr.split("-");
-            const [hour, minute] = timeStr.split(":");
-            return `${month}${day}${year}${hour}${minute}`;
-          } catch (e) {
-            // Fallback in case of parsing error
-            return String(Date.now());
-          }
-        };
-        const voucher = `INV-${booking.id}-${encodeDateTime(
-          new Date(booking.bookingDate).toISOString().split('T')[0],
-          booking.startTime,
-        )}`;
-        await this.invoicesService.create({
-          voucher,
-          bookingId: booking.id,
-          customerId: booking.customerId,
-          storeId: booking.storeId,
-          subtotal,
-          taxAmount,
-          totalAmount,
-          paymentStatus: PaymentStatus.PENDING,
-          items: booking.pendingInvoiceItems,
-          notes: `Invoice automatically generated from booking #${booking.id}`,
-        });
-
-        await this._updateCustomerLastVisit(booking);
-      } catch (error) {
-        console.error(`Failed to create invoice for booking ${booking.id}:`, error);
-      }
-    }
-  }
 
   async remove(id: number): Promise<void> {
     const booking = await this.findOne(id);
@@ -258,32 +217,112 @@ export class BookingsService {
     const originalStatus = booking.status;
 
     if (booking.status !== BookingStatus.IN_PROGRESS) {
-        booking.status = BookingStatus.IN_PROGRESS;
+      booking.status = BookingStatus.IN_PROGRESS;
     }
 
     if (originalStatus !== BookingStatus.IN_PROGRESS) {
-        if (!booking.customerId && booking.customerEmail) {
-            const customer = await this.customersService.findOrCreate({
-                fullName: booking.customerName,
-                phone: booking.customerPhone,
-                email: booking.customerEmail,
-            });
-            booking.customerId = customer.id;
-        }
+      if (!booking.customerId && booking.customerEmail) {
+        const customer = await this.customersService.findOrCreate({
+          fullName: booking.customerName,
+          phone: booking.customerPhone,
+          email: booking.customerEmail,
+        });
+        booking.customerId = customer.id;
+      }
     }
-    
+
     return await this.bookingRepository.save(booking);
   }
 
-  async completeService(id: number): Promise<Booking> {
+  async completeService(id: number, invoiceData?: CreateInvoiceDto): Promise<Booking> {
     const booking = await this.findOne(id);
     const originalStatus = booking.status;
+
+    if (!booking.customerId) {
+      throw new BadRequestException('Cannot complete booking without a customer');
+    }
+
     booking.status = BookingStatus.COMPLETED;
 
     if (originalStatus !== BookingStatus.COMPLETED) {
-      await this._createInvoiceForCompletedBooking(booking);
+      await this._createInvoiceForCompletedBooking(booking, invoiceData);
     }
 
     return await this.bookingRepository.save(booking);
+  }
+
+  private async _createInvoiceForCompletedBooking(
+    booking: Booking,
+    invoiceData?: CreateInvoiceDto
+  ): Promise<void> {
+    const existingInvoices = await this.invoicesService.findAll({
+      bookingId: booking.id,
+      limit: 1
+    });
+
+    if (existingInvoices.data.length > 0) {
+      console.log(`Invoice already exists for booking ${booking.id}`);
+      return;
+    }
+
+    if (!booking.customerId) {
+      throw new BadRequestException('Cannot create invoice without customer');
+    }
+    if (!booking.pendingInvoiceItems || booking.pendingInvoiceItems.length === 0) {
+      throw new BadRequestException('Cannot create invoice without items');
+    }
+
+    try {
+      const encodeDateTime = (dateStr: string, timeStr: string): string => {
+        if (!dateStr || !timeStr) return String(Date.now());
+        try {
+          const [year, month, day] = dateStr.split("-");
+          const [hour, minute] = timeStr.split(":");
+          return `${month}${day}${year}${hour}${minute}`;
+        } catch (e) {
+          return String(Date.now());
+        }
+      };
+      const subtotal = invoiceData?.subtotal ?? booking.pendingInvoiceItems.reduce(
+        (sum, item) => sum + (item.unitPrice * item.quantity),
+        0
+      );
+
+      const discountAmount = invoiceData?.discountAmount ?? booking.orderDiscount ?? 0;
+      const amountAfterDiscount = subtotal - discountAmount;
+      const taxRate = 0.08;
+      const taxAmount = invoiceData?.taxAmount ?? Math.round(amountAfterDiscount * taxRate);
+      const totalAmount = invoiceData?.totalAmount ?? (amountAfterDiscount + taxAmount);
+
+      const voucher = invoiceData?.voucher || `INV-${booking.id}-${encodeDateTime(
+        new Date(booking.bookingDate).toISOString().split('T')[0],
+        booking.startTime,
+      )}`;
+
+      const payload: CreateInvoiceDto = {
+        voucher,
+        bookingId: booking.id,
+        customerId: booking.customerId,
+        storeId: invoiceData?.storeId ?? booking.storeId,
+        subtotal,
+        discountAmount: discountAmount || undefined,
+        discountType: invoiceData?.discountType ?? (discountAmount ? 'amount' as any : undefined),
+        taxAmount,
+        totalAmount,
+        paymentStatus: invoiceData?.paymentStatus ?? PaymentStatus.PENDING,
+        notes: invoiceData?.notes ?? booking.discountReason ?? `Invoice automatically generated from booking #${booking.id}`,
+        items: invoiceData?.items ?? booking.pendingInvoiceItems,
+      };
+
+      console.log('📤 Creating invoice with payload:', JSON.stringify(payload, null, 2));
+
+      await this.invoicesService.create(payload);
+      await this._updateCustomerLastVisit(booking);
+
+      console.log('✅ Invoice created successfully for booking', booking.id);
+    } catch (error) {
+      console.error(` Failed to create invoice for booking ${booking.id}:`, error);
+      throw error; 
+    }
   }
 }

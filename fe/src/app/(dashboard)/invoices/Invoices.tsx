@@ -119,6 +119,14 @@ import { Staff as StaffType } from "@/types/staff";
 import { Product as ProductType } from "@/types/product";
 import { Service as ServiceType } from "@/types/service";
 import InvoiceDetail from "./InvoiceDetail";
+import { createTheme, ThemeProvider } from "@mui/material/styles";
+const blueTheme = createTheme({
+  palette: {
+    primary: {
+      main: "#3b82f6",
+    },
+  },
+});
 
 interface ApiResponseWrapper<T> {
   data?: {
@@ -254,6 +262,7 @@ const getItemTypeColor = (type: ItemType) => {
   }
 };
 
+
 const formatCurrency = (amount: number) => {
   return new Intl.NumberFormat("vi-VN", {
     style: "currency",
@@ -351,7 +360,6 @@ export default function InvoicesPage() {
 
     return () => {
       isMountedRef.current = false;
-      // Cancel mọi request đang pending khi unmount
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
@@ -433,10 +441,8 @@ export default function InvoicesPage() {
       setIsLoading(true);
 
       try {
-        // Load song song các data cơ bản trước
         await Promise.all([fetchCustomers(), fetchStores(), fetchStaff()]);
 
-        // Load bookings sau (ít quan trọng hơn)
         if (isMountedRef.current) {
           fetchBookings();
         }
@@ -537,13 +543,14 @@ export default function InvoicesPage() {
     }
   };
   useEffect(() => {
-    if (!isInitialLoad && customers.length > 0 && stores.length > 0) {
+    if (!isInitialLoad && customers.length > 0 && stores.length > 0 && bookings.length > 0) {
       fetchInvoices();
     }
   }, [
     isInitialLoad,
     customers.length,
     stores.length,
+    bookings.length,
     page,
     rowsPerPage,
     filterStatus,
@@ -858,8 +865,7 @@ export default function InvoicesPage() {
 
     const inputDiscountAmount = parseFloat(formData.discount_amount) || 0;
 
-    // --- THAY ĐỔI TÍNH TOÁN THUẾ Ở ĐÂY ---
-    const TAX_RATE = 0.08; // 8%
+    const TAX_RATE = 0.08;
     let finalDiscountAmount = inputDiscountAmount;
     let amountAfterDiscount = subtotal;
 
@@ -870,16 +876,14 @@ export default function InvoicesPage() {
       amountAfterDiscount = subtotal - finalDiscountAmount;
     }
 
-    // Tính thuế 8% trên Subtotal sau khi trừ Discount (nếu có)
     const calculatedTaxAmount = amountAfterDiscount * TAX_RATE;
 
     const total = amountAfterDiscount + calculatedTaxAmount;
-    // ----------------------------------------
 
     return {
       subtotal,
       discountAmount: finalDiscountAmount,
-      taxAmount: calculatedTaxAmount, // Thêm taxAmount đã tính toán
+      taxAmount: calculatedTaxAmount, 
       total: Math.max(0, total),
     };
   };
@@ -1057,14 +1061,14 @@ export default function InvoicesPage() {
     }));
   };
   const isAnyLoading =
-    isLoading || // Tải danh sách hóa đơn
-    isInitialLoad || // Tải dữ liệu ban đầu (Customers, Stores, Staff)
-    isFormDataLoading || // Tải dữ liệu form (Products, Services)
-    isItemsLoading || // Tải chi tiết mục hóa đơn (khi View/Edit)
+    isLoading || 
+    isInitialLoad || 
+    isFormDataLoading || 
+    isItemsLoading ||
     false;
 
   return (
-    <>
+     <ThemeProvider theme={blueTheme}>
       {/* <Box sx={{ mb: 3 }}>
                 <Typography variant="h4" fontWeight="bold" gutterBottom>
                     Invoice Management
@@ -1660,6 +1664,6 @@ export default function InvoicesPage() {
           </Button>
         </DialogActions>
       </Dialog>
-    </>
+    </ThemeProvider>
   );
 }

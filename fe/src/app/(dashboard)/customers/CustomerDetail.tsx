@@ -63,10 +63,15 @@ export default function CustomerDetail({
         status: initialData?.status || CustomerStatus.ACTIVE,
     }));
 
+    const [errors, setErrors] = useState<Partial<Record<keyof CustomerFormData, string>>>({});
+
     const handleTextChange = (field: keyof CustomerFormData) => (
         e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
     ) => {
         setFormData(prev => ({ ...prev, [field]: e.target.value }));
+        if (errors[field]) {
+            setErrors(prev => ({ ...prev, [field]: undefined }));
+        }
     };
     const handleSelectChange = (field: keyof CustomerFormData) => (
         e: SelectChangeEvent<string>
@@ -75,6 +80,23 @@ export default function CustomerDetail({
     };
 
     const handleSave = async () => {
+        const newErrors: Partial<Record<keyof CustomerFormData, string>> = {};
+        if (!formData.fullName.trim()) {
+            newErrors.fullName = "Full name is required.";
+        }
+        if (!formData.phone.trim()) {
+            newErrors.phone = "Phone number is required.";
+        }
+        if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+            newErrors.email = "Please enter a valid email address.";
+        }
+
+        if (Object.keys(newErrors).length > 0) {
+            setErrors(newErrors);
+            return;
+        }
+        setErrors({});
+        
         const submissionData = {
             ...formData,
             storeId: formData.storeId ? parseInt(formData.storeId) : undefined
@@ -112,6 +134,8 @@ export default function CustomerDetail({
                                     fullWidth label="Full Name" required
                                     value={formData.fullName} onChange={handleTextChange("fullName")}
                                     disabled={isView}
+                                    error={!!errors.fullName}
+                                    helperText={errors.fullName}
                                 />
                             </Grid>
                              <Grid size={{ xs: 12, sm: 6 }}>
@@ -119,6 +143,8 @@ export default function CustomerDetail({
                                     fullWidth label="Phone Number" required
                                     value={formData.phone} onChange={handleTextChange("phone")}
                                     disabled={isView}
+                                    error={!!errors.phone}
+                                    helperText={errors.phone}
                                 />
                             </Grid>
                              <Grid size={{ xs: 12, sm: 6 }}>
@@ -126,6 +152,8 @@ export default function CustomerDetail({
                                     fullWidth label="Email Address" type="email"
                                     value={formData.email} onChange={handleTextChange("email")}
                                     disabled={isView}
+                                    error={!!errors.email}
+                                    helperText={errors.email}
                                 />
                             </Grid>
                              <Grid size={{ xs: 12, sm: 6 }}>

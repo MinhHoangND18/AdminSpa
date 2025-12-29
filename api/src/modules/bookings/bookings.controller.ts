@@ -1,4 +1,4 @@
-// src/bookings/bookings.controller.ts
+
 import {
   Controller,
   Get,
@@ -15,11 +15,12 @@ import {
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { BookingsService } from './bookings.service';
 import { CreateBookingDto, UpdateBookingDto, QueryBookingDto, CreateBookingOrderDto } from './bookings.dto';
-
+import { CreateInvoiceDto } from '../invoices/invoices.dto';
+import { CompleteServiceDto } from './bookings.dto';
 @ApiTags('bookings')
 @Controller('bookings')
 export class BookingsController {
-  constructor(private readonly bookingsService: BookingsService) {}
+  constructor(private readonly bookingsService: BookingsService) { }
 
   @Post('order')
   @ApiOperation({ summary: 'Create a complete booking order' })
@@ -100,8 +101,26 @@ export class BookingsController {
   @ApiOperation({ summary: 'Complete service for a booking' })
   @ApiResponse({ status: 200, description: 'Service completed successfully' })
   @ApiResponse({ status: 404, description: 'Booking not found' })
-  completeService(@Param('id', ParseIntPipe) id: number) {
-    return this.bookingsService.completeService(id);
+ async completeService(
+  @Param('id', ParseIntPipe) id: number,
+  @Body() completeServiceDto: CompleteServiceDto,  
+) {
+    const booking = await this.bookingsService.findOne(id);
+    const invoiceData: CreateInvoiceDto = {
+      voucher: '', 
+      customerId: booking.customerId,
+      storeId: completeServiceDto.storeId,
+      subtotal: completeServiceDto.subtotal,
+      totalAmount: completeServiceDto.totalAmount,
+      discountAmount: completeServiceDto.discountAmount,
+      discountType: completeServiceDto.discountType as any,
+      taxAmount: completeServiceDto.taxAmount,
+      paymentStatus: completeServiceDto.paymentStatus as any,
+      notes: completeServiceDto.notes,
+      items: completeServiceDto.items,
+    };
+
+    return this.bookingsService.completeService(id, invoiceData);
   }
 
   @Get('store/:storeId/date-range')

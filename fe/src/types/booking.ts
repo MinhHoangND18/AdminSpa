@@ -83,6 +83,8 @@ export interface CreateBookingPayload {
     status?: BookingStatus;
     source?: string;
     notes?: string;
+    orderDiscount?: number;
+    discountReason?: string;
     confirm?: boolean;
     pendingInvoiceItems?: CreatePendingInvoiceItemPayload[];
 }

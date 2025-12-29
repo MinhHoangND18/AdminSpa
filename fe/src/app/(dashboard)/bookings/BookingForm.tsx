@@ -12,15 +12,22 @@ import {
   ConfirmationNumber, CheckCircle, Cancel
 } from "@mui/icons-material";
 import { useQuery } from "@tanstack/react-query";
-import { Booking, BookingStatus, PendingInvoiceItem, CreatePendingInvoiceItemPayload } from "@/types/booking";
+import { Booking, BookingStatus, PendingInvoiceItem, CreatePendingInvoiceItemPayload, UpdateBookingPayload } from "@/types/booking";
 import BookingDetail from "./BookingDetail"
 import { getServices } from "@/lib/api/services";
 import { getProducts } from "@/lib/api/products";
 import { getStaff } from "@/lib/api/staffs";
 import { Staff } from "@/types/staff";
+import { DiscountType } from "@/types/invoice";
 import { getBookings, updateBooking, startService, confirmBooking, completeService, type CompleteServicePayload } from "@/lib/api/bookings";
 import { useQueryClient, useMutation } from "@tanstack/react-query";
-
+interface BackendError {
+  response?: {
+    data?: {
+      message?: string | string[];
+    };
+  };
+}
 
 const PRIMARY_COLOR = "#3b82f6";
 const SUCCESS_COLOR = "#10b981";
@@ -75,48 +82,70 @@ export default function BookingsPage() {
     queryClient.invalidateQueries({ queryKey: ['bookings'] });
   };
 
-  const handleCompleteService = async (id: number) => {
-    const booking = bookings.find((b: Booking) => b.id === id);
+  const handleCompleteService = async (
+    id: number,
+    updatedData?: { orderDiscount?: number; discountReason?: string }
+  ) => {
+
+    const booking: Booking | undefined = bookings.find((b: Booking) => b.id === id);
     if (!booking) return;
 
     const subtotal = booking.pendingInvoiceItems?.reduce(
-      (sum, item) => sum + (item.unitPrice * item.quantity), 0
+      (sum: number, item: PendingInvoiceItem) => {
+ 
+        const itemTotal = (item.unitPrice * item.quantity) - (item.discount || 0);
+        return sum + Math.max(0, itemTotal);
+      },
+      0
     ) || 0;
 
-    const totalDiscount = booking.pendingInvoiceItems?.reduce(
-      (sum, item) => sum + (item.discount || 0), 0
-    ) || 0;
-
-    const afterDiscount = subtotal - totalDiscount;
-
-    const taxRate = 0.1;
-    const taxAmount = Math.round(afterDiscount * taxRate);
-
+    const totalDiscount = updatedData?.orderDiscount ?? booking.orderDiscount ?? 0;
+    const afterDiscount = Math.max(0, subtotal - totalDiscount); 
+    const taxAmount = Math.round(afterDiscount * 0.08);
     const finalAmount = afterDiscount + taxAmount;
-
     const invoiceData: CompleteServicePayload = {
-      storeId: booking.storeId,
+      storeId: Number(booking.storeId),
       subtotal: subtotal,
       totalAmount: finalAmount,
       discountAmount: totalDiscount,
+      discountType: totalDiscount > 0 ? DiscountType.AMOUNT : undefined,
       taxAmount: taxAmount,
       paymentStatus: 'pending',
-      items: booking.pendingInvoiceItems?.map(item => ({
+      notes: updatedData?.discountReason || undefined,
+      items: booking.pendingInvoiceItems?.map((item: PendingInvoiceItem) => {
+      const calculatedTotalPrice = (Number(item.unitPrice) * Number(item.quantity)) - Number(item.discount || 0);
+      
+      return {
         itemType: item.itemType,
-        itemId: item.itemId,
+        itemId: Number(item.itemId),
         itemName: item.itemName,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-        discount: item.discount || 0,
-        staffId: item.staffId,
-      })) || []
+        quantity: Number(item.quantity),
+        unitPrice: Number(item.unitPrice),
+        discount: Number(item.discount || 0),
+        staffId: item.staffId ? Number(item.staffId) : undefined,
+        totalPrice: Math.max(0, calculatedTotalPrice), 
+      };
+    }) || []
     };
 
-    await completeService(id, invoiceData);
-    await queryClient.invalidateQueries({ queryKey: ['bookings'] });
-    setSelectedId(null);
-  };
+    try {
+      await completeService(id, invoiceData);
+      await queryClient.invalidateQueries({ queryKey: ['bookings'] });
+      await queryClient.invalidateQueries({ queryKey: ['invoices'] });
 
+      setSelectedId(null);
+    } catch (error: unknown) {
+
+      const err = error as BackendError;
+      console.error("Error Detail:", err);
+
+      const errorMessage = Array.isArray(err.response?.data?.message)
+        ? err.response?.data?.message[0]
+        : err.response?.data?.message || "Không thể hoàn thành dịch vụ";
+
+      alert(errorMessage);
+    }
+  };
   const handleUpdateBookingItems = async (id: number, items: PendingInvoiceItem[]) => {
     const payloadItems: CreatePendingInvoiceItemPayload[] = items.map(item => ({
       itemType: item.itemType,
@@ -129,6 +158,15 @@ export default function BookingsPage() {
       itemName: item.itemName,
     }));
     await updateBooking(id, { pendingInvoiceItems: payloadItems });
+    queryClient.invalidateQueries({ queryKey: ['bookings'] });
+  };
+
+  const handleEditBooking = async (booking: Booking) => {
+    const payload: UpdateBookingPayload = {
+      orderDiscount: booking.orderDiscount,
+      discountReason: booking.discountReason,
+    };
+    await updateBooking(booking.id, payload);
     queryClient.invalidateQueries({ queryKey: ['bookings'] });
   };
 
@@ -146,8 +184,8 @@ export default function BookingsPage() {
           onBack={() => setSelectedId(null)}
           onUpdateStatus={handleUpdateStatus}
           onStartService={handleStartService}
-          onCompleteService={handleCompleteService}
-          onEdit={(b) => console.log("Edit", b)}
+          onCompleteService={(id, data) => handleCompleteService(id, data)}
+          onEdit={handleEditBooking}
           onUpdateBookingItems={handleUpdateBookingItems}
         />
       );
@@ -254,7 +292,7 @@ export default function BookingsPage() {
           <TextField
             fullWidth
             size="small"
-               placeholder="Search bookings by customer name or phone..."
+            placeholder="Search bookings by customer name or phone..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             InputProps={{

@@ -42,7 +42,7 @@ export class UserEntity {
     length: 255,
     nullable: true,
     name: 'fullname', 
-    select: false,
+    select: true,
   })
   fullname: string;
 

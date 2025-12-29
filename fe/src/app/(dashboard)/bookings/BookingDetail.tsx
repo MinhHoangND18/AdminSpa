@@ -9,6 +9,7 @@ import {
     FormControl, InputLabel, Select, MenuItem
 } from "@mui/material";
 import { Delete, Inventory, ExpandLess, ExpandMore } from "@mui/icons-material";
+import { NumericFormat } from 'react-number-format';
 import {
     PlayArrow, Store, Add, ArrowBack,
     Print, Edit, History, Storefront,
@@ -19,14 +20,6 @@ import { Staff as StaffType } from "@/types/staff";
 import { ItemType } from "@/types/invoice-item";
 import { Service as ServiceType } from "@/types/service";
 import { Product as ProductType } from "@/types/product";
-import { createTheme, ThemeProvider } from "@mui/material/styles";
-const blueTheme = createTheme({
-    palette: {
-        primary: {
-            main: "#3b82f6",
-        },
-    },
-});
 
 
 const PRIMARY_COLOR = "#3b82f6";
@@ -41,7 +34,7 @@ interface BookingDetailProps {
     onBack: () => void;
     onUpdateStatus: (id: number, status: BookingStatus) => void;
     onStartService: (id: number) => void;
-    onCompleteService: (id: number) => void;
+    onCompleteService: (id: number, data: { orderDiscount?: number; discountReason?: string; }) => void;
     onEdit: (booking: Booking) => void;
     onUpdateBookingItems: (id: number, items: PendingInvoiceItem[]) => void;
 }
@@ -63,8 +56,9 @@ export default function BookingDetail({
     const [discountDialogOpen, setDiscountDialogOpen] = useState(false);
     const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
 
-    const [orderDiscount, setOrderDiscount] = useState(booking.orderDiscount || 0);
-    const [tempOrderDiscount, setTempOrderDiscount] = useState(booking.orderDiscount || 0);
+    // State cho discount toàn đơn hàng
+    const [orderDiscount, setOrderDiscount] = useState<number>(Number(booking.orderDiscount) || 0);
+    const [tempOrderDiscount, setTempOrderDiscount] = useState<number>(Number(booking.orderDiscount) || 0);
     const [discountReason, setDiscountReason] = useState(booking.discountReason || "");
     const [tempDiscountReason, setTempDiscountReason] = useState(booking.discountReason || "");
 
@@ -84,16 +78,19 @@ export default function BookingDetail({
         const subtotal = booking.pendingInvoiceItems?.reduce(
             (sum, item) => sum + (item.unitPrice * item.quantity - (item.discount || 0)), 0
         ) || 0;
+
+        // Sử dụng orderDiscount thay vì tính từ items
         const totalDiscount = orderDiscount || 0;
 
         const afterDiscount = subtotal - totalDiscount;
 
-        const taxRate = 0.1;
+        const taxRate = 0.08;
+        const tax = afterDiscount * taxRate;
         const taxAmount = Math.round(afterDiscount * taxRate);
 
         const finalAmount = afterDiscount + taxAmount;
 
-        return { subtotal, totalDiscount, taxAmount, finalAmount };
+        return { subtotal, totalDiscount, taxAmount, finalAmount, tax };
     }, [booking.pendingInvoiceItems, orderDiscount]);
 
     const handleOpenAddDialog = () => {
@@ -161,11 +158,11 @@ export default function BookingDetail({
         setDiscountReason(tempDiscountReason);
         setDiscountDialogOpen(false);
 
-        // TODO: Gọi API để cập nhật discount lên server
-        // await updateBookingDiscount(booking.id, { 
-        //   orderDiscount: tempOrderDiscount, 
-        //   discountReason: tempDiscountReason 
-        // });
+        onEdit({ 
+          ...booking, 
+          orderDiscount: tempOrderDiscount, 
+          discountReason: tempDiscountReason 
+        });
     };
 
     const selectableItems = useMemo(() => {
@@ -188,7 +185,7 @@ export default function BookingDetail({
     }, [currentItem.itemType, products, services]);
 
     return (
-        <ThemeProvider theme={blueTheme}> <Box sx={{ minHeight: "100vh", bgcolor: "#f4f6f8", pb: 5 }}>
+        <Box sx={{ minHeight: "100vh", bgcolor: "#f4f6f8", pb: 5 }}>
             <Paper elevation={0} sx={{ p: 0, borderRadius: 0, bgcolor: "#fff" }}>
                 <Stack direction="row" justifyContent="space-between" alignItems="center">
                     <Stack direction="row" spacing={2} alignItems="center">
@@ -281,7 +278,7 @@ export default function BookingDetail({
                                         <Stack spacing={1} sx={{ mt: 2 }}>
                                             <Stack direction="row" justifyContent="space-between">
                                                 <Typography variant="body2">Subtotal</Typography>
-                                                <Typography variant="body2" fontWeight={600}>{financialSummary.subtotal.toLocaleString()}₫</Typography>
+                                                <Typography variant="body2" fontWeight={600}>{financialSummary.subtotal.toLocaleString('en-US')}₫</Typography>
                                             </Stack>
                                             <Stack
                                                 direction="row"
@@ -301,16 +298,16 @@ export default function BookingDetail({
                                                 <Typography variant="body2" sx={{ color: PRIMARY_COLOR }}>
                                                     Discount {discountReason && `(${discountReason})`}
                                                 </Typography>
-                                                <Typography variant="body2" fontWeight={600} color="success.main">-{financialSummary.totalDiscount.toLocaleString()}₫</Typography>
+                                                <Typography variant="body2" fontWeight={600} color="success.main">-{financialSummary.totalDiscount.toLocaleString('en-US')}₫</Typography>
                                             </Stack>
                                             <Stack direction="row" justifyContent="space-between">
-                                                <Typography variant="body2">Tax (10%)</Typography>
-                                                <Typography variant="body2" fontWeight={600}>{financialSummary.taxAmount.toLocaleString()}₫</Typography>
+                                                <Typography variant="body2">Tax (8%)</Typography>
+                                                <Typography variant="body2" fontWeight={600}>{financialSummary.taxAmount.toLocaleString('en-US')}₫</Typography>
                                             </Stack>
                                             <Divider sx={{ my: 1 }} />
                                             <Stack direction="row" justifyContent="space-between" alignItems="center">
                                                 <Typography variant="subtitle1" fontWeight={700} >Total Amount Due</Typography>
-                                                <Typography variant="subtitle1" fontWeight={700} >{financialSummary.finalAmount.toLocaleString()}₫</Typography>
+                                                <Typography variant="subtitle1" fontWeight={700} >{financialSummary.finalAmount.toLocaleString('en-US')}₫</Typography>
                                             </Stack>
                                         </Stack>
                                     </Grid>
@@ -375,7 +372,7 @@ export default function BookingDetail({
                                     <Button
                                         fullWidth variant="contained" startIcon={<Done />}
                                         disabled={booking.status !== BookingStatus.IN_PROGRESS}
-                                        onClick={() => onCompleteService(booking.id)}
+                                        onClick={() => onCompleteService(booking.id, { orderDiscount, discountReason })}
                                         sx={{ bgcolor: SUCCESS_COLOR, borderRadius: 0, fontWeight: 700 }}
                                     >
                                         Complete
@@ -572,12 +569,15 @@ export default function BookingDetail({
                             <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
                                 Giá trị khuyến mại
                             </Typography>
-                            <TextField
+                            <NumericFormat
+                                customInput={TextField}
                                 fullWidth
-                                type="number"
                                 size="small"
                                 value={tempOrderDiscount}
-                                onChange={(e) => setTempOrderDiscount(Number(e.target.value))}
+                                thousandSeparator=","
+                                onValueChange={(values) => {
+                                    setTempOrderDiscount(values.floatValue || 0);
+                                }}
                                 InputProps={{
                                     endAdornment: (
                                         <Box sx={{
@@ -650,7 +650,6 @@ export default function BookingDetail({
                     </Button>
                 </DialogActions>
             </Dialog>
-        </Box></ThemeProvider>
-
+        </Box>
     );
 }

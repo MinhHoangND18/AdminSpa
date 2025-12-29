@@ -70,6 +70,14 @@ import UserDetail from "./UserDetail";
 import { User, UserFormData, UserResponse } from "@/types/user";
 import { Staff } from "@/types/staff";
 import { Store as StoreType } from "@/types/store";
+import { createTheme, ThemeProvider } from "@mui/material/styles";
+const blueTheme = createTheme({
+  palette: {
+    primary: {
+      main: "#3b82f6",
+    },
+  },
+});
 interface AxiosErrorResponse {
   response?: {
     data?: {
@@ -99,7 +107,7 @@ const roleHierarchy: UserRole[] = [
   "store_admin",
   "manager",
   "receptionist",
-  // "staff",
+  "staff",
 ];
 
 type UserRole =
@@ -180,6 +188,7 @@ export default function UsersPage() {
 
   const [users, setUsers] = useState<User[]>([]);
   const [totalUsers, setTotalUsers] = useState(0);
+  const [aggregateStats, setAggregateStats] = useState({ active: 0, admins: 0 });
   const [availableStaff, setAvailableStaff] = useState<Staff[]>([]);
   const [availableStores, setAvailableStores] = useState<StoreType[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -199,6 +208,7 @@ export default function UsersPage() {
     Partial<Record<keyof UserFormData, string>>
   >({});
   const [showDetail, setShowDetail] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(false);
 
@@ -330,14 +340,41 @@ export default function UsersPage() {
     fetchUsers();
   }, [fetchUsers]);
 
-  const stats = {
-    total: users.length,
-    active: users.filter((u) => u.is_active && !u.is_locked).length,
-    locked: users.filter((u) => u.is_locked).length,
-    admins: users.filter(
-      (u) => u.role === "super_admin" || u.role === "store_admin"
-    ).length,
-  };
+  useEffect(() => {
+    const fetchStats = async () => {
+      const filters = {
+        search: searchQuery,
+        role: filterRole,
+        is_active:
+          filterStatus === "active" || filterStatus === "locked"
+            ? "true"
+            : filterStatus === "inactive"
+              ? "false"
+              : undefined,
+        is_locked: filterStatus === "locked" ? true : undefined,
+        page: 1,
+        limit: 99999, // Request a very large page size to get all users
+      };
+
+      try {
+        const apiResponse = await usersApi.getAll(filters);
+        const responseData: UserResponse['data'] = apiResponse.data || { data: [], total: 0, page: 0, limit: 0 };
+        const allMatchingUsers = responseData.data || [];
+
+        setAggregateStats({
+          active: allMatchingUsers.filter((u: User) => u.is_active && !u.is_locked).length,
+          admins: allMatchingUsers.filter(
+            (u: User) => u.role === "super_admin" || u.role === "store_admin"
+          ).length,
+        });
+      } catch (error) {
+        console.error("Failed to fetch aggregate user stats:", error);
+        setAggregateStats({ active: 0, admins: 0 });
+      }
+    };
+
+    fetchStats();
+  }, [searchQuery, filterRole, filterStatus]);
 
   const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, user: User) => {
     setAnchorEl(event.currentTarget);
@@ -352,12 +389,14 @@ export default function UsersPage() {
     setDialogMode("add");
     setSelectedUser(null);
     setShowDetail(true);
+    setSaveError(null);
   };
 
   const handleEdit = () => {
     if (selectedUser) {
       setDialogMode("edit");
       setShowDetail(true);
+      setSaveError(null);
     }
     handleMenuClose();
   };
@@ -397,11 +436,12 @@ export default function UsersPage() {
       fetchUsers();
       setSnackbar({
         open: true,
-        message: dialogMode === "add" ? "Tạo người dùng thành công" : "Cập nhật thành công",
+        message: dialogMode === "add" ? "User created successfully" : "Update successful",
         severity: "success",
       });
+      setSaveError(null); 
     } catch (error: unknown) {
-      console.error("Failed to delete user:", error);
+      console.error("Failed to save user:", error);
       let errorMessage = "An unknown error occurred.";
 
       if (isAxiosError(error)) {
@@ -412,12 +452,7 @@ export default function UsersPage() {
       } else if (error instanceof Error) {
         errorMessage = error.message;
       }
-      setSnackbar({
-        open: true,
-        message: `Deletion failed: ${errorMessage}`,
-        severity: "error",
-      });
-
+      setSaveError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -434,9 +469,11 @@ export default function UsersPage() {
         onBack={() => {
           setShowDetail(false);
           setSelectedUser(null);
+          setSaveError(null);
         }}
         onSave={handleSaveUser}
         loading={loading}
+        saveError={saveError}
       />
     );
   }
@@ -651,7 +688,7 @@ export default function UsersPage() {
   }
 
   return (
-    <>
+    <ThemeProvider theme={blueTheme}>
       <Backdrop
         sx={{ color: "#fff", zIndex: (theme) => theme.zIndex.drawer + 1 }}
         open={loading}
@@ -688,7 +725,7 @@ export default function UsersPage() {
                       Total Users
                     </Typography>
                     <Typography variant="h4" fontWeight="bold">
-                      {stats.total}
+                      {totalUsers}
                     </Typography>
                   </Box>
                   <Avatar
@@ -727,7 +764,7 @@ export default function UsersPage() {
                       fontWeight="bold"
                       color={SUCCESS_COLOR}
                     >
-                      {stats.active}
+                      {aggregateStats.active}
                     </Typography>
                   </Box>
                   <Avatar
@@ -805,7 +842,7 @@ export default function UsersPage() {
                       fontWeight="bold"
                       color={INFO_COLOR}
                     >
-                      {stats.admins}
+                      {aggregateStats.admins}
                     </Typography>
                   </Box>
                   <Avatar
@@ -1672,6 +1709,6 @@ export default function UsersPage() {
           </Alert>
         </Snackbar>
       </Box>
-    </>
+    </ThemeProvider>
   );
 }

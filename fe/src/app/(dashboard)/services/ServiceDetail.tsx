@@ -14,14 +14,6 @@ import {
 import {
   Service, ServiceCategory, ServiceStatus, CreateServiceDto, UpdateServiceDto
 } from '@/types';
-import { createTheme, ThemeProvider } from "@mui/material/styles";
-const blueTheme = createTheme({
-    palette: {
-        primary: {
-            main: "#3b82f6",
-        },
-    },
-});
 
 interface ServiceDetailProps {
   mode: 'add' | 'edit' | 'view';
@@ -51,6 +43,7 @@ export default function ServiceDetail({
 
   const [errors, setErrors] = useState<Partial<Record<string, string>>>({});
 
+  // Sửa lỗi Property 'type' does not exist: Tách biệt hàm xử lý TextField và Select/Switch
   const handleTextFieldChange = (field: string) => (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
@@ -96,7 +89,7 @@ export default function ServiceDetail({
   };
 
   return (
-    <ThemeProvider theme={blueTheme}><Box sx={{ p: { xs: 2, md: 2 } }}>
+    <Box sx={{ p: { xs: 2, md: 2 } }}>
       <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <Stack direction="row" spacing={2} alignItems="center">
           <IconButton onClick={onBack} sx={{ bgcolor: 'background.paper', boxShadow: 1 }}>
@@ -261,7 +254,6 @@ export default function ServiceDetail({
           </Button>
         </Box>
       )}
-    </Box></ThemeProvider>
-    
+    </Box>
   );
 }

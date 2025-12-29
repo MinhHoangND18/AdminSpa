@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo } from "react";
 import {
   Grid,
   Card,
@@ -42,7 +42,7 @@ import {
   SelectChangeEvent,
   FormHelperText,
   Backdrop,
-} from '@mui/material';
+} from "@mui/material";
 import {
   Add,
   Search,
@@ -61,15 +61,15 @@ import {
   FilterList,
   TrendingUp,
   Inventory,
-} from '@mui/icons-material';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+} from "@mui/icons-material";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getServices,
   deleteService,
   createService,
   updateService,
-} from '@/lib/api/services';
-import { getActiveServiceCategories } from '@/lib/api/service-categories';
+} from "@/lib/api/services";
+import { getActiveServiceCategories } from "@/lib/api/service-categories";
 import {
   Service,
   ServiceCategory,
@@ -78,19 +78,26 @@ import {
   UpdateServiceDto,
   CreateServiceDto,
   PaginatedServices,
-} from '@/types';
-import ServiceDetail from './ServiceDetail';
-
+} from "@/types";
+import ServiceDetail from "./ServiceDetail";
+import { createTheme, ThemeProvider } from "@mui/material/styles";
+const blueTheme = createTheme({
+  palette: {
+    primary: {
+      main: "#3b82f6",
+    },
+  },
+});
 
 // Colors
-const PRIMARY_COLOR = '#3b82f6';
-const PRIMARY_DARK = '#0f766e';
-const SUCCESS_COLOR = '#10b981';
-const ERROR_COLOR = '#ef4444';
-const WARNING_COLOR = '#f59e0b';
-const INFO_COLOR = '#3b82f6';
-const PURPLE_COLOR = '#a855f7';
-const EDIT_COLOR = "#f39c12"
+const PRIMARY_COLOR = "#3b82f6";
+const PRIMARY_DARK = "#0f766e";
+const SUCCESS_COLOR = "#10b981";
+const ERROR_COLOR = "#ef4444";
+const WARNING_COLOR = "#f59e0b";
+const INFO_COLOR = "#3b82f6";
+const PURPLE_COLOR = "#a855f7";
+const EDIT_COLOR = "#f39c12";
 
 interface ServiceFormData {
   name: string;
@@ -106,9 +113,9 @@ interface ServiceFormData {
 
 const getStatusColor = (status: ServiceStatus) => {
   switch (status) {
-    case 'active':
+    case "active":
       return SUCCESS_COLOR;
-    case 'inactive':
+    case "inactive":
       return ERROR_COLOR;
     default:
       return PRIMARY_COLOR;
@@ -117,19 +124,19 @@ const getStatusColor = (status: ServiceStatus) => {
 
 const getStatusLabel = (status: ServiceStatus) => {
   switch (status) {
-    case 'active':
-      return 'Active';
-    case 'inactive':
-      return 'Inactive';
+    case "active":
+      return "Active";
+    case "inactive":
+      return "Inactive";
     default:
       return status;
   }
 };
 
 const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat('vi-VN', {
-    style: 'currency',
-    currency: 'VND',
+  return new Intl.NumberFormat("vi-VN", {
+    style: "currency",
+    currency: "VND",
   }).format(amount);
 };
 
@@ -145,9 +152,11 @@ const formatDuration = (minutes: number) => {
 
 export default function ServicesPage() {
   const queryClient = useQueryClient();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filters, setFilters] = useState<Omit<QueryServiceDto, 'page' | 'limit'>>({
-    search: '',
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filters, setFilters] = useState<
+    Omit<QueryServiceDto, "page" | "limit">
+  >({
+    search: "",
     categoryId: undefined,
     status: undefined,
     isCombo: undefined,
@@ -157,23 +166,29 @@ export default function ServicesPage() {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [openDialog, setOpenDialog] = useState(false);
-  const [dialogMode, setDialogMode] = useState<'add' | 'edit' | 'view'>('add');
+  const [dialogMode, setDialogMode] = useState<"add" | "edit" | "view">("add");
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' } | null>(null);
-  const [validationErrors, setValidationErrors] = useState<Partial<Record<keyof ServiceFormData, string>>>({});
+  const [snackbar, setSnackbar] = useState<{
+    open: boolean;
+    message: string;
+    severity: "success" | "error";
+  } | null>(null);
+  const [validationErrors, setValidationErrors] = useState<
+    Partial<Record<keyof ServiceFormData, string>>
+  >({});
   const [loading, setLoading] = useState(false);
   const [showDetail, setShowDetail] = useState(false);
 
   const initialFormData: ServiceFormData = {
-    name: '',
-    categoryId: '',
-    description: '',
-    durationMinutes: '',
-    price: '',
-    discountPrice: '',
-    imageUrl: '',
+    name: "",
+    categoryId: "",
+    description: "",
+    durationMinutes: "",
+    price: "",
+    discountPrice: "",
+    imageUrl: "",
     isCombo: false,
-    status: 'active',
+    status: "active",
   };
 
   const [formData, setFormData] = useState<ServiceFormData>(initialFormData);
@@ -181,41 +196,54 @@ export default function ServicesPage() {
     const errors: Partial<Record<keyof ServiceFormData, string>> = {};
 
     if (!formData.name.trim()) {
-      errors.name = 'Service Name is required.';
+      errors.name = "Service Name is required.";
     }
 
     const duration = parseFloat(formData.durationMinutes);
-    if (!formData.durationMinutes || isNaN(duration) || duration <= 0 || !Number.isInteger(duration)) {
-      errors.durationMinutes = 'Duration must be a positive whole number (minutes).';
+    if (
+      !formData.durationMinutes ||
+      isNaN(duration) ||
+      duration <= 0 ||
+      !Number.isInteger(duration)
+    ) {
+      errors.durationMinutes =
+        "Duration must be a positive whole number (minutes).";
     }
 
     const price = parseFloat(formData.price);
     if (!formData.price || isNaN(price) || price <= 0) {
-      errors.price = 'Price must be a positive number.';
+      errors.price = "Price must be a positive number.";
     }
 
     if (!formData.categoryId) {
-      errors.categoryId = 'Category is required.';
+      errors.categoryId = "Category is required.";
     }
 
-    const discountPrice = formData.discountPrice ? parseFloat(formData.discountPrice) : null;
+    const discountPrice = formData.discountPrice
+      ? parseFloat(formData.discountPrice)
+      : null;
     if (discountPrice !== null && isNaN(discountPrice)) {
-      errors.discountPrice = 'Invalid discount price.';
+      errors.discountPrice = "Invalid discount price.";
     } else if (discountPrice !== null && discountPrice >= price) {
-      errors.discountPrice = 'Discount price must be less than the regular price.';
+      errors.discountPrice =
+        "Discount price must be less than the regular price.";
     } else if (discountPrice !== null && discountPrice < 0) {
-      errors.discountPrice = 'Discount price cannot be negative.';
+      errors.discountPrice = "Discount price cannot be negative.";
     }
 
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
   };
 
-  const { data: categories = [], isLoading: isLoadingCategories, error: categoriesError } = useQuery({
-    queryKey: ['activeServiceCategories'],
+  const {
+    data: categories = [],
+    isLoading: isLoadingCategories,
+    error: categoriesError,
+  } = useQuery({
+    queryKey: ["activeServiceCategories"],
     queryFn: async () => {
       const result = await getActiveServiceCategories();
-      console.log('Categories loaded:', result); // Debug
+      console.log("Categories loaded:", result); // Debug
       return result;
     },
   });
@@ -225,8 +253,9 @@ export default function ServicesPage() {
     isLoading: isLoadingServices,
     isError,
   } = useQuery<PaginatedServices>({
-    queryKey: ['services', page, rowsPerPage, filters],
-    queryFn: () => getServices({ ...filters, page: page + 1, limit: rowsPerPage }),
+    queryKey: ["services", page, rowsPerPage, filters],
+    queryFn: () =>
+      getServices({ ...filters, page: page + 1, limit: rowsPerPage }),
     placeholderData: (previousData) => previousData,
   });
 
@@ -237,53 +266,86 @@ export default function ServicesPage() {
 
   const totalServices = paginatedServices?.total ?? 0;
 
+  const handleBack = () => {
+    setShowDetail(false);
+    setSelectedService(null);
+  };
+
   const createMutation = useMutation({
     mutationFn: createService,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['services'] });
-      setSnackbar({ open: true, message: 'Service created successfully!', severity: 'success' });
-      handleDialogClose();
+      queryClient.invalidateQueries({ queryKey: ["services"] });
+      setSnackbar({
+        open: true,
+        message: "Service created successfully!",
+        severity: "success",
+      });
+      handleBack();
     },
     onError: (error: Error) => {
-      setSnackbar({ open: true, message: `Error: ${error.message}`, severity: 'error' });
-    }
+      setSnackbar({
+        open: true,
+        message: `Error: ${error.message}`,
+        severity: "error",
+      });
+    },
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: UpdateServiceDto }) => updateService(id, data),
+    mutationFn: ({ id, data }: { id: number; data: UpdateServiceDto }) =>
+      updateService(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['services'] });
-      setSnackbar({ open: true, message: 'Service updated successfully!', severity: 'success' });
-      handleDialogClose();
+      queryClient.invalidateQueries({ queryKey: ["services"] });
+      setSnackbar({
+        open: true,
+        message: "Service updated successfully!",
+        severity: "success",
+      });
+      handleBack();
     },
     onError: (error: Error) => {
-      setSnackbar({ open: true, message: `Error: ${error.message}`, severity: 'error' });
-    }
+      setSnackbar({
+        open: true,
+        message: `Error: ${error.message}`,
+        severity: "error",
+      });
+    },
   });
 
   const deleteMutation = useMutation({
     mutationFn: deleteService,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['services'] });
-      setSnackbar({ open: true, message: 'Service deleted successfully!', severity: 'success' });
+      queryClient.invalidateQueries({ queryKey: ["services"] });
+      setSnackbar({
+        open: true,
+        message: "Service deleted successfully!",
+        severity: "success",
+      });
       setDeleteConfirmOpen(false);
       setSelectedService(null);
     },
     onError: (error: Error) => {
-      setSnackbar({ open: true, message: `Error: ${error.message}`, severity: 'error' });
-    }
+      setSnackbar({
+        open: true,
+        message: `Error: ${error.message}`,
+        severity: "error",
+      });
+    },
   });
 
-  const handleFilterChange = <K extends keyof typeof filters>(key: K, value: (typeof filters)[K] | 'all') => {
-    setFilters(prev => ({
+  const handleFilterChange = <K extends keyof typeof filters>(
+    key: K,
+    value: (typeof filters)[K] | "all"
+  ) => {
+    setFilters((prev) => ({
       ...prev,
-      [key]: value === 'all' ? undefined : value,
+      [key]: value === "all" ? undefined : value,
     }));
     setPage(0);
   };
 
   const handleSearch = () => {
-    setFilters(prev => ({ ...prev, search: searchQuery }));
+    setFilters((prev) => ({ ...prev, search: searchQuery }));
     setPage(0);
   };
 
@@ -299,13 +361,19 @@ export default function ServicesPage() {
 
     return {
       total: totalServices,
-      active: services.filter((s) => s.status === 'active').length,
+      active: services.filter((s) => s.status === "active").length,
       combo: services.filter((s) => s.isCombo).length,
-      totalRevenue: services.reduce((sum, s) => sum + (Number(s.price) || 0), 0),
+      totalRevenue: services.reduce(
+        (sum, s) => sum + (Number(s.price) || 0),
+        0
+      ),
     };
   }, [services, totalServices]);
 
-  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, service: Service) => {
+  const handleMenuOpen = (
+    event: React.MouseEvent<HTMLElement>,
+    service: Service
+  ) => {
     setAnchorEl(event.currentTarget);
     setSelectedService(service);
   };
@@ -315,46 +383,42 @@ export default function ServicesPage() {
   };
 
   const handleAddNew = () => {
-    setDialogMode('add');
+    setDialogMode("add");
     setSelectedService(null);
     setShowDetail(true);
   };
 
   const handleEdit = (service: Service) => {
     setSelectedService(service);
-    setDialogMode('edit');
+    setDialogMode("edit");
     setShowDetail(true);
     handleMenuClose();
   };
 
   const handleView = () => {
     if (selectedService) {
-      setDialogMode('view');
+      setDialogMode("view");
       setShowDetail(true);
     }
     handleMenuClose();
-  };
-  const handleBack = () => {
-    setShowDetail(false);
-    setSelectedService(null);
   };
 
   const handleDelete = () => {
     setDeleteConfirmOpen(true);
     handleMenuClose();
   };
-  const handleSave = async (submissionData: CreateServiceDto | UpdateServiceDto) => {
+  const handleSave = async (
+    submissionData: CreateServiceDto | UpdateServiceDto
+  ) => {
     try {
-      if (dialogMode === 'add') {
+      if (dialogMode === "add") {
         await createMutation.mutateAsync(submissionData as CreateServiceDto);
-      } else if (dialogMode === 'edit' && selectedService) {
-
+      } else if (dialogMode === "edit" && selectedService) {
         await updateMutation.mutateAsync({
           id: selectedService.id,
-          data: submissionData as UpdateServiceDto
+          data: submissionData as UpdateServiceDto,
         });
       }
-      setShowDetail(false);
     } catch (error) {
       console.error("Failed to save service:", error);
     }
@@ -384,23 +448,21 @@ export default function ServicesPage() {
     setFormData(initialFormData);
   };
 
-  const handleFormChange = (field: keyof ServiceFormData) => (
-    event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => {
-    setFormData({ ...formData, [field]: event.target.value });
-  };
-  const handleSelectChange = (field: keyof ServiceFormData) => (
-    event: SelectChangeEvent
-  ) => {
-    setFormData({ ...formData, [field]: event.target.value });
-  };
+  const handleFormChange =
+    (field: keyof ServiceFormData) =>
+    (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      setFormData({ ...formData, [field]: event.target.value });
+    };
+  const handleSelectChange =
+    (field: keyof ServiceFormData) => (event: SelectChangeEvent) => {
+      setFormData({ ...formData, [field]: event.target.value });
+    };
 
-
-  const handleSwitchChange = (field: keyof ServiceFormData) => (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    setFormData({ ...formData, [field]: event.target.checked });
-  };
+  const handleSwitchChange =
+    (field: keyof ServiceFormData) =>
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      setFormData({ ...formData, [field]: event.target.checked });
+    };
 
   const handleSubmit = () => {
     const submissionData: CreateServiceDto | UpdateServiceDto = {
@@ -408,16 +470,20 @@ export default function ServicesPage() {
       description: formData.description || undefined,
       durationMinutes: parseInt(formData.durationMinutes),
       price: parseFloat(formData.price),
-      discountPrice: formData.discountPrice ? parseFloat(formData.discountPrice) : undefined,
+      discountPrice: formData.discountPrice
+        ? parseFloat(formData.discountPrice)
+        : undefined,
       imageUrl: formData.imageUrl || undefined,
       isCombo: formData.isCombo,
       status: formData.status,
-      categoryId: formData.categoryId ? parseInt(formData.categoryId) : undefined,
+      categoryId: formData.categoryId
+        ? parseInt(formData.categoryId)
+        : undefined,
     };
 
-    if (dialogMode === 'add') {
+    if (dialogMode === "add") {
       createMutation.mutate(submissionData as CreateServiceDto);
-    } else if (dialogMode === 'edit' && selectedService) {
+    } else if (dialogMode === "edit" && selectedService) {
       updateMutation.mutate({ id: selectedService.id, data: submissionData });
     }
   };
@@ -426,7 +492,9 @@ export default function ServicesPage() {
     setPage(newPage);
   };
 
-  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChangeRowsPerPage = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
     setRowsPerPage(parseInt(event.target.value, 10));
     setPage(0);
   };
@@ -437,7 +505,7 @@ export default function ServicesPage() {
     updateMutation.isPending ||
     deleteMutation.isPending;
   return (
-    <>
+     <ThemeProvider theme={blueTheme}>
       <Backdrop
         sx={{ color: "#fff", zIndex: (theme) => theme.zIndex.drawer + 1 }}
         open={isAnyLoading}
@@ -459,16 +527,32 @@ export default function ServicesPage() {
         <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
           <Card>
             <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
                 <Box>
-                  <Typography color="text.secondary" variant="body2" gutterBottom>
+                  <Typography
+                    color="text.secondary"
+                    variant="body2"
+                    gutterBottom
+                  >
                     Total Services
                   </Typography>
                   <Typography variant="h4" fontWeight="bold">
                     {stats.total}
                   </Typography>
                 </Box>
-                <Avatar sx={{ bgcolor: alpha(PRIMARY_COLOR, 0.1), width: 56, height: 56 }}>
+                <Avatar
+                  sx={{
+                    bgcolor: alpha(PRIMARY_COLOR, 0.1),
+                    width: 56,
+                    height: 56,
+                  }}
+                >
                   <Spa sx={{ color: PRIMARY_COLOR, fontSize: 28 }} />
                 </Avatar>
               </Box>
@@ -478,16 +562,32 @@ export default function ServicesPage() {
         <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
           <Card>
             <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
                 <Box>
-                  <Typography color="text.secondary" variant="body2" gutterBottom>
+                  <Typography
+                    color="text.secondary"
+                    variant="body2"
+                    gutterBottom
+                  >
                     Active Services
                   </Typography>
                   <Typography variant="h4" fontWeight="bold">
                     {stats.active}
                   </Typography>
                 </Box>
-                <Avatar sx={{ bgcolor: alpha(SUCCESS_COLOR, 0.1), width: 56, height: 56 }}>
+                <Avatar
+                  sx={{
+                    bgcolor: alpha(SUCCESS_COLOR, 0.1),
+                    width: 56,
+                    height: 56,
+                  }}
+                >
                   <CheckCircle sx={{ color: SUCCESS_COLOR, fontSize: 28 }} />
                 </Avatar>
               </Box>
@@ -497,16 +597,32 @@ export default function ServicesPage() {
         <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
           <Card>
             <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
                 <Box>
-                  <Typography color="text.secondary" variant="body2" gutterBottom>
+                  <Typography
+                    color="text.secondary"
+                    variant="body2"
+                    gutterBottom
+                  >
                     Combo Packages
                   </Typography>
                   <Typography variant="h4" fontWeight="bold">
                     {stats.combo}
                   </Typography>
                 </Box>
-                <Avatar sx={{ bgcolor: alpha(PURPLE_COLOR, 0.1), width: 56, height: 56 }}>
+                <Avatar
+                  sx={{
+                    bgcolor: alpha(PURPLE_COLOR, 0.1),
+                    width: 56,
+                    height: 56,
+                  }}
+                >
                   <Inventory sx={{ color: PURPLE_COLOR, fontSize: 28 }} />
                 </Avatar>
               </Box>
@@ -535,15 +651,15 @@ export default function ServicesPage() {
       </Grid>
 
       {/* Actions Bar */}
-      <Card sx={{ mb: 3}}>
-        <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
+      <Card sx={{ mb: 3 }}>
+        <CardContent sx={{ py: 1.5, "&:last-child": { pb: 1.5 } }}>
           <Stack direction="row" alignItems="center" flexWrap="wrap" gap={1.5}>
             <TextField
               size="small"
               placeholder="Search services..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+              onKeyPress={(e) => e.key === "Enter" && handleSearch()}
               sx={{ flex: 1, minWidth: 200 }}
               InputProps={{
                 startAdornment: (
@@ -559,27 +675,36 @@ export default function ServicesPage() {
             <FormControl sx={{ minWidth: 150 }} size="small">
               <InputLabel>Category</InputLabel>
               <Select
-                value={filters.categoryId?.toString() || 'all'}
+                value={filters.categoryId?.toString() || "all"}
                 label="Category"
                 onChange={(e: SelectChangeEvent) =>
-                  handleFilterChange('categoryId', e.target.value === 'all' ? 'all' : Number(e.target.value))
+                  handleFilterChange(
+                    "categoryId",
+                    e.target.value === "all" ? "all" : Number(e.target.value)
+                  )
                 }
               >
                 <MenuItem value="all">All Categories</MenuItem>
-                {Array.isArray(categories) && categories.map((category: ServiceCategory) => (
-                  <MenuItem key={category.id} value={category.id}>
-                    {category.name}
-                  </MenuItem>
-                ))}
+                {Array.isArray(categories) &&
+                  categories.map((category: ServiceCategory) => (
+                    <MenuItem key={category.id} value={category.id}>
+                      {category.name}
+                    </MenuItem>
+                  ))}
               </Select>
             </FormControl>
 
             <FormControl sx={{ minWidth: 120 }} size="small">
               <InputLabel>Status</InputLabel>
               <Select
-                value={filters.status || 'all'}
+                value={filters.status || "all"}
                 label="Status"
-                onChange={(e: SelectChangeEvent<unknown>) => handleFilterChange('status', e.target.value as ServiceStatus | 'all')}
+                onChange={(e: SelectChangeEvent<unknown>) =>
+                  handleFilterChange(
+                    "status",
+                    e.target.value as ServiceStatus | "all"
+                  )
+                }
               >
                 <MenuItem value="all">All Status</MenuItem>
                 <MenuItem value="active">Active</MenuItem>
@@ -590,9 +715,18 @@ export default function ServicesPage() {
             <FormControl sx={{ minWidth: 120 }} size="small">
               <InputLabel>Type</InputLabel>
               <Select
-                value={filters.isCombo === undefined ? 'all' : String(filters.isCombo)}
+                value={
+                  filters.isCombo === undefined
+                    ? "all"
+                    : String(filters.isCombo)
+                }
                 label="Type"
-                onChange={(e: SelectChangeEvent<unknown>) => handleFilterChange('isCombo', e.target.value === 'all' ? 'all' : e.target.value === 'true')}
+                onChange={(e: SelectChangeEvent<unknown>) =>
+                  handleFilterChange(
+                    "isCombo",
+                    e.target.value === "all" ? "all" : e.target.value === "true"
+                  )
+                }
               >
                 <MenuItem value="all">All Types</MenuItem>
                 <MenuItem value="true">Combo Packages</MenuItem>
@@ -608,17 +742,17 @@ export default function ServicesPage() {
               sx={{
                 height: 40,
                 bgcolor: PRIMARY_COLOR,
-                '&:hover': { bgcolor: PRIMARY_DARK },
-                textTransform: 'none',
+                "&:hover": { bgcolor: PRIMARY_DARK },
+                textTransform: "none",
                 fontWeight: 600,
-                px: 3
+                px: 3,
               }}
             >
               Add New Service
             </Button>
           </Stack>
         </CardContent>
-      </Card> 
+      </Card>
 
       {/* Services Table */}
       <Card>
@@ -650,11 +784,13 @@ export default function ServicesPage() {
                   <TableRow
                     key={service.id}
                     sx={{
-                      '&:hover': { bgcolor: alpha(PRIMARY_COLOR, 0.02) },
+                      "&:hover": { bgcolor: alpha(PRIMARY_COLOR, 0.02) },
                     }}
                   >
                     <TableCell>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                      <Box
+                        sx={{ display: "flex", alignItems: "center", gap: 1.5 }}
+                      >
                         <Avatar
                           src={service.imageUrl || undefined}
                           sx={{
@@ -671,7 +807,12 @@ export default function ServicesPage() {
                             {service.name}
                           </Typography>
                           {service.description && (
-                            <Typography variant="caption" color="text.secondary" noWrap sx={{ maxWidth: 200, display: 'block' }}>
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                              noWrap
+                              sx={{ maxWidth: 200, display: "block" }}
+                            >
                               {service.description}
                             </Typography>
                           )}
@@ -680,7 +821,7 @@ export default function ServicesPage() {
                     </TableCell>
                     <TableCell>
                       <Chip
-                        label={service.category?.name || 'N/A'}
+                        label={service.category?.name || "N/A"}
                         size="small"
                         sx={{
                           bgcolor: alpha(INFO_COLOR, 0.1),
@@ -690,8 +831,12 @@ export default function ServicesPage() {
                       />
                     </TableCell>
                     <TableCell>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        <Schedule sx={{ fontSize: 16, color: 'text.secondary' }} />
+                      <Box
+                        sx={{ display: "flex", alignItems: "center", gap: 0.5 }}
+                      >
+                        <Schedule
+                          sx={{ fontSize: 16, color: "text.secondary" }}
+                        />
                         <Typography variant="body2" fontWeight="600">
                           {formatDuration(service.durationMinutes)}
                         </Typography>
@@ -705,11 +850,18 @@ export default function ServicesPage() {
                     <TableCell>
                       {service.discountPrice ? (
                         <Box>
-                          <Typography variant="body2" fontWeight="600" color={SUCCESS_COLOR}>
+                          <Typography
+                            variant="body2"
+                            fontWeight="600"
+                            color={SUCCESS_COLOR}
+                          >
                             {formatCurrency(service.discountPrice)}
                           </Typography>
                           <Typography variant="caption" color="text.secondary">
-                            Save {formatCurrency(service.price - service.discountPrice)}
+                            Save{" "}
+                            {formatCurrency(
+                              service.price - service.discountPrice
+                            )}
                           </Typography>
                         </Box>
                       ) : (
@@ -720,10 +872,15 @@ export default function ServicesPage() {
                     </TableCell>
                     <TableCell>
                       <Chip
-                        label={service.isCombo ? 'Combo Package' : 'Single Service'}
+                        label={
+                          service.isCombo ? "Combo Package" : "Single Service"
+                        }
                         size="small"
                         sx={{
-                          bgcolor: alpha(service.isCombo ? PURPLE_COLOR : PRIMARY_COLOR, 0.1),
+                          bgcolor: alpha(
+                            service.isCombo ? PURPLE_COLOR : PRIMARY_COLOR,
+                            0.1
+                          ),
                           color: service.isCombo ? PURPLE_COLOR : PRIMARY_COLOR,
                           fontWeight: 600,
                         }}
@@ -744,18 +901,20 @@ export default function ServicesPage() {
                       <Button
                         variant="contained"
                         size="small"
-                        startIcon={<Edit sx={{ fontSize: '18px !important' }} />}
+                        startIcon={
+                          <Edit sx={{ fontSize: "18px !important" }} />
+                        }
                         onClick={() => handleEdit(service)}
                         sx={{
-                          bgcolor: '#f39c12',
-                          '&:hover': { bgcolor: '#e67e22' },
-                          textTransform: 'none',
+                          bgcolor: "#f39c12",
+                          "&:hover": { bgcolor: "#e67e22" },
+                          textTransform: "none",
                           fontWeight: 600,
-                          borderRadius: '6px',
+                          borderRadius: "6px",
                           px: 2,
-                          minWidth: '80px',
-                          boxShadow: 'none',
-                          height: '32px'
+                          minWidth: "80px",
+                          boxShadow: "none",
+                          height: "32px",
                         }}
                       >
                         Edit
@@ -766,15 +925,24 @@ export default function ServicesPage() {
               ) : (
                 <TableRow>
                   <TableCell colSpan={8}>
-                    <Box sx={{ textAlign: 'center', py: 6 }}>
-                      <Spa sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }} />
-                      <Typography variant="h6" color="text.secondary" gutterBottom>
+                    <Box sx={{ textAlign: "center", py: 6 }}>
+                      <Spa
+                        sx={{ fontSize: 64, color: "text.disabled", mb: 2 }}
+                      />
+                      <Typography
+                        variant="h6"
+                        color="text.secondary"
+                        gutterBottom
+                      >
                         No services found
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
-                        {filters.search || filters.categoryId || filters.status || filters.isCombo !== undefined
-                          ? 'Try adjusting your search or filters'
-                          : 'Get started by adding your first service'}
+                        {filters.search ||
+                        filters.categoryId ||
+                        filters.status ||
+                        filters.isCombo !== undefined
+                          ? "Try adjusting your search or filters"
+                          : "Get started by adding your first service"}
                       </Typography>
                     </Box>
                   </TableCell>
@@ -794,22 +962,27 @@ export default function ServicesPage() {
         />
       </Card>
 
-
-
       {/* Add/Edit Dialog */}
-      <Dialog open={openDialog} onClose={handleDialogClose} maxWidth="md" fullWidth>
+      <Dialog
+        open={openDialog}
+        onClose={handleDialogClose}
+        maxWidth="md"
+        fullWidth
+      >
         <DialogTitle>
-          {dialogMode === 'add'
-            ? 'Add New Service'
-            : dialogMode === 'edit'
-              ? 'Edit Service'
-              : 'Service Details'}
+          {dialogMode === "add"
+            ? "Add New Service"
+            : dialogMode === "edit"
+            ? "Edit Service"
+            : "Service Details"}
         </DialogTitle>
         <DialogContent dividers>
-          {dialogMode === 'view' && selectedService ? (
+          {dialogMode === "view" && selectedService ? (
             <Grid container spacing={3} sx={{ mt: 0.5 }}>
               <Grid size={{ xs: 12 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
+                <Box
+                  sx={{ display: "flex", alignItems: "center", gap: 2, mb: 3 }}
+                >
                   <Avatar
                     src={selectedService.imageUrl || undefined}
                     sx={{
@@ -825,20 +998,34 @@ export default function ServicesPage() {
                     <Typography variant="h5" fontWeight="bold">
                       {selectedService.name}
                     </Typography>
-                    <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
+                    <Box sx={{ display: "flex", gap: 1, mt: 1 }}>
                       <Chip
-                        label={selectedService.isCombo ? 'Combo Package' : 'Single Service'}
+                        label={
+                          selectedService.isCombo
+                            ? "Combo Package"
+                            : "Single Service"
+                        }
                         size="small"
                         sx={{
-                          bgcolor: alpha(selectedService.isCombo ? PURPLE_COLOR : PRIMARY_COLOR, 0.1),
-                          color: selectedService.isCombo ? PURPLE_COLOR : PRIMARY_COLOR,
+                          bgcolor: alpha(
+                            selectedService.isCombo
+                              ? PURPLE_COLOR
+                              : PRIMARY_COLOR,
+                            0.1
+                          ),
+                          color: selectedService.isCombo
+                            ? PURPLE_COLOR
+                            : PRIMARY_COLOR,
                         }}
                       />
                       <Chip
                         label={getStatusLabel(selectedService.status)}
                         size="small"
                         sx={{
-                          bgcolor: alpha(getStatusColor(selectedService.status), 0.1),
+                          bgcolor: alpha(
+                            getStatusColor(selectedService.status),
+                            0.1
+                          ),
                           color: getStatusColor(selectedService.status),
                         }}
                       />
@@ -850,7 +1037,9 @@ export default function ServicesPage() {
                 <Typography variant="caption" color="text.secondary">
                   Category
                 </Typography>
-                <Typography variant="body1">{selectedService.category?.name || 'N/A'}</Typography>
+                <Typography variant="body1">
+                  {selectedService.category?.name || "N/A"}
+                </Typography>
               </Grid>
               <Grid size={{ xs: 12, sm: 6 }}>
                 <Typography variant="caption" color="text.secondary">
@@ -872,11 +1061,14 @@ export default function ServicesPage() {
                 <Typography variant="caption" color="text.secondary">
                   Discount Price
                 </Typography>
-                <Typography variant="body1" color={SUCCESS_COLOR} fontWeight="600">
+                <Typography
+                  variant="body1"
+                  color={SUCCESS_COLOR}
+                  fontWeight="600"
+                >
                   {selectedService.discountPrice
                     ? formatCurrency(selectedService.discountPrice)
-                    : 'No discount'
-                  }
+                    : "No discount"}
                 </Typography>
               </Grid>
               {selectedService.description && (
@@ -884,7 +1076,7 @@ export default function ServicesPage() {
                   <Typography variant="caption" color="text.secondary">
                     Description
                   </Typography>
-                  <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
+                  <Typography variant="body1" sx={{ whiteSpace: "pre-wrap" }}>
                     {selectedService.description}
                   </Typography>
                 </Grid>
@@ -913,9 +1105,9 @@ export default function ServicesPage() {
                   fullWidth
                   label="Service Name"
                   value={formData.name}
-                  onChange={handleFormChange('name')}
+                  onChange={handleFormChange("name")}
                   required
-                  disabled={dialogMode === 'view'}
+                  disabled={dialogMode === "view"}
                 />
               </Grid>
               <Grid size={{ xs: 12, sm: 6 }}>
@@ -929,7 +1121,7 @@ export default function ServicesPage() {
                   <Select
                     value={formData.categoryId}
                     label="Category"
-                    onChange={handleSelectChange('categoryId')}
+                    onChange={handleSelectChange("categoryId")}
                   >
                     {isLoadingCategories ? (
                       <MenuItem disabled>Loading...</MenuItem>
@@ -937,13 +1129,20 @@ export default function ServicesPage() {
                       <MenuItem disabled>No categories</MenuItem>
                     ) : (
                       categories.map((category: ServiceCategory) => (
-                        <MenuItem key={category.id} value={category.id.toString()}>
+                        <MenuItem
+                          key={category.id}
+                          value={category.id.toString()}
+                        >
                           {category.name}
                         </MenuItem>
                       ))
                     )}
                   </Select>
-                  {validationErrors.categoryId && <FormHelperText>{validationErrors.categoryId}</FormHelperText>}
+                  {validationErrors.categoryId && (
+                    <FormHelperText>
+                      {validationErrors.categoryId}
+                    </FormHelperText>
+                  )}
                 </FormControl>
               </Grid>
               <Grid size={{ xs: 12, sm: 6 }}>
@@ -952,9 +1151,9 @@ export default function ServicesPage() {
                   label="Duration (minutes)"
                   type="number"
                   value={formData.durationMinutes}
-                  onChange={handleFormChange('durationMinutes')}
+                  onChange={handleFormChange("durationMinutes")}
                   required
-                  disabled={dialogMode === 'view'}
+                  disabled={dialogMode === "view"}
                   InputProps={{
                     endAdornment: (
                       <InputAdornment position="end">minutes</InputAdornment>
@@ -968,13 +1167,13 @@ export default function ServicesPage() {
                   label="Price"
                   type="number"
                   value={formData.price}
-                  onChange={handleFormChange('price')}
+                  onChange={handleFormChange("price")}
                   required
-                  disabled={dialogMode === 'view'}
+                  disabled={dialogMode === "view"}
                   InputProps={{
                     startAdornment: (
                       <InputAdornment position="start">
-                        <AttachMoney sx={{ color: 'text.secondary' }} />
+                        <AttachMoney sx={{ color: "text.secondary" }} />
                       </InputAdornment>
                     ),
                   }}
@@ -986,12 +1185,12 @@ export default function ServicesPage() {
                   label="Discount Price"
                   type="number"
                   value={formData.discountPrice}
-                  onChange={handleFormChange('discountPrice')}
-                  disabled={dialogMode === 'view'}
+                  onChange={handleFormChange("discountPrice")}
+                  disabled={dialogMode === "view"}
                   InputProps={{
                     startAdornment: (
                       <InputAdornment position="start">
-                        <Discount sx={{ color: 'text.secondary' }} />
+                        <Discount sx={{ color: "text.secondary" }} />
                       </InputAdornment>
                     ),
                   }}
@@ -1004,8 +1203,8 @@ export default function ServicesPage() {
                   multiline
                   rows={3}
                   value={formData.description}
-                  onChange={handleFormChange('description')}
-                  disabled={dialogMode === 'view'}
+                  onChange={handleFormChange("description")}
+                  disabled={dialogMode === "view"}
                   placeholder="Describe the service in detail..."
                 />
               </Grid>
@@ -1014,12 +1213,12 @@ export default function ServicesPage() {
                   fullWidth
                   label="Image URL"
                   value={formData.imageUrl}
-                  onChange={handleFormChange('imageUrl')}
-                  disabled={dialogMode === 'view'}
+                  onChange={handleFormChange("imageUrl")}
+                  disabled={dialogMode === "view"}
                   InputProps={{
                     startAdornment: (
                       <InputAdornment position="start">
-                        <ImageIcon sx={{ color: 'text.secondary' }} />
+                        <ImageIcon sx={{ color: "text.secondary" }} />
                       </InputAdornment>
                     ),
                   }}
@@ -1030,20 +1229,20 @@ export default function ServicesPage() {
                   control={
                     <Switch
                       checked={formData.isCombo}
-                      onChange={handleSwitchChange('isCombo')}
-                      disabled={dialogMode === 'view'}
+                      onChange={handleSwitchChange("isCombo")}
+                      disabled={dialogMode === "view"}
                     />
                   }
                   label="Combo Package"
                 />
               </Grid>
               <Grid size={{ xs: 12, sm: 6 }}>
-                <FormControl fullWidth disabled={dialogMode === 'view'}>
+                <FormControl fullWidth disabled={dialogMode === "view"}>
                   <InputLabel>Status</InputLabel>
                   <Select
                     value={formData.status}
                     label="Status"
-                    onChange={handleSelectChange('status')}
+                    onChange={handleSelectChange("status")}
                   >
                     <MenuItem value="active">Active</MenuItem>
                     <MenuItem value="inactive">Inactive</MenuItem>
@@ -1054,7 +1253,7 @@ export default function ServicesPage() {
           )}
         </DialogContent>
         <DialogActions>
-          {dialogMode !== 'view' && (
+          {dialogMode !== "view" && (
             <>
               <Button onClick={handleDialogClose}>Cancel</Button>
               <Button
@@ -1063,21 +1262,30 @@ export default function ServicesPage() {
                 disabled={createMutation.isPending || updateMutation.isPending}
                 sx={{
                   bgcolor: PRIMARY_COLOR,
-                  '&:hover': { bgcolor: PRIMARY_DARK },
+                  "&:hover": { bgcolor: PRIMARY_DARK },
                 }}
               >
-                {createMutation.isPending || updateMutation.isPending ? <CircularProgress size={24} /> : (dialogMode === 'add' ? 'Add Service' : 'Save Changes')}
+                {createMutation.isPending || updateMutation.isPending ? (
+                  <CircularProgress size={24} />
+                ) : dialogMode === "add" ? (
+                  "Add Service"
+                ) : (
+                  "Save Changes"
+                )}
               </Button>
             </>
           )}
-          {dialogMode === 'view' && (
+          {dialogMode === "view" && (
             <Button onClick={handleDialogClose}>Close</Button>
           )}
         </DialogActions>
       </Dialog>
 
       {/* Delete Confirmation Dialog */}
-      <Dialog open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)}>
+      <Dialog
+        open={deleteConfirmOpen}
+        onClose={() => setDeleteConfirmOpen(false)}
+      >
         <DialogTitle>Confirm Delete</DialogTitle>
         <DialogContent>
           <Alert severity="warning" sx={{ mb: 2 }}>
@@ -1085,7 +1293,7 @@ export default function ServicesPage() {
             This action cannot be undone.
           </Alert>
           {selectedService && (
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 2 }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 2, mt: 2 }}>
               <Avatar
                 src={selectedService.imageUrl || undefined}
                 sx={{
@@ -1102,7 +1310,8 @@ export default function ServicesPage() {
                   {selectedService.name}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  {selectedService.category?.name} • {formatDuration(selectedService.durationMinutes)}
+                  {selectedService.category?.name} •{" "}
+                  {formatDuration(selectedService.durationMinutes)}
                 </Typography>
               </Box>
             </Box>
@@ -1114,9 +1323,13 @@ export default function ServicesPage() {
             onClick={confirmDelete}
             variant="contained"
             disabled={deleteMutation.isPending}
-            sx={{ bgcolor: ERROR_COLOR, '&:hover': { bgcolor: '#dc2626' } }}
+            sx={{ bgcolor: ERROR_COLOR, "&:hover": { bgcolor: "#dc2626" } }}
           >
-            {deleteMutation.isPending ? <CircularProgress size={24} /> : 'Delete Service'}
+            {deleteMutation.isPending ? (
+              <CircularProgress size={24} />
+            ) : (
+              "Delete Service"
+            )}
           </Button>
         </DialogActions>
       </Dialog>
@@ -1126,12 +1339,16 @@ export default function ServicesPage() {
         open={snackbar?.open}
         autoHideDuration={6000}
         onClose={() => setSnackbar(null)}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+        anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
       >
-        <Alert onClose={() => setSnackbar(null)} severity={snackbar?.severity} sx={{ width: '100%' }}>
+        <Alert
+          onClose={() => setSnackbar(null)}
+          severity={snackbar?.severity}
+          sx={{ width: "100%" }}
+        >
           {snackbar?.message}
         </Alert>
       </Snackbar>
-    </>
+    </ThemeProvider>
   );
 }

@@ -80,6 +80,12 @@ export class Booking {
   @Column({ type: 'text', nullable: true })
   notes: string;
 
+  @Column({ type: 'decimal', precision: 10, scale: 2, name: 'order_discount', nullable: true })
+  orderDiscount: number;
+
+  @Column({ type: 'varchar', length: 255, name: 'discount_reason', nullable: true })
+  discountReason: string;
+
   @Column({ type: 'boolean', default: false })
   confirm: boolean;
 

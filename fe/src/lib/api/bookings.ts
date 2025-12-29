@@ -6,6 +6,7 @@ import {
   BookingResponse,
   BookingFilters
 } from '@/types/booking';
+import { DiscountType } from '@/types/invoice';
 import api from './axios';
 
 interface CompleteServicePayload {
@@ -13,6 +14,7 @@ interface CompleteServicePayload {
   subtotal: number;
   totalAmount: number;
   discountAmount?: number;
+  discountType?: DiscountType;
   taxAmount?: number;
   notes?: string;
   paymentStatus: string;
@@ -77,6 +79,7 @@ export const startService = async (id: number) => {
 };
 
 export const completeService = async (id: number, invoiceData: CompleteServicePayload) => {
+
   const { data } = await api.patch(`${API_ENDPOINTS.BOOKINGS}/${id}/complete`, invoiceData);
   return data;
 };

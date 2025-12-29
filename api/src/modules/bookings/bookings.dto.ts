@@ -1,4 +1,4 @@
-// src/bookings/dto/booking.dto.ts
+
 import {
   IsNotEmpty,
   IsNumber,
@@ -17,27 +17,13 @@ import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { BookingStatus } from '../bookings/entities/booking.entity';
 import { NestedCreateInvoiceItemDto } from '../invoices/invoices.dto';
+import { DiscountType } from '../invoices/entities/invoice.entity';
 
 export class CreateBookingDto {
-  @ApiPropertyOptional({ example: 1 })
-  @IsOptional()
+  @ApiProperty({ example: 1 })
+  @IsNotEmpty()
   @IsNumber()
-  customerId?: number;
-
-  @ApiPropertyOptional({ example: 'John Doe' })
-  @IsOptional()
-  @IsString()
-  customerName?: string;
-
-  @ApiPropertyOptional({ example: '0123456789' })
-  @IsOptional()
-  @IsString()
-  customerPhone?: string;
-
-  @ApiPropertyOptional({ example: 'john@example.com' })
-  @IsOptional()
-  @IsEmail()
-  customerEmail?: string;
+  customerId: number;
 
   @ApiProperty({ example: 1 })
   @IsNotEmpty()
@@ -79,6 +65,16 @@ export class CreateBookingDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @ApiPropertyOptional({ example: 10000 })
+  @IsOptional()
+  @IsNumber()
+  orderDiscount?: number;
+
+  @ApiPropertyOptional({ example: 'VIP Customer' })
+  @IsOptional()
+  @IsString()
+  discountReason?: string;
 
   @ApiPropertyOptional({ example: false })
   @IsOptional()
@@ -136,7 +132,6 @@ export class QueryBookingDto {
   limit?: number = 10;
 }
 
-// --- DTOs for creating a booking order ---
 
 class CustomerForBookingDto {
   @ApiProperty({ maxLength: 100, example: 'Nguyễn Văn A' })
@@ -232,4 +227,49 @@ export class CreateBookingOrderDto {
   @ValidateNested()
   @Type(() => InvoiceDataDto)
   invoice: InvoiceDataDto;
+}
+
+export class CompleteServiceDto {
+  @ApiProperty({ example: 1 })
+  @IsNotEmpty()
+  @IsNumber()
+  storeId: number;
+
+  @ApiProperty()
+  @IsNumber()
+  subtotal: number;
+
+  @ApiProperty()
+  @IsNumber()
+  totalAmount: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  discountAmount?: number;
+
+  @ApiPropertyOptional({ enum: ['amount', 'percent'] })
+  @IsOptional()
+  @IsEnum(['amount', 'percent'])
+  discountType?: 'amount' | 'percent';
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  taxAmount?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  notes?: string;
+
+  @ApiProperty()
+  @IsString()
+  paymentStatus: string;
+
+  @ApiProperty({ type: () => [NestedCreateInvoiceItemDto] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => NestedCreateInvoiceItemDto)
+  items: NestedCreateInvoiceItemDto[];
 }

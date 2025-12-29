@@ -69,6 +69,14 @@ import {
 
 import { useAuth } from "@/lib/hooks/useAuth";
 import StaffDetail from "./StaffDetail";
+import { createTheme, ThemeProvider } from "@mui/material/styles";
+const blueTheme = createTheme({
+  palette: {
+    primary: {
+      main: "#3b82f6",
+    },
+  },
+});
 
 interface AxiosErrorResponse {
   response?: {
@@ -165,17 +173,12 @@ export default function StaffPage() {
           isActive: true,
         });
 
-        let stores: Store[] = [];
-        if (Array.isArray(response)) {
-          stores = response;
-          console.log("Store list loaded. Count:", stores.length);
+        if (response?.data?.data) {
+          setStoreList(response.data.data);
         } else {
-
           console.warn("Could not parse store data structure:", response);
-          stores = [];
+          setStoreList([]);
         }
-
-        setStoreList(stores);
       } catch (error) {
         console.error("Failed to load stores for dropdown", error);
         setStoreList([]);
@@ -522,7 +525,7 @@ export default function StaffPage() {
   };
 
   return (
-    <>
+     <ThemeProvider theme={blueTheme}>
       <Backdrop
         sx={{ color: "#fff", zIndex: (theme) => theme.zIndex.drawer + 1 }}
         open={loading}
@@ -959,6 +962,6 @@ export default function StaffPage() {
           {snackbar.message}
         </Alert>
       </Snackbar>
-    </>
+    </ThemeProvider>
   );
 }

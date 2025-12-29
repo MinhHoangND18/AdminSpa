@@ -90,6 +90,10 @@ export default function StaffDetail({
         if (!formData.phone) newErrors.phone = "Phone number is required";
         if (!formData.store_id) newErrors.store_id = "Store assignment is required";
         if (!formData.salary_type) newErrors.salary_type = "Salary type is required";
+        if (!formData.email) newErrors.email = "Email is required";
+        if (!formData.gender) newErrors.gender = "Gender is required";
+        if (!formData.address) newErrors.address = "Address is required";
+        if (!formData.hire_date) newErrors.hire_date = "Hire date is required";
 
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
@@ -97,7 +101,13 @@ export default function StaffDetail({
 
     const handleSave = () => {
         if (validate()) {
-            onSave(formData);
+            const submitData = {
+                ...formData,
+                store_id: formData.store_id ? Number(formData.store_id) : undefined,
+                base_salary: formData.base_salary ? Number(formData.base_salary) : 0,
+                commission_rate: formData.commission_rate ? Number(formData.commission_rate) : undefined,
+            };
+            onSave(submitData as StaffFormData);
         }
     };
 
@@ -188,17 +198,18 @@ export default function StaffDetail({
                                 <TextField
                                     fullWidth label="Email" type="email"
                                     value={formData.email} onChange={handleChange("email")}
-                                    disabled={isView}
+                                    disabled={isView} error={!!errors.email} helperText={errors.email}
                                 />
                             </Grid>
                             <Grid size={{ xs: 12, sm: 6 }}>
-                                <FormControl fullWidth disabled={isView}>
+                                <FormControl fullWidth disabled={isView} error={!!errors.gender}>
                                     <InputLabel>Gender</InputLabel>
                                     <Select value={formData.gender} label="Gender" onChange={handleChange("gender")}>
                                         <MenuItem value="male">Male</MenuItem>
                                         <MenuItem value="female">Female</MenuItem>
                                         <MenuItem value="other">Other</MenuItem>
                                     </Select>
+                                    {errors.gender && <FormHelperText>{errors.gender}</FormHelperText>}
                                 </FormControl>
                             </Grid>
                             <Grid size={{ xs: 12, sm: 6 }}>
@@ -227,7 +238,7 @@ export default function StaffDetail({
                                 <TextField
                                     fullWidth label="Address"
                                     value={formData.address} onChange={handleChange("address")}
-                                    disabled={isView}
+                                    disabled={isView} error={!!errors.address} helperText={errors.address}
                                 />
                             </Grid>
                         </Grid>
@@ -241,6 +252,7 @@ export default function StaffDetail({
                                     fullWidth label="Hire Date" type="date"
                                     value={formData.hire_date} onChange={handleChange("hire_date")}
                                     disabled={isView} InputLabelProps={{ shrink: true }}
+                                    error={!!errors.hire_date} helperText={errors.hire_date}
                                 />
                             </Grid>
                             <Grid size={{ xs: 12, sm: 6 }}>
@@ -251,6 +263,7 @@ export default function StaffDetail({
                                         <MenuItem value="hourly">Hourly Rate</MenuItem>
                                         <MenuItem value="commission">Commission</MenuItem>
                                     </Select>
+                                    {errors.salary_type && <FormHelperText>{errors.salary_type}</FormHelperText>}
                                 </FormControl>
                             </Grid>
                             <Grid size={{ xs: 12, sm: 6 }}>

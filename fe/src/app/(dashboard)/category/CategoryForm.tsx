@@ -65,6 +65,14 @@ import {
   PaginatedServiceCategories,
 } from '@/types';
 import CategoryDetail from './CategoryDetail';
+import { createTheme, ThemeProvider } from "@mui/material/styles";
+const blueTheme = createTheme({
+  palette: {
+    primary: {
+      main: "#3b82f6",
+    },
+  },
+});
 
 // Colors
 const PRIMARY_COLOR = '#3b82f6';
@@ -83,12 +91,20 @@ interface CategoryFormData {
   status: CategoryStatus;
 }
 
-const getStatusColor = (status: CategoryStatus) => {
-  return status === 'active' ? SUCCESS_COLOR : ERROR_COLOR;
+interface CategoryDetailFormData {
+  name: string;
+  slug: string;
+  description: string;
+  status: CategoryStatus;
+}
+
+
+const getStatusColor = (isActive: boolean) => {
+  return isActive ? SUCCESS_COLOR : ERROR_COLOR;
 };
 
-const getStatusLabel = (status: CategoryStatus) => {
-  return status === 'active' ? 'Active' : 'Inactive';
+const getStatusLabel = (isActive: boolean) => {
+  return isActive ? 'Active' : 'Inactive';
 };
 
 export default function CategoryForm() {
@@ -119,6 +135,12 @@ export default function CategoryForm() {
   };
 
   const [formData, setFormData] = useState<CategoryFormData>(initialFormData);
+
+  const handleDialogClose = () => {
+    setOpenDialog(false);
+    setFormData(initialFormData);
+    setValidationErrors({});
+  };
 
   const validateForm = () => {
     const errors: Partial<Record<keyof CategoryFormData, string>> = {};
@@ -261,13 +283,20 @@ export default function CategoryForm() {
     setDeleteConfirmOpen(true);
     handleMenuClose();
   };
-  const handleSave = async (data: CreateServiceCategoryDto | UpdateServiceCategoryDto) => {
+  const handleSave = async (data: CategoryDetailFormData) => {
+    const submissionData = {
+      name: data.name,
+      slug: data.slug,
+      description: data.description,
+      isActive: data.status === 'active',
+    };
+
     if (dialogMode === 'add') {
-      await createMutation.mutateAsync(data as CreateServiceCategoryDto);
+      await createMutation.mutateAsync(submissionData as CreateServiceCategoryDto);
     } else if (dialogMode === 'edit' && selectedCategory) {
       await updateMutation.mutateAsync({
         id: selectedCategory.id,
-        data: data as UpdateServiceCategoryDto
+        data: submissionData as UpdateServiceCategoryDto
       });
     }
     setShowDetail(false);
@@ -289,12 +318,6 @@ export default function CategoryForm() {
       />
     );
   }
-
-  const handleDialogClose = () => {
-    setOpenDialog(false);
-    setFormData(initialFormData);
-    setValidationErrors({});
-  };
 
   const handleFormChange = (field: keyof CategoryFormData) => (
     event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -343,7 +366,7 @@ export default function CategoryForm() {
     updateMutation.isPending ||
     deleteMutation.isPending;
   return (
-    <>
+       <ThemeProvider theme={blueTheme}>
 
       <Backdrop
         sx={{ color: "#fff", zIndex: (theme) => theme.zIndex.drawer + 1 }}
@@ -547,11 +570,11 @@ export default function CategoryForm() {
 
                     <TableCell>
                       <Chip
-                        label={getStatusLabel(category.status)}
+                        label={getStatusLabel(category.isActive)} 
                         size="small"
                         sx={{
-                          bgcolor: alpha(getStatusColor(category.status), 0.1),
-                          color: getStatusColor(category.status),
+                          bgcolor: alpha(getStatusColor(category.isActive), 0.1),
+                          color: getStatusColor(category.isActive),
                           fontWeight: 600,
                         }}
                       />
@@ -625,6 +648,6 @@ export default function CategoryForm() {
           {snackbar?.message}
         </Alert>
       </Snackbar>
-    </>
+    </ThemeProvider>
   );
 }
