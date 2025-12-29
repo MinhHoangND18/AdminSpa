@@ -326,7 +326,7 @@ export default function BookingDetail({
                                         onChange={(e) => setNote(e.target.value)}
                                         sx={{ "& fieldset": { borderRadius: 0 } }}
                                     />
-                                    <Button variant="contained" sx={{ bgcolor: "#3498db", borderRadius: 0, height: 40, }}>Save Note</Button>
+                                    <Button variant="contained" sx={{ bgcolor: "#3498db", borderRadius: 0, height: 40,whiteSpace: 'nowrap' }}>Save Note</Button>
                                 </Stack>
                             </Paper>
                         </Stack>
@@ -470,23 +470,39 @@ export default function BookingDetail({
                                     <Typography variant="caption" color="text.secondary" fontWeight={700}>PRICING DETAILS</Typography>
                                 </Grid>
                                 <Grid size={{ xs: 12, sm: 6 }}>
-                                    <TextField
+                                    <NumericFormat
+                                        customInput={TextField}
                                         fullWidth
                                         label="Unit Price (₫)"
-                                        type="number"
                                         size="small"
                                         value={currentItem.unitPrice}
-                                        onChange={(e) => setCurrentItem({ ...currentItem, unitPrice: Number(e.target.value) })}
+                                        thousandSeparator=","
+                                        onValueChange={(values) => {
+                                            setCurrentItem({ ...currentItem, unitPrice: values.floatValue || 0 });
+                                        }}
+                                        sx={{
+                                            '& .MuiOutlinedInput-root': {
+                                                borderRadius: 0,
+                                            }
+                                        }}
                                     />
                                 </Grid>
                                 <Grid size={{ xs: 12, sm: 6 }}>
-                                    <TextField
+                                    <NumericFormat
+                                        customInput={TextField}
                                         fullWidth
                                         label="Item Discount (₫)"
-                                        type="number"
                                         size="small"
                                         value={currentItem.discount}
-                                        onChange={(e) => setCurrentItem({ ...currentItem, discount: Number(e.target.value) })}
+                                        thousandSeparator=","
+                                        onValueChange={(values) => {
+                                            setCurrentItem({ ...currentItem, discount: values.floatValue || 0 });
+                                        }}
+                                        sx={{
+                                            '& .MuiOutlinedInput-root': {
+                                                borderRadius: 0,
+                                            }
+                                        }}
                                     />
                                 </Grid>
                                 <Grid size={{ xs: 12, sm: 6 }}>
@@ -528,7 +544,7 @@ export default function BookingDetail({
                 </DialogActions>
             </Dialog>
 
-            {/* Dialog cập nhật discount toàn đơn */}
+            {/* Dialog for updating order-wide discount */}
             <Dialog
                 open={discountDialogOpen}
                 onClose={() => setDiscountDialogOpen(false)}
@@ -553,7 +569,7 @@ export default function BookingDetail({
                     pb: 1.5,
                     pt: 2
                 }}>
-                    Cập nhật khuyến mãi
+                    Update Promotion
                     <IconButton
                         onClick={() => setDiscountDialogOpen(false)}
                         size="small"
@@ -567,7 +583,7 @@ export default function BookingDetail({
                     <Stack spacing={2}>
                         <Box>
                             <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                                Giá trị khuyến mại
+                                Promotion Value
                             </Typography>
                             <NumericFormat
                                 customInput={TextField}
@@ -589,7 +605,7 @@ export default function BookingDetail({
                                             ml: 1
                                         }}>
                                             <Typography variant="body2" fontWeight={600}>
-                                                đ
+                                                ₫
                                             </Typography>
                                         </Box>
                                     ),
@@ -604,12 +620,12 @@ export default function BookingDetail({
 
                         <Box>
                             <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                                Lý do
+                                Reason
                             </Typography>
                             <TextField
                                 fullWidth
                                 size="small"
-                                placeholder="Giảm giá sản phẩm, khách hàng thân thiết"
+                                placeholder="e.g., Product discount, loyal customer"
                                 value={tempDiscountReason}
                                 onChange={(e) => setTempDiscountReason(e.target.value)}
                                 multiline
@@ -631,7 +647,7 @@ export default function BookingDetail({
                         color="inherit"
                         sx={{ borderRadius: 0, px: 3 }}
                     >
-                        Đóng
+                        Close
                     </Button>
                     <Button
                         variant="contained"
@@ -646,7 +662,7 @@ export default function BookingDetail({
                             }
                         }}
                     >
-                        Cập nhật
+                        Update
                     </Button>
                 </DialogActions>
             </Dialog>

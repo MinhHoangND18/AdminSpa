@@ -213,10 +213,40 @@ export default function BookingsPage() {
     }
   };
 
+  const getStatusChipStyle = (status: BookingStatus) => {
+    let bgcolor = '';
+    let color = 'white'; 
+
+    switch (status) {
+      case BookingStatus.PENDING:
+        bgcolor = '#F59E0B';
+        break;
+      case BookingStatus.IN_PROGRESS:
+        bgcolor = '#8B5CF6';
+        break;
+      case BookingStatus.COMPLETED:
+        bgcolor = '#10B981';
+        break;
+      case BookingStatus.CANCELLED:
+        bgcolor = '#F44336';
+        break;
+      case BookingStatus.CONFIRMED:
+        bgcolor = INFO_COLOR; 
+        break;
+      case BookingStatus.NO_SHOW:
+        bgcolor = GRAY_COLOR; 
+        break;
+      default:
+        bgcolor = alpha(PRIMARY_COLOR, 0.1);
+        color = PRIMARY_COLOR;
+        break;
+    }
+    return { bgcolor, color, fontWeight: 600, borderRadius: 2 };
+  };
+
   return (
     <Box sx={{ p: 3, bgcolor: "#F8FAFC", minHeight: "100vh" }}>
 
-      {/* TABS */}
       <Paper elevation={0} sx={{ borderRadius: 0, mb: 3, border: "1px solid #E2E8F0", overflow: "hidden" }}>
         <Tabs
           value={currentTab}
@@ -373,7 +403,7 @@ export default function BookingsPage() {
                       <Chip
                         label={booking.status}
                         size="small"
-                        sx={{ bgcolor: alpha(PRIMARY_COLOR, 0.1), color: PRIMARY_COLOR, fontWeight: 600, borderRadius: 2 }}
+                        sx={getStatusChipStyle(booking.status)}
                       />
                     </TableCell>
                     <TableCell>
@@ -390,7 +420,7 @@ export default function BookingsPage() {
                 <TableRow sx={{ height: 400 }}>
                   <TableCell colSpan={7} align="center">
                     <ConfirmationNumber sx={{ fontSize: 48, color: "text.disabled", mb: 2 }} />
-                    <Typography color="text.secondary">Không tìm thấy lịch hẹn</Typography>
+                    <Typography color="text.secondary">No appointment found</Typography>
                   </TableCell>
                 </TableRow>
               )}

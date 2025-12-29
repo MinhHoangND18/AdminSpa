@@ -41,6 +41,7 @@ export default function InvoiceDetail({
   onSave, onBack, loading
 }: InvoiceDetailProps) {
   const isView = mode === "view";
+  const isEdit = mode === "edit";
 
   const [formData, setFormData] = useState({
     customer_id: initialData?.customerId || "",
@@ -203,7 +204,7 @@ export default function InvoiceDetail({
               <Person sx={{ color: '#3b82f6' }} fontSize="small" /> Customer Details
             </Typography>
             <Stack spacing={2}>
-              <FormControl fullWidth disabled={isView} size="small">
+              <FormControl fullWidth disabled={isView || isEdit} size="small">
                 <InputLabel>Customer</InputLabel>
                 <Select
                   value={formData.customer_id.toString()}
@@ -213,7 +214,7 @@ export default function InvoiceDetail({
                   {customers.map(c => <MenuItem key={c.id} value={c.id}>{c.fullName}</MenuItem>)}
                 </Select>
               </FormControl>
-              <FormControl fullWidth disabled={isView} size="small">
+              <FormControl fullWidth disabled={isView || isEdit} size="small">
                 <InputLabel>Store</InputLabel>
                 <Select
                   value={formData.store_id.toString()}
