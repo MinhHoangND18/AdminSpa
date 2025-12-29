@@ -108,189 +108,247 @@ export default function StoreDetail({
 
     return (
         <ThemeProvider theme={blueTheme}>
-             <Box>
-            {/* Header */}
-            <Box sx={{ mb: 2, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <Stack direction="row" spacing={2} alignItems="center">
-                    <IconButton onClick={onBack} sx={{ bgcolor: "background.paper", boxShadow: 1 }}>
-                        <ArrowBack />
-                    </IconButton>
-                    <Box>
-                        <Typography variant="h5" fontWeight="bold">
-                            {mode === "add" ? "Add New Store" : mode === "edit" ? "Edit Store" : "Store Details"}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                            {mode === "view" ? "Full information about the store" : "Fill in the information below"}
-                        </Typography>
-                    </Box>
-                </Stack>
-            </Box>
-
-            <Grid container spacing={3}>
-                {/* Left Column: Basic Information */}
-                <Grid size={{ xs: 12, md: 8 }}>
-                    <Paper sx={{ p: 2, borderRadius: 2 }}>
-                        <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 2 }}>
-                            General Information
-                        </Typography>
-                        <Grid container spacing={2}>
-                            <Grid size={{ xs: 12, sm: 6 }}>
-                                <TextField
-                                    fullWidth label="Store Code" required
-                                    value={formData.code} onChange={handleChange("code")}
-                                    disabled={isView}
-                                    error={!!errors.code}
-                                    helperText={errors.code}
-                                    InputProps={{ startAdornment: <InputAdornment position="start"><Code fontSize="small" /></InputAdornment> }}
-                                />
-                            </Grid>
-                            <Grid size={{ xs: 12, sm: 6 }}>
-                                <TextField
-                                    fullWidth label="Store Name" required
-                                    value={formData.name} onChange={handleChange("name")}
-                                    disabled={isView}
-                                    error={!!errors.name}
-                                    helperText={errors.name}
-                                    InputProps={{ startAdornment: <InputAdornment position="start"><StoreIcon fontSize="small" /></InputAdornment> }}
-                                />
-                            </Grid>
-                            <Grid size={{ xs: 12 }}>
-                                <TextField
-                                    fullWidth label="Address" required
-                                    value={formData.address} onChange={handleChange("address")}
-                                    disabled={isView}
-                                    error={!!errors.address}
-                                    helperText={errors.address}
-                                    InputProps={{ startAdornment: <InputAdornment position="start"><LocationOn fontSize="small" /></InputAdornment> }}
-                                />
-                            </Grid>
-                            <Grid size={{ xs: 12 }}>
-                                <TextField
-                                    fullWidth label="Description" multiline rows={3}
-                                    value={formData.description} onChange={handleChange("description")}
-                                    disabled={isView}
-                                />
-                            </Grid>
-                        </Grid>
-                    </Paper>
-
-                    <Paper sx={{ p: 3, borderRadius: 2, mt: 3 }}>
-                        <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 2 }}>
-                            Contact & Operation
-                        </Typography>
-                        <Grid container spacing={2}>
-                            <Grid size={{ xs: 12, sm: 6 }}>
-                                <TextField
-                                    fullWidth label="Phone"
-                                    value={formData.phone} onChange={handleChange("phone")}
-                                    disabled={isView}
-                                    InputProps={{ startAdornment: <InputAdornment position="start"><Phone fontSize="small" /></InputAdornment> }}
-                                />
-                            </Grid>
-                            <Grid size={{ xs: 12, sm: 6 }}>
-                                <TextField
-                                    fullWidth label="Email"
-                                    value={formData.email} onChange={handleChange("email")}
-                                    disabled={isView}
-                                    InputProps={{ startAdornment: <InputAdornment position="start"><Email fontSize="small" /></InputAdornment> }}
-                                />
-                            </Grid>
-                            <Grid size={{ xs: 12, sm: 6 }}>
-                                <TextField
-                                    fullWidth label="Domain"
-                                    value={formData.domain} onChange={handleChange("domain")}
-                                    disabled={isView}
-                                    InputProps={{ startAdornment: <InputAdornment position="start"><LinkIcon fontSize="small" /></InputAdornment> }}
-                                />
-                            </Grid>
-                            <Grid size={{ xs: 12, sm: 6 }}>
-                                <TextField
-                                    fullWidth label="Opening Hours"
-                                    placeholder="e.g. 08:00 - 22:00"
-                                    value={formData.openingHours} onChange={handleChange("openingHours")}
-                                    disabled={isView}
-                                    InputProps={{ startAdornment: <InputAdornment position="start"><AccessTime fontSize="small" /></InputAdornment> }}
-                                />
-                            </Grid>
-                        </Grid>
-                    </Paper>
-                </Grid>
-
-                {/* Right Column: Management & Status */}
-                <Grid size={{ xs: 12, md: 4 }}>
-                    <Stack spacing={3}>
-                        <Paper sx={{ p: 3, borderRadius: 2 }}>
-                            <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 2 }}>
-                                Management
+            <Box>
+                {/* Header */}
+                <Box sx={{ mb: 2, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <Stack direction="row" spacing={2} alignItems="center">
+                        <IconButton onClick={onBack} sx={{ bgcolor: "background.paper", boxShadow: 1 }}>
+                            <ArrowBack />
+                        </IconButton>
+                        <Box>
+                            <Typography variant="h5" fontWeight="bold">
+                                {mode === "add" ? "Add New Store" : mode === "edit" ? "Edit Store" : "Store Details"}
                             </Typography>
-                            <FormControl fullWidth disabled={isView} size="small" sx={{ mb: 2 }} error={!!errors.manager_id}>
-                                <InputLabel>Manager</InputLabel>
-                                <Select
-                                    value={formData.manager_id}
-                                    label="Manager"
-                                    onChange={handleSelectChange("manager_id")}
-                                >
-                                    <MenuItem value=""><em>None</em></MenuItem>
-                                    {managers.map((manager) => (
-                                        <MenuItem key={manager.id} value={String(manager.id)}>
-                                            {manager.fullname || manager.username}
-                                        </MenuItem>
-                                    ))}
-                                </Select>
-                                {errors.manager_id && <FormHelperText>{errors.manager_id}</FormHelperText>}
-                            </FormControl>
-
-                            <Divider sx={{ my: 2 }} />
-
-                            <FormControlLabel
-                                control={
-                                    <Switch
-                                        checked={formData.isActive}
-                                        onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
-                                        disabled={isView}
-                                        color="primary"
-                                    />
-                                }
-                                label={formData.isActive ? "Active" : "Inactive"}
-                            />
-                        </Paper>
-
-                        <Paper sx={{ p: 3, borderRadius: 2 }}>
-                            <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 2 }}>
-                                Location Coordinates
+                            <Typography variant="body2" color="text.secondary">
+                                {mode === "view" ? "Full information about the store" : "Fill in the information below"}
                             </Typography>
-                            <Stack spacing={2}>
-                                <TextField
-                                    fullWidth label="Latitude" size="small"
-                                    value={formData.latitude} onChange={handleChange("latitude")}
-                                    disabled={isView}
-                                />
-                                <TextField
-                                    fullWidth label="Longitude" size="small"
-                                    value={formData.longitude} onChange={handleChange("longitude")}
-                                    disabled={isView}
-                                />
-                            </Stack>
-                        </Paper>
+                        </Box>
                     </Stack>
-                </Grid>
-            </Grid>
-
-            {/* Action Buttons */}
-            {!isView && (
-                <Box sx={{ mt: 2, display: "flex", justifyContent: "flex-end", gap: 2 }}>
-
-                    <Button
-                        variant="contained"
-                        startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <Save />}
-                        onClick={handleSave}
-                        disabled={loading}
-                        sx={{ px: 6, bgcolor: "#3b82f6", height: 48, borderRadius: 2 }}
-                    >
-                        {loading ? "Processing..." : mode === "add" ? "Create Store" : "Save Changes"}
-                    </Button>
                 </Box>
-            )}
+
+                <Grid container spacing={3}>
+                    {/* Left Column: Basic Information */}
+                    <Grid size={{ xs: 12, md: 8 }}>
+                        <Paper sx={{ p: 2, borderRadius: 0 }}>
+                            <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 2 }}>
+                                General Information
+                            </Typography>
+                            <Grid container spacing={2}>
+                                <Grid size={{ xs: 12, sm: 6 }}>
+                                    <TextField
+                                        fullWidth label="Store Code" required
+                                        value={formData.code} onChange={handleChange("code")}
+                                        disabled={isView}
+                                        error={!!errors.code}
+                                        helperText={errors.code}
+                                        InputProps={{ startAdornment: <InputAdornment position="start"><Code fontSize="small" /></InputAdornment> }}
+                                        sx={{
+                                            "& .MuiOutlinedInput-root": {
+                                                borderRadius: "0px",
+                                            }
+                                        }}
+                                    />
+                                </Grid>
+                                <Grid size={{ xs: 12, sm: 6 }}>
+                                    <TextField
+                                        fullWidth label="Store Name" required
+                                        value={formData.name} onChange={handleChange("name")}
+                                        disabled={isView}
+                                        error={!!errors.name}
+                                        helperText={errors.name}
+                                        InputProps={{ startAdornment: <InputAdornment position="start"><StoreIcon fontSize="small" /></InputAdornment> }}
+                                        sx={{
+                                            "& .MuiOutlinedInput-root": {
+                                                borderRadius: "0px",
+                                            }
+                                        }}
+                                    />
+                                </Grid>
+                                <Grid size={{ xs: 12 }}>
+                                    <TextField
+                                        fullWidth label="Address" required
+                                        value={formData.address} onChange={handleChange("address")}
+                                        disabled={isView}
+                                        error={!!errors.address}
+                                        helperText={errors.address}
+                                        InputProps={{ startAdornment: <InputAdornment position="start"><LocationOn fontSize="small" /></InputAdornment> }}
+                                        sx={{
+                                            "& .MuiOutlinedInput-root": {
+                                                borderRadius: "0px",
+                                            }
+                                        }}
+                                    />
+                                </Grid>
+                                <Grid size={{ xs: 12 }}>
+                                    <TextField
+                                        fullWidth label="Description" multiline rows={3}
+                                        value={formData.description} onChange={handleChange("description")}
+                                        disabled={isView}
+                                        sx={{
+                                            "& .MuiOutlinedInput-root": {
+                                                borderRadius: "0px",
+                                            }
+                                        }}
+                                    />
+                                </Grid>
+                            </Grid>
+                        </Paper>
+
+                        <Paper sx={{ p: 3, borderRadius: 0, mt: 3 }}>
+                            <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 2 }}>
+                                Contact & Operation
+                            </Typography>
+                            <Grid container spacing={2}>
+                                <Grid size={{ xs: 12, sm: 6 }}>
+                                    <TextField
+                                        fullWidth label="Phone"
+                                        value={formData.phone} onChange={handleChange("phone")}
+                                        disabled={isView}
+                                        InputProps={{ startAdornment: <InputAdornment position="start"><Phone fontSize="small" /></InputAdornment> }}
+                                        sx={{
+                                            "& .MuiOutlinedInput-root": {
+                                                borderRadius: "0px",
+                                            }
+                                        }}
+                                    />
+                                </Grid>
+                                <Grid size={{ xs: 12, sm: 6 }}>
+                                    <TextField
+                                        fullWidth label="Email"
+                                        value={formData.email} onChange={handleChange("email")}
+                                        disabled={isView}
+                                        InputProps={{ startAdornment: <InputAdornment position="start"><Email fontSize="small" /></InputAdornment> }}
+                                        sx={{
+                                            "& .MuiOutlinedInput-root": {
+                                                borderRadius: "0px",
+                                            }
+                                        }}
+                                    />
+                                </Grid>
+                                <Grid size={{ xs: 12, sm: 6 }}>
+                                    <TextField
+                                        fullWidth label="Domain"
+                                        value={formData.domain} onChange={handleChange("domain")}
+                                        disabled={isView}
+                                        InputProps={{ startAdornment: <InputAdornment position="start"><LinkIcon fontSize="small" /></InputAdornment> }}
+                                        sx={{
+                                            "& .MuiOutlinedInput-root": {
+                                                borderRadius: "0px",
+                                            }
+                                        }}
+                                    />
+                                </Grid>
+                                <Grid size={{ xs: 12, sm: 6 }}>
+                                    <TextField
+                                        fullWidth label="Opening Hours"
+                                        placeholder="e.g. 08:00 - 22:00"
+                                        value={formData.openingHours} onChange={handleChange("openingHours")}
+                                        disabled={isView}
+                                        InputProps={{ startAdornment: <InputAdornment position="start"><AccessTime fontSize="small" /></InputAdornment> }}
+                                        sx={{
+                                            "& .MuiOutlinedInput-root": {
+                                                borderRadius: "0px",
+                                            }
+                                        }}
+                                    />
+                                </Grid>
+                            </Grid>
+                        </Paper>
+                    </Grid>
+
+                    {/* Right Column: Management & Status */}
+                    <Grid size={{ xs: 12, md: 4 }}>
+                        <Stack spacing={3}>
+                            <Paper sx={{ p: 3, borderRadius: 0 }}>
+                                <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 2 }}>
+                                    Management
+                                </Typography>
+                                <FormControl fullWidth disabled={isView} size="small" sx={{
+                                    mb: 2, "& .MuiOutlinedInput-root": {
+                                        borderRadius: "0px",
+                                    }
+                                }} error={!!errors.manager_id}
+
+                                >
+                                    <InputLabel>Manager</InputLabel>
+                                    <Select
+                                        value={formData.manager_id}
+                                        label="Manager"
+                                        onChange={handleSelectChange("manager_id")}
+                                    >
+                                        <MenuItem value=""><em>None</em></MenuItem>
+                                        {managers.map((manager) => (
+                                            <MenuItem key={manager.id} value={String(manager.id)}>
+                                                {manager.fullname || manager.username}
+                                            </MenuItem>
+                                        ))}
+                                    </Select>
+                                    {errors.manager_id && <FormHelperText>{errors.manager_id}</FormHelperText>}
+                                </FormControl>
+
+                                <Divider sx={{ my: 2 }} />
+
+                                <FormControlLabel
+                                    control={
+                                        <Switch
+                                            checked={formData.isActive}
+                                            onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
+                                            disabled={isView}
+                                            color="primary"
+                                        />
+                                    }
+                                    label={formData.isActive ? "Active" : "Inactive"}
+                                />
+                            </Paper>
+
+                            <Paper sx={{
+                                p: 3, borderRadius: 0
+                            }}>
+                                <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 2 }}>
+                                    Location Coordinates
+                                </Typography>
+                                <Stack spacing={2}>
+                                    <TextField
+                                        fullWidth label="Latitude" size="small"
+                                        value={formData.latitude} onChange={handleChange("latitude")}
+                                        disabled={isView}
+                                        sx={{
+                                            "& .MuiOutlinedInput-root": {
+                                                borderRadius: "0px",
+                                            }
+                                        }}
+                                    />
+                                    <TextField
+                                        fullWidth label="Longitude" size="small"
+                                        value={formData.longitude} onChange={handleChange("longitude")}
+                                        disabled={isView}
+                                        sx={{
+                                            "& .MuiOutlinedInput-root": {
+                                                borderRadius: "0px",
+                                            }
+                                        }}
+                                    />
+                                </Stack>
+                            </Paper>
+                        </Stack>
+                    </Grid>
+                </Grid>
+
+                {/* Action Buttons */}
+                {!isView && (
+                    <Box sx={{ mt: 2, display: "flex", justifyContent: "flex-end", gap: 2 }}>
+
+                        <Button
+                            variant="contained"
+                            startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <Save />}
+                            onClick={handleSave}
+                            disabled={loading}
+                            sx={{ px: 6, bgcolor: "#3b82f6", height: 48, borderRadius: 0 }}
+                        >
+                            {loading ? "Processing..." : mode === "add" ? "Create Store" : "Save Changes"}
+                        </Button>
+                    </Box>
+                )}
             </Box>
         </ThemeProvider>
 

@@ -90,7 +90,7 @@ export default function UserDetail({
     };
 
     const validate = (): boolean => {
-        const newErrors: Partial<Record<keyof UserFormData, string>> = {}; // Fixed: Explicit typing
+        const newErrors: Partial<Record<keyof UserFormData, string>> = {};
         if (!formData.username) newErrors.username = "Username is required";
         if (mode === "add" && !formData.password) newErrors.password = "Password is required";
         if (!formData.fullname) newErrors.fullname = "Full name is required";
@@ -112,7 +112,7 @@ export default function UserDetail({
     };
 
     const isView = mode === "view";
-    
+
     return (
         <ThemeProvider theme={blueTheme}>
             <Box sx={{ p: 3 }}>
@@ -127,7 +127,7 @@ export default function UserDetail({
 
                 <Grid container spacing={3}>
                     <Grid size={{ xs: 12, md: 4 }}>
-                        <Paper sx={{ p: 3, textAlign: 'center', height: '100%', borderRadius: 2 }}>
+                        <Paper sx={{ p: 3, textAlign: 'center', height: '100%', borderRadius: 0 }}>
                             <Box sx={{ position: 'relative', display: 'inline-block' }}>
                                 <Avatar
                                     sx={{
@@ -175,7 +175,7 @@ export default function UserDetail({
                     </Grid>
 
                     <Grid size={{ xs: 12, md: 8 }}>
-                        <Paper sx={{ p: 3, borderRadius: 2 }}>
+                        <Paper sx={{ p: 3, borderRadius: 0 }}>
                             <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 1 }}>
                                 <Badge fontSize="small" sx={{ color: '#3b82f6' }} /> Basic Information
                             </Typography>
@@ -187,6 +187,11 @@ export default function UserDetail({
                                         value={formData.username} onChange={handleChange("username")}
                                         disabled={isView || mode === "edit"}
                                         error={!!errors.username} helperText={errors.username}
+                                        sx={{
+                                            "& .MuiOutlinedInput-root": {
+                                                borderRadius: "0px",
+                                            }
+                                        }}
                                     />
                                 </Grid>
                                 <Grid size={{ xs: 12, sm: 6 }}>
@@ -195,6 +200,11 @@ export default function UserDetail({
                                         value={formData.fullname} onChange={handleChange("fullname")}
                                         disabled={isView}
                                         error={!!errors.fullname} helperText={errors.fullname}
+                                        sx={{
+                                            "& .MuiOutlinedInput-root": {
+                                                borderRadius: "0px",
+                                            }
+                                        }}
                                     />
                                 </Grid>
                                 <Grid size={{ xs: 12, sm: 6 }}>
@@ -202,6 +212,11 @@ export default function UserDetail({
                                         fullWidth label="Email Address" type="email"
                                         value={formData.email} onChange={handleChange("email")}
                                         disabled={isView}
+                                        sx={{
+                                            "& .MuiOutlinedInput-root": {
+                                                borderRadius: "0px",
+                                            }
+                                        }}
                                     />
                                 </Grid>
                                 <Grid size={{ xs: 12, sm: 6 }}>
@@ -211,10 +226,21 @@ export default function UserDetail({
                                         value={formData.password} onChange={handleChange("password")}
                                         disabled={isView}
                                         error={!!errors.password} helperText={errors.password}
+                                        sx={{
+                                            "& .MuiOutlinedInput-root": {
+                                                borderRadius: "0px",
+                                            }
+                                        }}
                                     />
                                 </Grid>
                                 <Grid size={{ xs: 12, sm: 6 }}>
-                                    <FormControl fullWidth required error={!!errors.role}>
+                                    <FormControl fullWidth required error={!!errors.role}
+                                        sx={{
+                                            "& .MuiOutlinedInput-root": {
+                                                borderRadius: "0px",
+                                            }
+                                        }}
+                                    >
                                         <InputLabel>User Role</InputLabel>
                                         <Select
                                             value={formData.role} label="User Role"
@@ -229,7 +255,13 @@ export default function UserDetail({
                                     </FormControl>
                                 </Grid>
                                 <Grid size={{ xs: 12, sm: 6 }}>
-                                    <FormControl fullWidth disabled={isView} error={!!errors.store_id}>
+                                    <FormControl fullWidth disabled={isView} error={!!errors.store_id}
+                                        sx={{
+                                            "& .MuiOutlinedInput-root": {
+                                                borderRadius: "0px",
+                                            }
+                                        }}
+                                    >
                                         <InputLabel>Assigned Store/Branch</InputLabel>
                                         <Select
                                             value={formData.store_id} label="Assigned Store/Branch"
@@ -252,7 +284,7 @@ export default function UserDetail({
                                         startIcon={<Save />}
                                         onClick={handleSave}
                                         disabled={loading}
-                                        sx={{ px: 4, bgcolor: '#004aad' }}
+                                        sx={{ px: 4, bgcolor: '#004aad', borderRadius: 0 }}
                                     >
                                         {mode === "add" ? "Create Account" : "Update Information"}
                                     </Button>

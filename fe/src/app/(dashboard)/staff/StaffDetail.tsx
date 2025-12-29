@@ -127,7 +127,7 @@ export default function StaffDetail({
             <Grid container spacing={3}>
                 {/* Profile Card Section */}
                 <Grid size={{ xs: 12, md: 4 }}>
-                    <Paper sx={{ p: 3, textAlign: 'center', height: '100%', borderRadius: 2 }}>
+                    <Paper sx={{ p: 3, textAlign: 'center', height: '100%', borderRadius: 0 }}>
                         <Box sx={{ position: 'relative', display: 'inline-block' }}>
                             <Avatar
                                 sx={{
@@ -158,7 +158,13 @@ export default function StaffDetail({
 
                         <Divider sx={{ my: 3 }} />
 
-                        <FormControl fullWidth disabled={isView} size="small">
+                        <FormControl fullWidth disabled={isView} size="small"
+                            sx={{
+                                "& .MuiOutlinedInput-root": {
+                                    borderRadius: "0px",
+                                }
+                            }}
+                        >
                             <InputLabel>Status</InputLabel>
                             <Select
                                 value={formData.status}
@@ -175,7 +181,7 @@ export default function StaffDetail({
 
                 {/* Main Form Section */}
                 <Grid size={{ xs: 12, md: 8 }}>
-                    <Paper sx={{ p: 2, borderRadius: 2 }}>
+                    <Paper sx={{ p: 2, borderRadius: 0 }}>
                         <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 3 }}>
                             Personal Information
                         </Typography>
@@ -185,6 +191,11 @@ export default function StaffDetail({
                                     fullWidth label="Full Name *"
                                     value={formData.full_name} onChange={handleChange("full_name")}
                                     disabled={isView} error={!!errors.full_name} helperText={errors.full_name}
+                                    sx={{
+                                        "& .MuiOutlinedInput-root": {
+                                            borderRadius: "0px",
+                                        }
+                                    }}
                                 />
                             </Grid>
                             <Grid size={{ xs: 12, sm: 6 }}>
@@ -192,6 +203,11 @@ export default function StaffDetail({
                                     fullWidth label="Phone *"
                                     value={formData.phone} onChange={handleChange("phone")}
                                     disabled={isView} error={!!errors.phone} helperText={errors.phone}
+                                    sx={{
+                                        "& .MuiOutlinedInput-root": {
+                                            borderRadius: "0px",
+                                        }
+                                    }}
                                 />
                             </Grid>
                             <Grid size={{ xs: 12, sm: 6 }}>
@@ -199,10 +215,20 @@ export default function StaffDetail({
                                     fullWidth label="Email" type="email"
                                     value={formData.email} onChange={handleChange("email")}
                                     disabled={isView} error={!!errors.email} helperText={errors.email}
+                                    sx={{
+                                        "& .MuiOutlinedInput-root": {
+                                            borderRadius: "0px",
+                                        }
+                                    }}
                                 />
                             </Grid>
                             <Grid size={{ xs: 12, sm: 6 }}>
-                                <FormControl fullWidth disabled={isView} error={!!errors.gender}>
+                                <FormControl fullWidth disabled={isView} error={!!errors.gender}
+                                sx={{
+                                    "& .MuiOutlinedInput-root": {
+                                        borderRadius: "0px",
+                                    }
+                                }}>
                                     <InputLabel>Gender</InputLabel>
                                     <Select value={formData.gender} label="Gender" onChange={handleChange("gender")}>
                                         <MenuItem value="male">Male</MenuItem>
@@ -217,10 +243,20 @@ export default function StaffDetail({
                                     fullWidth label="Birthday" type="date"
                                     value={formData.birthday} onChange={handleChange("birthday")}
                                     disabled={isView} InputLabelProps={{ shrink: true }}
+                                    sx={{
+                                        "& .MuiOutlinedInput-root": {
+                                            borderRadius: "0px",
+                                        }
+                                    }}
                                 />
                             </Grid>
                             <Grid size={{ xs: 12, sm: 6 }}>
-                                <FormControl fullWidth required disabled={isView} error={!!errors.store_id}>
+                                <FormControl fullWidth required disabled={isView} error={!!errors.store_id}
+                                sx={{
+                                    "& .MuiOutlinedInput-root": {
+                                        borderRadius: "0px",
+                                    }
+                                }}>
                                     <InputLabel>Assigned Store</InputLabel>
                                     <Select
                                         value={formData.store_id}
@@ -239,6 +275,11 @@ export default function StaffDetail({
                                     fullWidth label="Address"
                                     value={formData.address} onChange={handleChange("address")}
                                     disabled={isView} error={!!errors.address} helperText={errors.address}
+                                    sx={{
+                                        "& .MuiOutlinedInput-root": {
+                                            borderRadius: "0px",
+                                        }
+                                    }}
                                 />
                             </Grid>
                         </Grid>
@@ -253,10 +294,21 @@ export default function StaffDetail({
                                     value={formData.hire_date} onChange={handleChange("hire_date")}
                                     disabled={isView} InputLabelProps={{ shrink: true }}
                                     error={!!errors.hire_date} helperText={errors.hire_date}
+                                    sx={{
+                                        "& .MuiOutlinedInput-root": {
+                                            borderRadius: "0px",
+                                        }
+                                    }}
                                 />
                             </Grid>
                             <Grid size={{ xs: 12, sm: 6 }}>
-                                <FormControl fullWidth required disabled={isView} error={!!errors.salary_type}>
+                                <FormControl fullWidth required disabled={isView} error={!!errors.salary_type}
+                                    sx={{
+                                        "& .MuiOutlinedInput-root": {
+                                            borderRadius: "0px",
+                                        }
+                                    }}
+                                >
                                     <InputLabel>Salary Type</InputLabel>
                                     <Select value={formData.salary_type} label="Salary Type" onChange={handleChange("salary_type")}>
                                         <MenuItem value="fixed">Fixed Salary</MenuItem>
@@ -272,6 +324,11 @@ export default function StaffDetail({
                                     value={formData.base_salary} onChange={handleChange("base_salary")}
                                     disabled={isView}
                                     InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
+                                    sx={{
+                                        "& .MuiOutlinedInput-root": {
+                                            borderRadius: "0px",
+                                        }
+                                    }}
                                 />
                             </Grid>
                             {formData.salary_type === "commission" && (
@@ -287,11 +344,11 @@ export default function StaffDetail({
                         </Grid>
 
                         {mode !== "view" && (
-                            <Box sx={{ mt: 4, pt: 2, display: 'flex', justifyContent: 'flex-end', gap: 2, borderTop: `1px solid ${alpha("#000", 0.05)}` }}>
+                            <Box sx={{ mt: 2, pt: 2, display: 'flex', justifyContent: 'flex-end', gap: 2, borderTop: `0px solid ${alpha("#000", 0.05)}` }}>
                                 <Button
                                     variant="contained" startIcon={<Save />}
                                     onClick={handleSave} disabled={loading}
-                                    sx={{ px: 4, bgcolor: '#004aad' }}
+                                    sx={{ px: 4, bgcolor: '#004aad' , borderRadius: 0 }}
                                 >
                                     {mode === "add" ? "Add Staff Member" : "Save Profile Changes"}
                                 </Button>

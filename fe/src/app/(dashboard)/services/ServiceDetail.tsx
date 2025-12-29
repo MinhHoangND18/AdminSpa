@@ -14,6 +14,15 @@ import {
 import {
   Service, ServiceCategory, ServiceStatus, CreateServiceDto, UpdateServiceDto
 } from '@/types';
+import { createTheme, ThemeProvider } from "@mui/material/styles";
+const blueTheme = createTheme({
+    palette: {
+        primary: {
+            main: "#3b82f6",
+        },
+    },
+});
+
 
 interface ServiceDetailProps {
   mode: 'add' | 'edit' | 'view';
@@ -89,6 +98,7 @@ export default function ServiceDetail({
   };
 
   return (
+    <ThemeProvider theme={blueTheme}>
     <Box sx={{ p: { xs: 2, md: 2 } }}>
       <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <Stack direction="row" spacing={2} alignItems="center">
@@ -107,28 +117,39 @@ export default function ServiceDetail({
       </Box>
 
       <Grid container spacing={3}>
-        <Grid size={{xs: 12, md: 8}}>
-          <Paper sx={{ p: 3, borderRadius: 2 }}>
+        <Grid size={{ xs: 12, md: 8 }}>
+          <Paper sx={{ p: 3, borderRadius: 0 }}>
             <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 1 }}>
               <Description sx={{ color: '#3b82f6' }} fontSize="small" /> Service Information
             </Typography>
 
             <Grid container spacing={2.5}>
-              <Grid size={{xs: 12}}>
+              <Grid size={{ xs: 12 }}>
                 <TextField
+
                   fullWidth label="Service Name *"
                   value={formData.name} onChange={handleTextFieldChange("name")}
                   disabled={isView} error={!!errors.name} helperText={errors.name}
+                  sx={{
+                    "& .MuiOutlinedInput-root": {
+                      borderRadius: "0px",
+                    }
+                  }}
                 />
               </Grid>
 
-              <Grid size={{xs: 12, sm: 6}}>
-                <FormControl fullWidth disabled={isView} error={!!errors.categoryId}>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <FormControl fullWidth disabled={isView} error={!!errors.categoryId} sx={{
+                  "& .MuiOutlinedInput-root": {
+                    borderRadius: "0px",
+                  }
+                }}>
                   <InputLabel>Category *</InputLabel>
-                  <Select 
-                    value={formData.categoryId} 
-                    label="Category *" 
+                  <Select
+                    value={formData.categoryId}
+                    label="Category *"
                     onChange={handleSelectChange("categoryId")}
+
                   >
                     {categories.map(cat => (
                       <MenuItem key={cat.id} value={cat.id.toString()}>{cat.name}</MenuItem>
@@ -137,46 +158,71 @@ export default function ServiceDetail({
                 </FormControl>
               </Grid>
 
-              <Grid size={{xs: 12, sm: 6}}>
+              <Grid size={{ xs: 12, sm: 6 }}>
                 <TextField
                   fullWidth label="Duration (Minutes) *" type="number"
                   value={formData.durationMinutes} onChange={handleTextFieldChange("durationMinutes")}
                   disabled={isView} error={!!errors.durationMinutes}
                   InputProps={{ startAdornment: <InputAdornment position="start"><Schedule fontSize="small" /></InputAdornment> }}
+                  sx={{
+                    "& .MuiOutlinedInput-root": {
+                      borderRadius: "0px",
+                    }
+                  }}
                 />
               </Grid>
 
-              <Grid size={{xs: 12, sm: 6}}>
+              <Grid size={{ xs: 12, sm: 6 }}>
                 <TextField
                   fullWidth label="Regular Price *" type="number"
                   value={formData.price} onChange={handleTextFieldChange("price")}
                   disabled={isView} error={!!errors.price}
                   InputProps={{ startAdornment: <InputAdornment position="start"><AttachMoney fontSize="small" /></InputAdornment> }}
+                  sx={{
+                    "& .MuiOutlinedInput-root": {
+                      borderRadius: "0px",
+                    }
+                  }}
                 />
               </Grid>
 
-           <Grid size={{xs: 12, sm: 6}}>
+              <Grid size={{ xs: 12, sm: 6 }}>
                 <TextField
                   fullWidth label="Discount Price" type="number"
                   value={formData.discountPrice} onChange={handleTextFieldChange("discountPrice")}
                   disabled={isView}
                   InputProps={{ startAdornment: <InputAdornment position="start"><Discount fontSize="small" /></InputAdornment> }}
+                  sx={{
+                    "& .MuiOutlinedInput-root": {
+                      borderRadius: "0px",
+                    }
+                  }}
                 />
               </Grid>
 
-             <Grid size={{xs: 12}}>
+              {/* <Grid size={{ xs: 12 }}>
                 <TextField
                   fullWidth label="Image URL"
                   value={formData.imageUrl} onChange={handleTextFieldChange("imageUrl")}
                   disabled={isView}
                   InputProps={{ startAdornment: <InputAdornment position="start"><ImageIcon fontSize="small" /></InputAdornment> }}
+                    sx={{
+                    "& .MuiOutlinedInput-root": {
+                      borderRadius: "0px",
+                    }
+                  }}
                 />
-              </Grid>
+              </Grid> */}
 
-              <Grid size={{xs: 12}}>
+              <Grid size={{ xs: 12 }}>
                 <TextField
                   fullWidth label="Description" multiline rows={4}
                   value={formData.description} onChange={handleTextFieldChange("description")}
+                  sx={{
+                    "& .MuiOutlinedInput-root": {
+                      borderRadius: "0px",
+                    }
+                  }}
                   disabled={isView}
                 />
               </Grid>
@@ -184,8 +230,8 @@ export default function ServiceDetail({
           </Paper>
         </Grid>
 
-        <Grid size={{xs: 12, md: 4}}>
-          <Paper sx={{ p: 3, textAlign: 'center', borderRadius: 2, mb: 3 }}>
+        <Grid size={{ xs: 12, md: 4 }}>
+          <Paper sx={{ p: 3, textAlign: 'center', borderRadius: 0, mb: 3 }}>
             <Box sx={{ mb: 2 }}>
               <Avatar
                 src={formData.imageUrl}
@@ -193,7 +239,7 @@ export default function ServiceDetail({
                 sx={{
                   width: 140, height: 140, mx: 'auto',
                   bgcolor: alpha('#3b82f6', 0.1), color: '#3b82f6',
-                  borderRadius: 2
+                  borderRadius: 0
                 }}
               >
                 <Spa sx={{ fontSize: 60 }} />
@@ -218,19 +264,31 @@ export default function ServiceDetail({
             </Stack>
           </Paper>
 
-          <Paper sx={{ p: 3, borderRadius: 2 }}>
+          <Paper sx={{ p: 2, borderRadius: 0 }}>
             <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 2 }}>Settings</Typography>
             <Stack spacing={2}>
               <FormControlLabel
                 control={<Switch checked={formData.isCombo} onChange={handleSwitchChange("isCombo")} disabled={isView} />}
                 label="Is Combo Package"
+                sx={{ ml: 0 }}
               />
-              <FormControl fullWidth disabled={isView} size="small">
+              <FormControl fullWidth disabled={isView} size="small"
+                sx={{
+                  "& .MuiOutlinedInput-root": {
+                    borderRadius: "0px",
+                  }
+                }}
+              >
                 <InputLabel>Status</InputLabel>
-                <Select 
-                  value={formData.status} 
-                  label="Status" 
+                <Select
+                  value={formData.status}
+                  label="Status"
                   onChange={handleSelectChange("status")}
+                  sx={{
+                    "& .MuiOutlinedInput-root": {
+                      borderRadius: "0px",
+                    }
+                  }}
                 >
                   <MenuItem value="active">Active</MenuItem>
                   <MenuItem value="inactive">Inactive</MenuItem>
@@ -242,18 +300,19 @@ export default function ServiceDetail({
       </Grid>
 
       {!isView && (
-        <Box sx={{ mt: 4, display: 'flex', justifyContent: 'flex-end' }}>
+        <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
           <Button
             variant="contained"
             startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <Save />}
             onClick={handleSave}
             disabled={loading}
-            sx={{ px: 6, bgcolor: '#3b82f6', height: 48, borderRadius: 2 }}
+            sx={{ px: 6, bgcolor: '#3b82f6', height: 48, borderRadius: 0 }}
           >
             {loading ? "Processing..." : (mode === "add" ? "Save Service" : "Update Service")}
           </Button>
         </Box>
       )}
     </Box>
+    </ThemeProvider>
   );
 }

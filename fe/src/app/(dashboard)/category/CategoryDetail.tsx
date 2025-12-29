@@ -105,7 +105,7 @@ export default function CategoryDetail({
       <Grid container spacing={3}>
         {/* Left Side: Preview Card */}
         <Grid size={{ xs: 12, md: 4 }}>
-          <Paper sx={{ p: 3, textAlign: 'center', borderRadius: 2 }}>
+          <Paper sx={{ p: 3, textAlign: 'center', borderRadius: 0 }}>
             <Box sx={{ mb: 2 }}>
               <Avatar
                 src={formData.imageUrl}
@@ -127,7 +127,7 @@ export default function CategoryDetail({
 
         {/* Right Side: Form Content */}
         <Grid size={{ xs: 12, md: 8 }}>
-          <Paper sx={{ p: 3, borderRadius: 2 }}>
+          <Paper sx={{ p: 3, borderRadius: 0 }}>
             <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 1 }}>
               <Description sx={{ color: '#3b82f6' }} fontSize="small" /> Category Information
             </Typography>
@@ -138,6 +138,11 @@ export default function CategoryDetail({
                   fullWidth label="Category Name *"
                   value={formData.name} onChange={handleChange("name")}
                   disabled={isView} error={!!errors.name} helperText={errors.name}
+                  sx={{
+                    "& .MuiOutlinedInput-root": {
+                      borderRadius: "0px",
+                    }
+                  }}
                 />
               </Grid>
 
@@ -147,11 +152,21 @@ export default function CategoryDetail({
                   value={formData.slug} onChange={handleChange("slug")}
                   disabled={isView} error={!!errors.slug} helperText={errors.slug}
                   InputProps={{ startAdornment: <InputAdornment position="start"><LinkIcon fontSize="small" /></InputAdornment> }}
+                  sx={{
+                    "& .MuiOutlinedInput-root": {
+                      borderRadius: "0px",
+                    }
+                  }}
                 />
               </Grid>
 
               <Grid size={{ xs: 12, sm: 6 }}>
-                <FormControl fullWidth disabled={isView}>
+                <FormControl fullWidth disabled={isView}
+                  sx={{
+                    "& .MuiOutlinedInput-root": {
+                      borderRadius: "0px",
+                    }
+                  }}>
                   <InputLabel>Status</InputLabel>
                   <Select
                     value={formData.status}
@@ -164,20 +179,30 @@ export default function CategoryDetail({
                 </FormControl>
               </Grid>
 
-              <Grid size={{ xs: 12 }}>
+              {/* <Grid size={{ xs: 12 }}>
                 <TextField
                   fullWidth label="Image URL"
                   value={formData.imageUrl} onChange={handleChange("imageUrl")}
                   disabled={isView}
                   InputProps={{ startAdornment: <InputAdornment position="start"><ImageIcon fontSize="small" /></InputAdornment> }}
+                    sx={{
+                    "& .MuiOutlinedInput-root": {
+                      borderRadius: "0px",
+                    }
+                  }}
                 />
-              </Grid>
+              </Grid> */}
 
               <Grid size={{ xs: 12 }}>
                 <TextField
                   fullWidth label="Description" multiline rows={4}
                   value={formData.description} onChange={handleChange("description")}
                   disabled={isView} placeholder="Describe the services in this category..."
+                  sx={{
+                    "& .MuiOutlinedInput-root": {
+                      borderRadius: "0px",
+                    }
+                  }}
                 />
               </Grid>
 
@@ -191,7 +216,7 @@ export default function CategoryDetail({
                       startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <Save />}
                       onClick={handleSave}
                       disabled={loading}
-                      sx={{ px: 4, bgcolor: '#3b82f6', height: 40 }}
+                      sx={{ px: 4, bgcolor: '#3b82f6', height: 40, borderRadius: 0 }} 
                     >
                       {mode === "add" ? "Save Category" : "Update Category"}
                     </Button>

@@ -41,6 +41,7 @@ export default function InvoiceDetail({
   onSave, onBack, loading
 }: InvoiceDetailProps) {
   const isView = mode === "view";
+  const isEdit = mode === "edit";
 
   const [formData, setFormData] = useState({
     customer_id: initialData?.customerId || "",
@@ -123,11 +124,11 @@ export default function InvoiceDetail({
 
     try {
       await onSave(submissionData);
-    } catch (error: unknown) { 
+    } catch (error: unknown) {
       const err = error as ApiError;
       const message = err.response?.data?.message || "Error saving invoice";
       alert(Array.isArray(message) ? message[0] : message);
-      
+
       console.error("Chi tiết lỗi lưu hóa đơn:", err);
     }
   };
@@ -153,7 +154,7 @@ export default function InvoiceDetail({
       <Grid container spacing={3}>
         {/* Bảng Items bên trái */}
         <Grid size={{ xs: 12, md: 8 }}>
-          <Paper sx={{ p: 3, borderRadius: 2, height: '100%' }}>
+          <Paper sx={{ p: 3, borderRadius: 0, height: '100%' }}>
             <Typography variant="h6" fontWeight="bold" sx={{ mb: 2 }}>Invoice Items</Typography>
             <TableContainer>
               <Table size="small">
@@ -196,14 +197,18 @@ export default function InvoiceDetail({
           </Paper>
         </Grid>
 
-        {/* Thông tin khách hàng bên phải */}
+        {/* Thông tin khách hàng  */}
         <Grid size={{ xs: 12, md: 4 }}>
-          <Paper sx={{ p: 3, borderRadius: 2, mb: 3 }}>
+          <Paper sx={{ p: 3, borderRadius: 0, mb: 3 }}>
             <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
               <Person sx={{ color: '#3b82f6' }} fontSize="small" /> Customer Details
             </Typography>
             <Stack spacing={2}>
-              <FormControl fullWidth disabled={isView} size="small">
+              <FormControl fullWidth disabled={isView || isEdit} size="small" sx={{
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: "0px",
+                }
+              }}>
                 <InputLabel>Customer</InputLabel>
                 <Select
                   value={formData.customer_id.toString()}
@@ -213,7 +218,11 @@ export default function InvoiceDetail({
                   {customers.map(c => <MenuItem key={c.id} value={c.id}>{c.fullName}</MenuItem>)}
                 </Select>
               </FormControl>
-              <FormControl fullWidth disabled={isView} size="small">
+              <FormControl fullWidth disabled={isView || isEdit} size="small" sx={{
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: "0px",
+                }
+              }}>
                 <InputLabel>Store</InputLabel>
                 <Select
                   value={formData.store_id.toString()}
@@ -226,7 +235,7 @@ export default function InvoiceDetail({
             </Stack>
           </Paper>
 
-          <Paper sx={{ p: 3, borderRadius: 2, bgcolor: alpha('#3b82f6', 0.02) }}>
+          <Paper sx={{ p: 3, borderRadius: 0, bgcolor: alpha('#3b82f6', 0.02) }}>
             <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 2 }}>Payment Summary</Typography>
             <Stack spacing={1.5}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -261,7 +270,7 @@ export default function InvoiceDetail({
             startIcon={<Save />}
             onClick={handleSave}
             disabled={loading || !formData.customer_id || items.length === 0}
-            sx={{ px: 6, bgcolor: '#3b82f6', height: 48, borderRadius: 2 }}
+            sx={{ px: 6, bgcolor: '#3b82f6', height: 48, borderRadius: 0 }}
           >
             {loading ? "Saving..." : "Confirm & Save"}
           </Button>

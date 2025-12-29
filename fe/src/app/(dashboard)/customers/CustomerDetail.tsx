@@ -49,7 +49,7 @@ export default function CustomerDetail({
     loading
 }: CustomerDetailProps) {
     const isView = mode === "view";
-    
+
     const [formData, setFormData] = useState<CustomerFormData>(() => ({
         fullName: initialData?.fullName || "",
         phone: initialData?.phone || "",
@@ -96,7 +96,7 @@ export default function CustomerDetail({
             return;
         }
         setErrors({});
-        
+
         const submissionData = {
             ...formData,
             storeId: formData.storeId ? parseInt(formData.storeId) : undefined
@@ -124,11 +124,11 @@ export default function CustomerDetail({
 
             <Grid container spacing={3}>
                 <Grid size={{ xs: 12, md: 8 }}>
-                    <Paper sx={{ p: 3, borderRadius: 2 }}>
-                        <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Paper sx={{ p: 3, borderRadius: 0 }}>
+                        <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                             <Description sx={{ color: '#3b82f6' }} /> Basic Information
                         </Typography>
-                        <Grid container spacing={2.5} sx={{ mt: 0.5 }}>
+                        <Grid container spacing={2.5} sx={{ mt: 3 }}>
                             <Grid size={{ xs: 12, sm: 6 }}>
                                 <TextField
                                     fullWidth label="Full Name" required
@@ -136,32 +136,52 @@ export default function CustomerDetail({
                                     disabled={isView}
                                     error={!!errors.fullName}
                                     helperText={errors.fullName}
+                                    sx={{
+                                        "& .MuiOutlinedInput-root": {
+                                            borderRadius: "0px",
+                                        }
+                                    }}
                                 />
                             </Grid>
-                             <Grid size={{ xs: 12, sm: 6 }}>
+                            <Grid size={{ xs: 12, sm: 6 }}>
                                 <TextField
                                     fullWidth label="Phone Number" required
                                     value={formData.phone} onChange={handleTextChange("phone")}
                                     disabled={isView}
                                     error={!!errors.phone}
                                     helperText={errors.phone}
+                                    sx={{
+                                        "& .MuiOutlinedInput-root": {
+                                            borderRadius: "0px",
+                                        }
+                                    }}
                                 />
                             </Grid>
-                             <Grid size={{ xs: 12, sm: 6 }}>
+                            <Grid size={{ xs: 12, sm: 6 }}>
                                 <TextField
                                     fullWidth label="Email Address" type="email"
                                     value={formData.email} onChange={handleTextChange("email")}
                                     disabled={isView}
                                     error={!!errors.email}
                                     helperText={errors.email}
+                                    sx={{
+                                        "& .MuiOutlinedInput-root": {
+                                            borderRadius: "0px",
+                                        }
+                                    }}
                                 />
                             </Grid>
-                             <Grid size={{ xs: 12, sm: 6 }}>
-                                <FormControl fullWidth disabled={isView}>
+                            <Grid size={{ xs: 12, sm: 6 }}>
+                                <FormControl fullWidth disabled={isView}
+                                    sx={{
+                                        "& .MuiOutlinedInput-root": {
+                                            borderRadius: "0px",
+                                        }
+                                    }}>
                                     <InputLabel>Gender</InputLabel>
-                                    <Select 
-                                        value={formData.gender} 
-                                        label="Gender" 
+                                    <Select
+                                        value={formData.gender}
+                                        label="Gender"
                                         onChange={handleSelectChange("gender")}
                                     >
                                         <MenuItem value={Gender.MALE}>Male</MenuItem>
@@ -170,19 +190,29 @@ export default function CustomerDetail({
                                     </Select>
                                 </FormControl>
                             </Grid>
-                             <Grid size={{ xs: 12, sm: 6 }}>
+                            <Grid size={{ xs: 12, sm: 6 }}>
                                 <TextField
                                     fullWidth label="Birthday" type="date"
                                     value={formData.birthday} onChange={handleTextChange("birthday")}
                                     disabled={isView} InputLabelProps={{ shrink: true }}
+                                    sx={{
+                                        "& .MuiOutlinedInput-root": {
+                                            borderRadius: "0px",
+                                        }
+                                    }}
                                 />
                             </Grid>
-                             <Grid size={{ xs: 12, sm: 6 }}>
-                                <FormControl fullWidth disabled={isView}>
+                            <Grid size={{ xs: 12, sm: 6 }}>
+                                <FormControl fullWidth disabled={isView}
+                                    sx={{
+                                        "& .MuiOutlinedInput-root": {
+                                            borderRadius: "0px",
+                                        }
+                                    }}>
                                     <InputLabel>Store</InputLabel>
-                                    <Select 
-                                        value={formData.storeId} 
-                                        label="Store" 
+                                    <Select
+                                        value={formData.storeId}
+                                        label="Store"
                                         onChange={handleSelectChange("storeId")}
                                     >
                                         {storeList.map(store => (
@@ -191,11 +221,16 @@ export default function CustomerDetail({
                                     </Select>
                                 </FormControl>
                             </Grid>
-                             <Grid size={{ xs: 12 }}>
+                            <Grid size={{ xs: 12 }}>
                                 <TextField
                                     fullWidth label="Address"
                                     value={formData.address} onChange={handleTextChange("address")}
                                     disabled={isView} multiline rows={2}
+                                    sx={{
+                                        "& .MuiOutlinedInput-root": {
+                                            borderRadius: "0px",
+                                        }
+                                    }}
                                 />
                             </Grid>
                             <Grid size={{ xs: 12 }}>
@@ -203,6 +238,11 @@ export default function CustomerDetail({
                                     fullWidth label="Internal Notes" multiline rows={3}
                                     value={formData.notes} onChange={handleTextChange("notes")}
                                     disabled={isView} placeholder="Notes about preferences..."
+                                    sx={{
+                                        "& .MuiOutlinedInput-root": {
+                                            borderRadius: "0px",
+                                        }
+                                    }}
                                 />
                             </Grid>
                         </Grid>
@@ -210,12 +250,12 @@ export default function CustomerDetail({
                 </Grid>
 
                 <Grid size={{ xs: 12, md: 4 }}>
-                    <Paper sx={{ p: 1, textAlign: 'center', borderRadius: 2, mb: 2 }}>
-                      
+                    <Paper sx={{ p: 1, textAlign: 'center', borderRadius: 0, mb: 2 }}>
+
                         <Typography variant="h6" fontWeight="bold">{formData.fullName || "Full Name"}</Typography>
-                        <Chip 
-                            label={formData.customerType.toUpperCase()} 
-                            size="small" 
+                        <Chip
+                            label={formData.customerType.toUpperCase()}
+                            size="small"
                             color={formData.customerType === CustomerType.VIP ? "secondary" : "primary"}
                             sx={{ mt: 1, fontWeight: 'bold' }}
                         />
@@ -232,10 +272,15 @@ export default function CustomerDetail({
                         </Stack>
                     </Paper>
 
-                    <Paper sx={{ p: 3, borderRadius: 2 }}>
+                    <Paper sx={{ p: 3, borderRadius: 0 }}>
                         <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 2 }}>Classification</Typography>
                         <Stack spacing={2}>
-                            <FormControl fullWidth disabled={isView} size="small">
+                            <FormControl fullWidth disabled={isView} size="small"
+                                sx={{
+                                    "& .MuiOutlinedInput-root": {
+                                        borderRadius: "0px",
+                                    }
+                                }}>
                                 <InputLabel>Type</InputLabel>
                                 <Select value={formData.customerType} label="Type" onChange={handleSelectChange("customerType")}>
                                     <MenuItem value={CustomerType.NEW}>New</MenuItem>
@@ -243,7 +288,12 @@ export default function CustomerDetail({
                                     <MenuItem value={CustomerType.VIP}>VIP</MenuItem>
                                 </Select>
                             </FormControl>
-                            <FormControl fullWidth disabled={isView} size="small">
+                            <FormControl fullWidth disabled={isView} size="small"
+                                sx={{
+                                    "& .MuiOutlinedInput-root": {
+                                        borderRadius: "0px",
+                                    }
+                                }}>
                                 <InputLabel>Status</InputLabel>
                                 <Select value={formData.status} label="Status" onChange={handleSelectChange("status")}>
                                     <MenuItem value={CustomerStatus.ACTIVE}>Active</MenuItem>
@@ -256,19 +306,19 @@ export default function CustomerDetail({
                 </Grid>
             </Grid>
             {!isView && (
-                <Box sx={{ mt: 4, display: 'flex', justifyContent: 'flex-end' }}>
+                <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}>
                     <Button
                         variant="contained"
                         startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <Save />}
                         onClick={handleSave}
                         disabled={loading}
-                        sx={{ px: 6, bgcolor: '#3b82f6', height: 48, borderRadius: 2 }}
+                        sx={{ px: 6, bgcolor: '#3b82f6', height: 48, borderRadius: 0 }}
                     >
                         {loading ? "Processing..." : (mode === "add" ? "Save Customer" : "Update Profile")}
                     </Button>
                 </Box>
             )}
         </Box></ThemeProvider>
-        
+
     );
 }
