@@ -12,12 +12,7 @@ export enum BookingStatus {
     NO_SHOW = 'no_show'
 }
 
-// export interface Customer {
-//     id: number;
-//     full_name: string; 
-//     phone: string;
-//     email: string | null;
-// }
+
 export type Customer = CustomerType;
 
 export interface Store {

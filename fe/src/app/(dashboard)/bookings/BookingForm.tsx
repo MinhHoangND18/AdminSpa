@@ -15,7 +15,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Booking, BookingStatus, PendingInvoiceItem, CreatePendingInvoiceItemPayload, UpdateBookingPayload } from "@/types/booking";
 import BookingDetail from "./BookingDetail"
 import { getServices } from "@/lib/api/services";
-import { getProducts } from "@/lib/api/products";
+
 import { getStaff } from "@/lib/api/staffs";
 import { Staff } from "@/types/staff";
 import { DiscountType } from "@/types/invoice";
@@ -49,10 +49,7 @@ export default function BookingsPage() {
     queryFn: () => getServices({ limit: 100 })
   });
 
-  const { data: productsRes } = useQuery({
-    queryKey: ["products"],
-    queryFn: () => getProducts({ limit: 100 })
-  });
+  
   const { data: staffDataRes } = useQuery({
     queryKey: ['staff'],
     queryFn: () => getStaff({ limit: 1000 })
@@ -180,7 +177,7 @@ export default function BookingsPage() {
           booking={selectedBooking}
           staff={staffData || []}
           services={servicesRes?.data || []}
-          products={productsRes?.data || []}
+         
           onBack={() => setSelectedId(null)}
           onUpdateStatus={handleUpdateStatus}
           onStartService={handleStartService}

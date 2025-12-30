@@ -110,13 +110,13 @@ import { getCustomers } from "@/lib/api/customers";
 import { storesApi } from "@/lib/api/stores";
 import { getBookings } from "@/lib/api/bookings";
 import { getStaff } from "@/lib/api/staffs";
-import { getProducts } from "@/lib/api/products";
+
 import { getServices } from "@/lib/api/services";
 import { Customer as CustomerType } from "@/types/customer";
 import { Store as StoreType } from "@/types/store";
 import { Booking as BookingType } from "@/types/booking";
 import { Staff as StaffType } from "@/types/staff";
-import { Product as ProductType } from "@/types/product";
+
 import { Service as ServiceType } from "@/types/service";
 import InvoiceDetail from "./InvoiceDetail";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
@@ -306,7 +306,7 @@ export default function InvoicesPage() {
   const [stores, setStores] = useState<StoreType[]>([]);
   const [bookings, setBookings] = useState<BookingType[]>([]);
   const [staff, setStaff] = useState<StaffType[]>([]);
-  const [products, setProducts] = useState<ProductType[]>([]);
+
   const [services, setServices] = useState<ServiceType[]>([]);
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -415,14 +415,7 @@ export default function InvoicesPage() {
     }
   };
 
-  const fetchProducts = async () => {
-    try {
-      const data = await getProducts({ limit: 1000 });
-      setProducts(Array.isArray(data) ? data : []);
-    } catch (err) {
-      console.error("Failed to fetch products:", err);
-    }
-  };
+  
 
   const fetchServices = async () => {
     try {
@@ -727,16 +720,7 @@ export default function InvoicesPage() {
 
   const selectableItems = useMemo((): SelectableItem[] => {
 
-    if (currentItem.item_type === "product") {
-      const items = (products || []).map((product) => ({
-        id: product.id,
-        name: product.name,
-        price: product.price,
-        discount: product.discount || 0,
-        type: "product" as const,
-      }));
-      return items;
-    }
+ 
     if (currentItem.item_type === "service") {
       const items = (services || [])
         .filter((service) => !service.isCombo)
@@ -766,7 +750,7 @@ export default function InvoicesPage() {
       return items;
     }
     return [];
-  }, [products, services, currentItem.item_type]);
+  }, [services, currentItem.item_type]);
 
   if (showDetail) {
     return (
