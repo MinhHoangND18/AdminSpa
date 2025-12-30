@@ -43,6 +43,9 @@ export class Customer {
   @Column({ type: 'varchar', length: 15, unique: true, nullable: false })
   phone: string;
 
+  @Column({ type: 'varchar', length: 8, nullable: true })
+  country_code: string;
+
   @Column({ type: 'varchar', length: 100, nullable: true })
   email: string;
 

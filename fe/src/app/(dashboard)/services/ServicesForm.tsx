@@ -450,9 +450,9 @@ export default function ServicesPage() {
 
   const handleFormChange =
     (field: keyof ServiceFormData) =>
-    (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-      setFormData({ ...formData, [field]: event.target.value });
-    };
+      (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+        setFormData({ ...formData, [field]: event.target.value });
+      };
   const handleSelectChange =
     (field: keyof ServiceFormData) => (event: SelectChangeEvent) => {
       setFormData({ ...formData, [field]: event.target.value });
@@ -460,9 +460,9 @@ export default function ServicesPage() {
 
   const handleSwitchChange =
     (field: keyof ServiceFormData) =>
-    (event: React.ChangeEvent<HTMLInputElement>) => {
-      setFormData({ ...formData, [field]: event.target.checked });
-    };
+      (event: React.ChangeEvent<HTMLInputElement>) => {
+        setFormData({ ...formData, [field]: event.target.checked });
+      };
 
   const handleSubmit = () => {
     const submissionData: CreateServiceDto | UpdateServiceDto = {
@@ -505,7 +505,7 @@ export default function ServicesPage() {
     updateMutation.isPending ||
     deleteMutation.isPending;
   return (
-     <ThemeProvider theme={blueTheme}>
+    <ThemeProvider theme={blueTheme}>
       <Backdrop
         sx={{ color: "#fff", zIndex: (theme) => theme.zIndex.drawer + 1 }}
         open={isAnyLoading}
@@ -525,7 +525,7 @@ export default function ServicesPage() {
       {/* Stats Cards */}
       <Grid container spacing={3} sx={{ mb: 3 }}>
         <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
-          <Card>
+          <Card sx={{borderRadius: 0}}>
             <CardContent>
               <Box
                 sx={{
@@ -560,7 +560,7 @@ export default function ServicesPage() {
           </Card>
         </Grid>
         <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
-          <Card>
+          <Card sx={{ borderRadius: 0 }}>
             <CardContent>
               <Box
                 sx={{
@@ -595,7 +595,7 @@ export default function ServicesPage() {
           </Card>
         </Grid>
         <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
-          <Card>
+          <Card sx={{ borderRadius: 0 }}>
             <CardContent>
               <Box
                 sx={{
@@ -651,7 +651,7 @@ export default function ServicesPage() {
       </Grid>
 
       {/* Actions Bar */}
-      <Card sx={{ mb: 3 }}>
+      <Card sx={{ mb: 3, borderRadius: 0 }}>
         <CardContent sx={{ py: 1.5, "&:last-child": { pb: 1.5 } }}>
           <Stack direction="row" alignItems="center" flexWrap="wrap" gap={1.5}>
             <TextField
@@ -660,7 +660,11 @@ export default function ServicesPage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyPress={(e) => e.key === "Enter" && handleSearch()}
-              sx={{ flex: 1, minWidth: 200 }}
+              sx={{
+                flex: 1, minWidth: 200, "& .MuiOutlinedInput-root": {
+                  borderRadius: "0px",
+                }
+              }}
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
@@ -672,7 +676,13 @@ export default function ServicesPage() {
               }}
             />
 
-            <FormControl sx={{ minWidth: 150 }} size="small">
+            <FormControl sx={{
+              minWidth: 150, "& .MuiOutlinedInput-root": {
+                borderRadius: "0px",
+              }
+            }} size="small"
+
+            >
               <InputLabel>Category</InputLabel>
               <Select
                 value={filters.categoryId?.toString() || "all"}
@@ -694,7 +704,11 @@ export default function ServicesPage() {
               </Select>
             </FormControl>
 
-            <FormControl sx={{ minWidth: 120 }} size="small">
+            <FormControl sx={{
+              minWidth: 120, "& .MuiOutlinedInput-root": {
+                borderRadius: "0px",
+              }
+            }} size="small">
               <InputLabel>Status</InputLabel>
               <Select
                 value={filters.status || "all"}
@@ -712,7 +726,11 @@ export default function ServicesPage() {
               </Select>
             </FormControl>
 
-            <FormControl sx={{ minWidth: 120 }} size="small">
+            <FormControl sx={{
+              minWidth: 120, "& .MuiOutlinedInput-root": {
+                borderRadius: "0px",
+              }
+            }} size="small">
               <InputLabel>Type</InputLabel>
               <Select
                 value={
@@ -746,6 +764,7 @@ export default function ServicesPage() {
                 textTransform: "none",
                 fontWeight: 600,
                 px: 3,
+                borderRadius: "0px",
               }}
             >
               Add New Service
@@ -910,7 +929,7 @@ export default function ServicesPage() {
                           "&:hover": { bgcolor: "#e67e22" },
                           textTransform: "none",
                           fontWeight: 600,
-                          borderRadius: "6px",
+                          borderRadius: "0px",
                           px: 2,
                           minWidth: "80px",
                           boxShadow: "none",
@@ -938,9 +957,9 @@ export default function ServicesPage() {
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
                         {filters.search ||
-                        filters.categoryId ||
-                        filters.status ||
-                        filters.isCombo !== undefined
+                          filters.categoryId ||
+                          filters.status ||
+                          filters.isCombo !== undefined
                           ? "Try adjusting your search or filters"
                           : "Get started by adding your first service"}
                       </Typography>
@@ -973,8 +992,8 @@ export default function ServicesPage() {
           {dialogMode === "add"
             ? "Add New Service"
             : dialogMode === "edit"
-            ? "Edit Service"
-            : "Service Details"}
+              ? "Edit Service"
+              : "Service Details"}
         </DialogTitle>
         <DialogContent dividers>
           {dialogMode === "view" && selectedService ? (

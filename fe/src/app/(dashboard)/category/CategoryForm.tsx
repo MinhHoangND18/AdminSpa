@@ -366,7 +366,7 @@ export default function CategoryForm() {
     updateMutation.isPending ||
     deleteMutation.isPending;
   return (
-       <ThemeProvider theme={blueTheme}>
+    <ThemeProvider theme={blueTheme}>
 
       <Backdrop
         sx={{ color: "#fff", zIndex: (theme) => theme.zIndex.drawer + 1 }}
@@ -377,7 +377,7 @@ export default function CategoryForm() {
       {/* Stats Cards */}
       <Grid container spacing={3} sx={{ mb: 3 }}>
         <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
-          <Card>
+          <Card sx={{borderRadius: 0}}>
             <CardContent>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Box>
@@ -396,7 +396,7 @@ export default function CategoryForm() {
           </Card>
         </Grid>
         <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
-          <Card>
+          <Card sx={{ borderRadius: 0 }}>
             <CardContent>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Box>
@@ -415,7 +415,7 @@ export default function CategoryForm() {
           </Card>
         </Grid>
         <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
-          <Card>
+          <Card sx={{ borderRadius: 0 }}>
             <CardContent>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Box>
@@ -436,7 +436,7 @@ export default function CategoryForm() {
       </Grid>
 
       {/* Actions Bar */}
-      <Card sx={{ mb: 3 }}>
+      <Card sx={{ mb: 3, borderRadius: 0 }}>
         <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
           <Stack direction="row" alignItems="center" flexWrap="wrap" gap={1.5}>
             <TextField
@@ -445,7 +445,12 @@ export default function CategoryForm() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-              sx={{ flex: 1, minWidth: 200 }}
+              sx={{
+                flex: 1, minWidth: 200, "& .MuiOutlinedInput-root": {
+                  borderRadius: "0px",
+                }
+              }}
+
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
@@ -457,7 +462,13 @@ export default function CategoryForm() {
               }}
             />
 
-            <FormControl sx={{ minWidth: 140 }} size="small">
+            <FormControl sx={{
+              minWidth: 140, "& .MuiOutlinedInput-root": {
+                borderRadius: "0px",
+              }
+            }} size="small"
+
+            >
               <InputLabel>Status</InputLabel>
               <Select
                 value={filters.isActive === undefined ? 'all' : filters.isActive ? 'active' : 'inactive'}
@@ -484,7 +495,10 @@ export default function CategoryForm() {
                 '&:hover': { bgcolor: PRIMARY_DARK },
                 textTransform: 'none',
                 fontWeight: 600,
-                px: 3
+                px: 3,
+
+                borderRadius: "0px",
+
               }}
             >
               Add New Category
@@ -570,7 +584,7 @@ export default function CategoryForm() {
 
                     <TableCell>
                       <Chip
-                        label={getStatusLabel(category.isActive)} 
+                        label={getStatusLabel(category.isActive)}
                         size="small"
                         sx={{
                           bgcolor: alpha(getStatusColor(category.isActive), 0.1),
@@ -595,7 +609,7 @@ export default function CategoryForm() {
                           '&:hover': { bgcolor: '#e67e22' },
                           textTransform: 'none',
                           fontWeight: 600,
-                          borderRadius: '6px',
+                          borderRadius: '0px',
                           px: 2,
                           minWidth: '80px',
                           boxShadow: 'none',

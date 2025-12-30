@@ -127,7 +127,7 @@ const StatCard = ({
   color: string;
 }) => (
   <Grid size={{ xs: 12, sm: 4 }}>
-    <Card>
+    <Card sx={{borderRadius: 0}}>
       <CardContent>
         <Box
           sx={{
@@ -504,7 +504,7 @@ export default function StoresPage() {
             value={stats.total}
             icon={StoreIcon}
             color={PRIMARY_COLOR}
-          
+
           />
           <StatCard
             title="Active Stores"
@@ -521,7 +521,7 @@ export default function StoresPage() {
         </Grid>
 
         {/* Actions Bar */}
-        <Card sx={{ mb: 3 }}>
+        <Card sx={{ mb: 3 , borderRadius: 0}}>
           <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
             <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap", alignItems: "center" }}>
               <TextField
@@ -529,7 +529,11 @@ export default function StoresPage() {
                 placeholder="Search stores..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                sx={{ flex: 1, minWidth: 200 }}
+                sx={{
+                  flex: 1, minWidth: 200, "& .MuiOutlinedInput-root": {
+                    borderRadius: "0px",
+                  }
+                }}
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
@@ -549,7 +553,8 @@ export default function StoresPage() {
                   "&:hover": { bgcolor: PRIMARY_DARK },
                   textTransform: "none",
                   fontWeight: 600,
-                  px: 3
+                  px: 3,
+                  borderRadius: "0px",
                 }}
               >
                 Add New Store

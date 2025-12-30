@@ -45,6 +45,7 @@ export interface Booking {
     customer?: Customer;
     customerName?: string;
     customerPhone?: string;
+    customerCountryCode?: string;
     customerEmail?: string;
     pendingInvoiceItems?: PendingInvoiceItem[];
     storeId: number;

@@ -31,6 +31,12 @@ export class CreateCustomerDto {
   @MaxLength(15)
   phone: string;
 
+  @ApiPropertyOptional({ maxLength: 8, example: '+84' })
+  @IsString()
+  @IsOptional()
+  @MaxLength(8)
+  country_code?: string;
+
   @ApiPropertyOptional({ maxLength: 100, example: 'customer@example.com' })
   @IsEmail()
   @IsOptional()

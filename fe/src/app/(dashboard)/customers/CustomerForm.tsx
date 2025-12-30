@@ -353,7 +353,7 @@ export default function CustomersPage() {
 
           <Grid container spacing={3} sx={{ mb: 3 }}>
             <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-              <Card>
+              <Card sx={{ borderRadius: 0 }}>
                 <CardContent>
                   <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                     <Box>
@@ -368,7 +368,7 @@ export default function CustomersPage() {
               </Card>
             </Grid>
             <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-              <Card>
+              <Card sx={{ borderRadius: 0 }}>
                 <CardContent>
                   <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                     <Box>
@@ -383,7 +383,7 @@ export default function CustomersPage() {
               </Card>
             </Grid>
             <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-              <Card>
+              <Card sx={{ borderRadius: 0 }}>
                 <CardContent>
                   <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                     <Box>
@@ -398,7 +398,7 @@ export default function CustomersPage() {
               </Card>
             </Grid>
             <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-              <Card>
+              <Card sx={{ borderRadius: 0 }}>
                 <CardContent>
                   <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                     <Box>
@@ -414,7 +414,7 @@ export default function CustomersPage() {
             </Grid>
           </Grid>
 
-          <Card sx={{ mb: 3 }}>
+          <Card sx={{ mb: 3, borderRadius: 0 }}>
             <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
               <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap", alignItems: "center" }}>
                 <TextField
@@ -514,7 +514,10 @@ export default function CustomersPage() {
                         </TableCell>
                         <TableCell>
                           <Stack spacing={0.5}>
-                            <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}><Phone sx={{ fontSize: 14, color: "text.secondary" }} /><Typography variant="body2">{customer.phone}</Typography></Box>
+                            <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                              <Phone sx={{ fontSize: 14, color: "text.secondary" }} />
+                              <Typography variant="body2"> {customer.country_code ? `(${customer.country_code}) ` : ''}{customer.phone}</Typography>
+                            </Box>
                             {customer.email && <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}><Email sx={{ fontSize: 14, color: "text.secondary" }} /><Typography variant="caption" color="text.secondary">{customer.email}</Typography></Box>}
                           </Stack>
                         </TableCell>
@@ -541,7 +544,7 @@ export default function CustomersPage() {
                               '&:hover': { bgcolor: '#e67e22' },
                               textTransform: 'none',
                               fontWeight: 600,
-                              borderRadius: '6px',
+                              borderRadius: '0px',
                               px: 2,
                               minWidth: '80px',
                               boxShadow: 'none',

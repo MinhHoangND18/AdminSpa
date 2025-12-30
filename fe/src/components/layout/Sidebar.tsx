@@ -47,8 +47,8 @@ const menuItems: MenuItem[] = [
  
   { text: 'Bookings', icon: <EventNoteIcon />, path: '/bookings' },
   { text: 'Invoices', icon: <ReceiptIcon />, path: '/invoices' },
-  { text: 'Reports', icon: <AssessmentIcon />, path: '/report' },
-  { text: 'Settings', icon: <SettingsIcon />, path: '/#' },
+  // { text: 'Reports', icon: <AssessmentIcon />, path: '/report' },
+  // { text: 'Settings', icon: <SettingsIcon />, path: '/#' },
 ];
 
 interface SidebarProps {
@@ -89,7 +89,7 @@ export default function Sidebar({
 }: SidebarProps) {
   const pathname = usePathname();
   const isSelected = (itemPath: string) => {
-    // Nếu là trang dashboard, phải khớp chính xác
+  
     if (itemPath === '/dashboard' && pathname === '/dashboard') return true;
    
     if (itemPath !== '/#' && pathname.startsWith(itemPath)) return true;
@@ -117,7 +117,7 @@ export default function Sidebar({
                   selected={active} 
                   onClick={() => onMenuSelect(item.text)}
                   sx={{
-                    borderRadius: 2,
+                    borderRadius: 0,
                     '&.Mui-selected': {
                       bgcolor: PRIMARY_COLOR,
                       color: 'white',

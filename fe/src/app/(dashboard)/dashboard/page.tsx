@@ -158,7 +158,7 @@ const StatCard = ({
   color: string;
   subtitle?: string;
 }) => (
-  <Card sx={{ height: '100%', position: 'relative', overflow: 'visible' }}>
+  <Card sx={{ height: '100%', position: 'relative', overflow: 'visible', borderRadius: 0 }}>
     <CardContent>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <Box>
@@ -192,7 +192,7 @@ const StatCard = ({
           sx={{
             width: 64,
             height: 64,
-            borderRadius: 3,
+            borderRadius: '50%',
             bgcolor: alpha(color, 0.1),
             display: 'flex',
             alignItems: 'center',
@@ -211,8 +211,8 @@ export default function DashboardPage() {
   return (
     <>
       {/* Stats Cards */}
-      <Grid container spacing={3} sx={{ mb: 3 }}>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+      <Grid container spacing={3} sx={{ mb: 3}}>
+        <Grid size={{ xs: 12, sm: 6, md: 3}}>
           <StatCard
             title="Monthly Revenue"
             value="$72.5K"
@@ -257,7 +257,7 @@ export default function DashboardPage() {
       {/* Charts Row 1 */}
       <Grid container spacing={3} sx={{ mb: 3 }}>
         <Grid size={{ xs: 12, lg: 8 }}>
-          <Card sx={{ height: '100%' }}>
+          <Card sx={{ height: '100%', borderRadius: 0 }}>
             <CardContent>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                 <Typography variant="h6" fontWeight="bold">
@@ -281,7 +281,7 @@ export default function DashboardPage() {
                     contentStyle={{
                       backgroundColor: '#fff',
                       border: `1px solid ${alpha(PRIMARY_COLOR, 0.2)}`,
-                      borderRadius: 8,
+                      borderRadius: 0,
                     }}
                   />
                   <Legend />
@@ -308,7 +308,7 @@ export default function DashboardPage() {
         </Grid>
 
         <Grid size={{ xs: 12, lg: 4 }}>
-          <Card sx={{ height: '100%' }}>
+          <Card sx={{ height: '100%', borderRadius: 0 }}>
             <CardContent>
               <Typography variant="h6" fontWeight="bold" gutterBottom>
                 Booking Status
@@ -360,7 +360,7 @@ export default function DashboardPage() {
       {/* Charts Row 2 */}
       <Grid container spacing={3} sx={{ mb: 3 }}>
         <Grid size={{ xs: 12, lg: 6 }}>
-          <Card>
+          <Card sx={{ borderRadius: 0 }}>
             <CardContent>
               <Typography variant="h6" fontWeight="bold" gutterBottom>
                 Top Popular Services
@@ -375,10 +375,10 @@ export default function DashboardPage() {
                     contentStyle={{
                       backgroundColor: '#fff',
                       border: `1px solid ${alpha(PRIMARY_COLOR, 0.2)}`,
-                      borderRadius: 8,
+                      borderRadius: 0,
                     }}
                   />
-                  <Bar dataKey="bookings" fill={PRIMARY_COLOR} radius={[0, 8, 8, 0]} name="Bookings" />
+                  <Bar dataKey="bookings" fill={PRIMARY_COLOR} radius={[0, 0, 0, 0]} name="Bookings" />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
@@ -386,7 +386,7 @@ export default function DashboardPage() {
         </Grid>
 
         <Grid size={{ xs: 12, lg: 6 }}>
-          <Card>
+          <Card sx={{ borderRadius: 0 }}>
             <CardContent>
               <Typography variant="h6" fontWeight="bold" gutterBottom>
                 Top Performing Staff
@@ -431,11 +431,11 @@ export default function DashboardPage() {
                               sx={{
                                 mt: 0.5,
                                 height: 6,
-                                borderRadius: 3,
+                                borderRadius: 0,
                                 bgcolor: alpha(PRIMARY_COLOR, 0.1),
                                 '& .MuiLinearProgress-bar': {
                                   bgcolor: PRIMARY_COLOR,
-                                  borderRadius: 3,
+                                  borderRadius: 0,
                                 },
                               }}
                             />
@@ -455,7 +455,7 @@ export default function DashboardPage() {
       {/* Recent Activities */}
       <Grid container spacing={3}>
         <Grid size={{ xs: 12 }}>
-          <Card>
+          <Card sx={{ borderRadius: 0 }}>
             <CardContent>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                 <Typography variant="h6" fontWeight="bold">
@@ -481,7 +481,7 @@ export default function DashboardPage() {
                           sx={{
                             width: 48,
                             height: 48,
-                            borderRadius: 2,
+                            borderRadius: 0,
                             bgcolor: alpha(activity.color, 0.1),
                             display: 'flex',
                             alignItems: 'center',

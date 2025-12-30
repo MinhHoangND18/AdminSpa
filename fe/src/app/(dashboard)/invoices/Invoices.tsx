@@ -883,7 +883,7 @@ export default function InvoicesPage() {
     return {
       subtotal,
       discountAmount: finalDiscountAmount,
-      taxAmount: calculatedTaxAmount, 
+      taxAmount: calculatedTaxAmount,
       total: Math.max(0, total),
     };
   };
@@ -1060,15 +1060,10 @@ export default function InvoicesPage() {
       discount: item.discount.toString(),
     }));
   };
-  const isAnyLoading =
-    isLoading || 
-    isInitialLoad || 
-    isFormDataLoading || 
-    isItemsLoading ||
-    false;
+const isAnyLoading = (isInitialLoad || isFormDataLoading || isItemsLoading) && invoices.length === 0;
 
   return (
-     <ThemeProvider theme={blueTheme}>
+    <ThemeProvider theme={blueTheme}>
       {/* <Box sx={{ mb: 3 }}>
                 <Typography variant="h4" fontWeight="bold" gutterBottom>
                     Invoice Management
@@ -1086,7 +1081,7 @@ export default function InvoicesPage() {
       {/* Stats Cards */}
       <Grid container spacing={3} sx={{ mb: 3 }}>
         <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-          <Card>
+          <Card sx={{borderRadius: 0}}>
             <CardContent>
               <Box
                 sx={{
@@ -1121,7 +1116,7 @@ export default function InvoicesPage() {
           </Card>
         </Grid>
         <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-          <Card>
+          <Card sx={{ borderRadius: 0 }}>
             <CardContent>
               <Box
                 sx={{
@@ -1160,7 +1155,7 @@ export default function InvoicesPage() {
           </Card>
         </Grid>
         <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-          <Card>
+          <Card sx={{ borderRadius: 0 }}>
             <CardContent>
               <Box
                 sx={{
@@ -1199,7 +1194,7 @@ export default function InvoicesPage() {
           </Card>
         </Grid>
         <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-          <Card>
+          <Card sx={{ borderRadius: 0 }}>
             <CardContent>
               <Box
                 sx={{
@@ -1236,32 +1231,40 @@ export default function InvoicesPage() {
       </Grid>
 
       {/* Actions Bar */}
-      <Card sx={{ mb: 3 }}> 
-        <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}> 
+      <Card sx={{ mb: 3, borderRadius: 0 }}>
+        <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
           <Box
             sx={{
               display: "flex",
-              gap: 1.5, 
+              gap: 1.5,
               flexWrap: "wrap",
               alignItems: "center",
             }}
           >
             <TextField
-              size="small" 
+              size="small"
               placeholder="Search by invoice code..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              sx={{ flex: 1, minWidth: 200 }} 
+              sx={{
+                flex: 1, minWidth: 200, "& .MuiOutlinedInput-root": {
+                  borderRadius: "0px",
+                }
+              }}
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
-                    <Search sx={{ color: PRIMARY_COLOR, fontSize: 20 }} /> 
+                    <Search sx={{ color: PRIMARY_COLOR, fontSize: 20 }} />
                   </InputAdornment>
                 ),
               }}
             />
 
-            <FormControl sx={{ minWidth: 130 }} size="small"> 
+            <FormControl sx={{
+              minWidth: 130, "& .MuiOutlinedInput-root": {
+                borderRadius: "0px",
+              }
+            }} size="small">
               <InputLabel>Payment Status</InputLabel>
               <Select
                 value={filterStatus}
@@ -1274,7 +1277,11 @@ export default function InvoicesPage() {
               </Select>
             </FormControl>
 
-            <FormControl sx={{ minWidth: 150 }} size="small">
+            <FormControl sx={{
+              minWidth: 150, "& .MuiOutlinedInput-root": {
+                borderRadius: "0px",
+              }
+            }} size="small">
               <InputLabel>Store</InputLabel>
               <Select
                 value={filterStore}
@@ -1296,12 +1303,13 @@ export default function InvoicesPage() {
               startIcon={<Add />}
               onClick={handleAddNew}
               sx={{
-                height: 40, 
+                height: 40,
                 bgcolor: PRIMARY_COLOR,
                 "&:hover": { bgcolor: PRIMARY_DARK },
                 textTransform: "none",
                 fontWeight: 600,
-                px: 3, 
+                px: 3,
+                borderRadius: "0px",
               }}
             >
               Create Invoice
@@ -1435,7 +1443,7 @@ export default function InvoicesPage() {
                           '&:hover': { bgcolor: '#e67e22' },
                           textTransform: 'none',
                           fontWeight: 600,
-                          borderRadius: '6px',
+                          borderRadius: '0px',
                           px: 2,
                           minWidth: '80px',
                           boxShadow: 'none',

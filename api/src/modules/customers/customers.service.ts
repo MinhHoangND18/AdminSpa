@@ -30,9 +30,15 @@ export class CustomersService {
     phone: string;
     fullName: string;
     email?: string;
+    country_code?: string;
   }): Promise<Customer> {
+    // Set default country_code if not provided
+    if (!customerData.country_code) {
+      customerData.country_code = '+84';
+    }
+
     let customer = await this.customerRepository.findOne({
-      where: { phone: customerData.phone },
+      where: { phone: customerData.phone, country_code: customerData.country_code },
     });
 
     if (customer) {

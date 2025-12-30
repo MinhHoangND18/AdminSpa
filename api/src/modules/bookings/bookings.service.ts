@@ -34,11 +34,26 @@ export class BookingsService {
   async createBookingFromOrder(orderDto: CreateBookingOrderDto): Promise<Booking> {
     const { customer: customerData, booking: bookingData, invoice: invoiceData } = orderDto;
 
+    // Set default country_code if not provided
+    if (!customerData.country_code) {
+      customerData.country_code = '+84';
+    }
+
+    // Log for debugging
+    console.log('Received country_code:', customerData.country_code);
+    console.log('Customer data:', {
+      fullName: customerData.fullName,
+      phone: customerData.phone,
+      email: customerData.email,
+      country_code: customerData.country_code,
+    });
+
     const booking = this.bookingRepository.create({
       ...bookingData,
       customerId: null,
       customerName: customerData.fullName,
       customerPhone: customerData.phone,
+      customerCountryCode: customerData.country_code,
       customerEmail: customerData.email,
       pendingInvoiceItems: invoiceData.items,
       status: BookingStatus.PENDING,
@@ -46,7 +61,10 @@ export class BookingsService {
       source: 'website',
     });
 
-    return await this.bookingRepository.save(booking);
+    const savedBooking = await this.bookingRepository.save(booking);
+    console.log('Saved booking with customerCountryCode:', savedBooking.customerCountryCode);
+    
+    return savedBooking;
   }
 
   async create(createBookingDto: CreateBookingDto): Promise<Booking> {
@@ -149,6 +167,7 @@ export class BookingsService {
           fullName: booking.customerName,
           phone: booking.customerPhone,
           email: booking.customerEmail,
+          country_code: booking.customerCountryCode,
         });
         booking.customerId = customer.id;
       }
@@ -226,6 +245,7 @@ export class BookingsService {
           fullName: booking.customerName,
           phone: booking.customerPhone,
           email: booking.customerEmail,
+          country_code: booking.customerCountryCode,
         });
         booking.customerId = customer.id;
       }

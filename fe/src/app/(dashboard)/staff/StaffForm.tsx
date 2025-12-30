@@ -545,7 +545,7 @@ export default function StaffPage() {
       {/* Stats Cards */}
       <Grid container spacing={3} sx={{ mb: 3 }}>
         <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-          <Card>
+          <Card sx={{ borderRadius: 0 }}>
             <CardContent>
               <Box
                 sx={{
@@ -580,7 +580,7 @@ export default function StaffPage() {
           </Card>
         </Grid>
         <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-          <Card>
+          <Card sx={{ borderRadius: 0 }}>
             <CardContent>
               <Box
                 sx={{
@@ -615,7 +615,7 @@ export default function StaffPage() {
           </Card>
         </Grid>
         <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-          <Card>
+          <Card sx={{ borderRadius: 0 }}>
             <CardContent>
               <Box
                 sx={{
@@ -650,7 +650,7 @@ export default function StaffPage() {
           </Card>
         </Grid>
         <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-          <Card>
+          <Card sx={{ borderRadius: 0 }}>
             <CardContent>
               <Box
                 sx={{
@@ -687,7 +687,7 @@ export default function StaffPage() {
       </Grid>
 
       {/* Actions Bar */}
-      <Card sx={{ mb: 3}}>
+      <Card sx={{ mb: 3, borderRadius: 0 }}>
         <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
           <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap", alignItems: "center" }}>
             <TextField
@@ -695,7 +695,9 @@ export default function StaffPage() {
               placeholder="Search staff..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              sx={{ flex: 1, minWidth: 200 }}
+              sx={{ flex: 1, minWidth: 200,  "& .MuiOutlinedInput-root": {
+                                            borderRadius: "0px",
+                                        } }}
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
@@ -705,7 +707,9 @@ export default function StaffPage() {
               }}
             />
 
-            <FormControl sx={{ minWidth: 140 }} size="small">
+            <FormControl sx={{ minWidth: 140,   "& .MuiOutlinedInput-root": {
+                                            borderRadius: "0px",
+                                        } }} size="small">
               <InputLabel>Status</InputLabel>
               <Select
                 value={filterStatus}
@@ -736,7 +740,8 @@ export default function StaffPage() {
                 "&:hover": { bgcolor: PRIMARY_DARK },
                 textTransform: "none",
                 fontWeight: 600,
-                px: 3
+                px: 3,
+                borderRadius: "0px",
               }}
             >
               Add New Staff
@@ -871,7 +876,7 @@ export default function StaffPage() {
                           '&:hover': { bgcolor: '#e67e22' },
                           textTransform: 'none',
                           fontWeight: 600,
-                          borderRadius: '6px',
+                          borderRadius: '0px',
                           px: 2,
                           minWidth: '80px',
                           boxShadow: 'none',
