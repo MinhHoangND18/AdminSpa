@@ -127,7 +127,7 @@ const StatCard = ({
   color: string;
 }) => (
   <Grid size={{ xs: 12, sm: 4 }}>
-    <Card>
+    <Card sx={{ borderRadius: 0 }}>
       <CardContent>
         <Box
           sx={{
@@ -520,7 +520,7 @@ export default function StoresPage() {
       </Grid>
 
       {/* Actions Bar */}
-      <Card sx={{ mb: 3 }}>
+      <Card sx={{ mb: 3, borderRadius: 0 }}>
         <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
           <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap", alignItems: "center" }}>
             <TextField
@@ -567,6 +567,7 @@ export default function StoresPage() {
                   height: "100%",
                   transition: "all 0.3s",
                   "&:hover": { boxShadow: 6, transform: "translateY(-4px)" },
+                  borderRadius: 0,
                 }}
               >
                 <CardContent>
@@ -609,7 +610,7 @@ export default function StoresPage() {
                           '&:hover': { bgcolor: '#e67e22' },
                           textTransform: 'none',
                           fontWeight: 600,
-                          borderRadius: '6px',
+                          borderRadius: '0px',
                           px: 2,
                           minWidth: '80px',
                           boxShadow: 'none',
@@ -715,7 +716,7 @@ export default function StoresPage() {
           ))
         ) : (
           <Grid size={{ xs: 12 }}>
-            <Card>
+            <Card sx={{ borderRadius: 0 }}>
               <CardContent>
                 <Box sx={{ textAlign: "center", py: 6 }}>
                   <StoreIcon

@@ -30,9 +30,10 @@ export class CustomersService {
     phone: string;
     fullName: string;
     email?: string;
+    country_code?: string;
   }): Promise<Customer> {
     let customer = await this.customerRepository.findOne({
-      where: { phone: customerData.phone },
+      where: { phone: customerData.phone, country_code: customerData.country_code },
     });
 
     if (customer) {

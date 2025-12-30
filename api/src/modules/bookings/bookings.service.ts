@@ -39,6 +39,7 @@ export class BookingsService {
       customerId: null,
       customerName: customerData.fullName,
       customerPhone: customerData.phone,
+      customerCountryCode: customerData.country_code,
       customerEmail: customerData.email,
       pendingInvoiceItems: invoiceData.items,
       status: BookingStatus.PENDING,
@@ -149,6 +150,7 @@ export class BookingsService {
           fullName: booking.customerName,
           phone: booking.customerPhone,
           email: booking.customerEmail,
+          country_code: booking.customerCountryCode,
         });
         booking.customerId = customer.id;
       }
@@ -226,6 +228,7 @@ export class BookingsService {
           fullName: booking.customerName,
           phone: booking.customerPhone,
           email: booking.customerEmail,
+          country_code: booking.customerCountryCode,
         });
         booking.customerId = customer.id;
       }

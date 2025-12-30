@@ -705,9 +705,9 @@ export default function UsersPage() {
           </Typography>
         </Box> */}
 
-        <Grid container spacing={3} sx={{ mb: 3 }}>
+        <Grid container spacing={3} sx={{ mb: 3, }}>
           <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
-            <Card>
+            <Card sx={{borderRadius: 0}}>
               <CardContent>
                 <Box
                   sx={{

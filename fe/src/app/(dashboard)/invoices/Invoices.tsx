@@ -294,7 +294,7 @@ function useDebounce<T>(value: T, delay: number): T {
 export default function InvoicesPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [totalItems, setTotalItems] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isItemsLoading, setIsItemsLoading] = useState(false);
   const [itemsForView, setItemsForView] = useState<InvoiceItem[]>([]);
@@ -543,7 +543,7 @@ export default function InvoicesPage() {
     }
   };
   useEffect(() => {
-    if (!isInitialLoad && customers.length > 0 && stores.length > 0 && bookings.length > 0) {
+    if (!isInitialLoad && customers.length > 0 && stores.length > 0) {
       fetchInvoices();
     }
   }, [

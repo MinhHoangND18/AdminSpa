@@ -31,6 +31,7 @@ export interface Customer {
   id: number;
   fullName: string;
   phone: string;
+  country_code?: string;
   email: string | null;
   gender: Gender;
   birthday: string | null;
@@ -51,6 +52,7 @@ export interface Customer {
 export interface CustomerFormData {
   fullName: string;
   phone: string;
+  country_code?: string;
   email: string;
   gender: Gender;
   birthday: string;
@@ -64,6 +66,7 @@ export interface CustomerFormData {
 export interface CreateCustomerDto {
   fullName: string;
   phone: string;
+  country_code?: string;
   email?: string;
   gender?: Gender;
   birthday?: string;

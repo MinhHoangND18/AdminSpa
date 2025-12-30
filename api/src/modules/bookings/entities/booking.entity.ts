@@ -1,14 +1,14 @@
 // src/bookings/entities/booking.entity.ts
-import { 
-  Entity, 
-  PrimaryGeneratedColumn, 
-  Column, 
-  ManyToOne, 
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  ManyToOne,
   JoinColumn,
   CreateDateColumn,
   UpdateDateColumn,
   Index,
-  OneToMany
+  OneToMany,
 } from 'typeorm';
 import { Customer } from '../../customers/entities/customer.entity';
 import { Store } from '../../stores/entities/store.entity';
@@ -21,7 +21,7 @@ export enum BookingStatus {
   IN_PROGRESS = 'in_progress',
   COMPLETED = 'completed',
   CANCELLED = 'cancelled',
-  NO_SHOW = 'no_show'
+  NO_SHOW = 'no_show',
 }
 
 @Entity('booking')
@@ -39,13 +39,36 @@ export class Booking {
   @JoinColumn({ name: 'customer_id' })
   customer: Customer;
 
-  @Column({ type: 'varchar', length: 255, name: 'customer_name', nullable: true })
+  @Column({
+    type: 'varchar',
+    length: 255,
+    name: 'customer_name',
+    nullable: true,
+  })
   customerName: string;
 
-  @Column({ type: 'varchar', length: 50, name: 'customer_phone', nullable: true })
+  @Column({
+    type: 'varchar',
+    length: 50,
+    name: 'customer_phone',
+    nullable: true,
+  })
   customerPhone: string;
 
-  @Column({ type: 'varchar', length: 255, name: 'customer_email', nullable: true })
+  @Column({
+    type: 'varchar',
+    length: 8,
+    name: 'customer_country_code',
+    nullable: true,
+  })
+  customerCountryCode: string;
+
+  @Column({
+    type: 'varchar',
+    length: 255,
+    name: 'customer_email',
+    nullable: true,
+  })
   customerEmail: string;
 
   @Column({ type: 'json', name: 'pending_invoice_items', nullable: true })
@@ -70,7 +93,7 @@ export class Booking {
   @Column({
     type: 'enum',
     enum: BookingStatus,
-    default: BookingStatus.PENDING
+    default: BookingStatus.PENDING,
   })
   status: BookingStatus;
 
@@ -80,10 +103,21 @@ export class Booking {
   @Column({ type: 'text', nullable: true })
   notes: string;
 
-  @Column({ type: 'decimal', precision: 10, scale: 2, name: 'order_discount', nullable: true })
+  @Column({
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    name: 'order_discount',
+    nullable: true,
+  })
   orderDiscount: number;
 
-  @Column({ type: 'varchar', length: 255, name: 'discount_reason', nullable: true })
+  @Column({
+    type: 'varchar',
+    length: 255,
+    name: 'discount_reason',
+    nullable: true,
+  })
   discountReason: string;
 
   @Column({ type: 'boolean', default: false })
@@ -102,6 +136,6 @@ export class Booking {
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
 
-  @OneToMany(() => Invoice, invoice => invoice.booking)
+  @OneToMany(() => Invoice, (invoice) => invoice.booking)
   invoices: Invoice[];
 }

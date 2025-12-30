@@ -382,7 +382,7 @@ export default function BookingsPage() {
                           {booking.customer?.fullName || booking.customerName}
                         </Typography>
                         <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
-                          {booking.customer?.phone || booking.customerPhone}
+                          {booking.customerCountryCode ? `(${booking.customerCountryCode}) ` : ''}{booking.customer?.phone || booking.customerPhone}
                         </Typography>
                       </Box>
                     </TableCell>
@@ -401,7 +401,7 @@ export default function BookingsPage() {
                     </TableCell>
                     <TableCell>
                       <Chip
-                        label={booking.status}
+                        label={booking.status === 'in_progress' ? 'progressing' : booking.status}
                         size="small"
                         sx={getStatusChipStyle(booking.status)}
                       />
