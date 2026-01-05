@@ -59,6 +59,26 @@ export default function CategoryDetail({
     status: initialData?.status || 'active',
   }));
 
+  React.useEffect(() => {
+    if (initialData) {
+      setFormData({
+        name: initialData.name || '',
+        slug: initialData.slug || '',
+        description: initialData.description || '',
+        imageUrl: initialData.imageUrl || '',
+        status: initialData.status || 'active',
+      });
+    } else {
+      setFormData({
+        name: '',
+        slug: '',
+        description: '',
+        imageUrl: '',
+        status: 'active',
+      });
+    }
+  }, [initialData]);
+
   const [errors, setErrors] = useState<Partial<Record<keyof CategoryFormData, string>>>({});
 
   const validate = () => {

@@ -1,4 +1,5 @@
 import api from './axios';
+import apiClient from './axios';
 import {
   ServiceCategory,
   QueryServiceCategoryDto,
@@ -22,23 +23,21 @@ export const getServiceCategories = async (
     { params },
   );
   
-  // Debug log
   console.log('Raw API Response:', data);
   console.log('Actual Data:', data.data);
   
-  // Trả về data thật từ wrapper
   return data.data;
 };
-
+export const getServiceCategoryById = async (id: number): Promise<ServiceCategory> => {
+  const response = await apiClient.get<ServiceCategory>(`/service-categories/${id}`);
+  return response.data;
+};
 export const getActiveServiceCategories = async (): Promise<ServiceCategory[]> => {
   const { data } = await api.get<ApiResponse<ServiceCategory[]>>('/service-categories/active');
   
-  // Xử lý nhiều trường hợp response format
   if (data && typeof data === 'object') {
-    // Nếu có wrapper { success, data, timestamp }
     if ('data' in data) {
       const innerData = data.data;
-      // Nếu innerData cũng có wrapper nữa
       if (innerData && typeof innerData === 'object' && 'data' in innerData) {
         return Array.isArray(innerData.data) ? innerData.data : [];
       }
@@ -57,7 +56,6 @@ export const createServiceCategory = async (
     categoryData,
   );
   
-  // Trả về data thật từ wrapper
   return data.data;
 };
 
@@ -70,7 +68,6 @@ export const updateServiceCategory = async (
     categoryData,
   );
   
-  // Trả về data thật từ wrapper
   return data.data;
 };
 

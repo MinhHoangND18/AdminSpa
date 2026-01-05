@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Grid,
   Card,
@@ -68,6 +68,7 @@ import {
   deleteService,
   createService,
   updateService,
+  getServiceById,
 } from "@/lib/api/services";
 import { getActiveServiceCategories } from "@/lib/api/service-categories";
 import {
@@ -79,6 +80,7 @@ import {
   CreateServiceDto,
   PaginatedServices,
 } from "@/types";
+import { useRouter } from "next/navigation";
 import ServiceDetail from "./ServiceDetail";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
 const blueTheme = createTheme({
@@ -150,7 +152,7 @@ const formatDuration = (minutes: number) => {
   return `${minutes}m`;
 };
 
-export default function ServicesPage() {
+export default function ServicesPage({ slug }: { slug?: string[] }) {
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
   const [filters, setFilters] = useState<
@@ -161,6 +163,8 @@ export default function ServicesPage() {
     status: undefined,
     isCombo: undefined,
   });
+  const router = useRouter();
+
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
@@ -178,7 +182,16 @@ export default function ServicesPage() {
   >({});
   const [loading, setLoading] = useState(false);
   const [showDetail, setShowDetail] = useState(false);
-
+  useEffect(() => {
+    if (sessionStorage.getItem("showServiceUpdateSuccess")) {
+      setSnackbar({
+        open: true,
+        message: "Service updated successfully!",
+        severity: "success",
+      });
+      sessionStorage.removeItem("showServiceUpdateSuccess");
+    }
+  }, []);
   const initialFormData: ServiceFormData = {
     name: "",
     categoryId: "",
@@ -290,18 +303,49 @@ export default function ServicesPage() {
       });
     },
   });
+  
+  useEffect(() => {
+    const serviceId = slug?.[0];
 
+    if (serviceId) {
+      if (selectedService?.id === Number(serviceId) && showDetail) {
+        return;
+      }
+
+      getServiceById(Number(serviceId))
+        .then((Response: Service | { data: Service }) => {
+          const serviceData = "data" in Response ? Response.data : Response;
+          handleEdit(serviceData);
+        })
+        .catch(() => {
+          router.push("/services");
+        });
+    } else {
+      if (showDetail && dialogMode === "edit") {
+        setShowDetail(false);
+        setSelectedService(null);
+      }
+    }
+  }, [slug]);
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: UpdateServiceDto }) =>
       updateService(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["services"] });
-      setSnackbar({
-        open: true,
-        message: "Service updated successfully!",
-        severity: "success",
-      });
-      handleBack();
+      // queryClient.invalidateQueries({ queryKey: ["services"] });
+      sessionStorage.setItem("showServiceUpdateSuccess", "true");
+      const query: Record<string, string> = {};
+
+      if (filters.search) query.search = filters.search;
+      if (filters.categoryId) query.categoryId = filters.categoryId.toString();
+      if (filters.status) query.status = filters.status;
+      if (filters.isCombo !== undefined)
+        query.isCombo = String(filters.isCombo);
+
+      const queryString = new URLSearchParams(query).toString();
+      router.push(queryString ? `/services?${queryString}` : "/services");
+
+      setShowDetail(false);
+      setSelectedService(null);
     },
     onError: (error: Error) => {
       setSnackbar({
@@ -431,7 +475,11 @@ export default function ServicesPage() {
         initialData={selectedService}
         categories={categories}
         onSave={handleSave}
-        onBack={handleBack}
+        onBack={() => {
+          setShowDetail(false);
+          setSelectedService(null);
+          router.push("/services");
+        }}
         loading={createMutation.isPending || updateMutation.isPending}
       />
     );
@@ -505,7 +553,7 @@ export default function ServicesPage() {
     updateMutation.isPending ||
     deleteMutation.isPending;
   return (
-     <ThemeProvider theme={blueTheme}>
+    <ThemeProvider theme={blueTheme}>
       <Backdrop
         sx={{ color: "#fff", zIndex: (theme) => theme.zIndex.drawer + 1 }}
         open={isAnyLoading}
@@ -525,7 +573,7 @@ export default function ServicesPage() {
       {/* Stats Cards */}
       <Grid container spacing={3} sx={{ mb: 3 }}>
         <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
-          <Card>
+          <Card sx={{ borderRadius: 0 }}>
             <CardContent>
               <Box
                 sx={{
@@ -560,7 +608,7 @@ export default function ServicesPage() {
           </Card>
         </Grid>
         <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
-          <Card>
+          <Card sx={{ borderRadius: 0 }}>
             <CardContent>
               <Box
                 sx={{
@@ -595,7 +643,7 @@ export default function ServicesPage() {
           </Card>
         </Grid>
         <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
-          <Card>
+          <Card sx={{ borderRadius: 0 }}>
             <CardContent>
               <Box
                 sx={{
@@ -651,7 +699,7 @@ export default function ServicesPage() {
       </Grid>
 
       {/* Actions Bar */}
-      <Card sx={{ mb: 3 }}>
+      <Card sx={{ mb: 3, borderRadius: 0 }}>
         <CardContent sx={{ py: 1.5, "&:last-child": { pb: 1.5 } }}>
           <Stack direction="row" alignItems="center" flexWrap="wrap" gap={1.5}>
             <TextField
@@ -660,7 +708,13 @@ export default function ServicesPage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyPress={(e) => e.key === "Enter" && handleSearch()}
-              sx={{ flex: 1, minWidth: 200 }}
+              sx={{
+                flex: 1,
+                minWidth: 200,
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: "0px",
+                },
+              }}
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
@@ -672,7 +726,15 @@ export default function ServicesPage() {
               }}
             />
 
-            <FormControl sx={{ minWidth: 150 }} size="small">
+            <FormControl
+              sx={{
+                minWidth: 150,
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: "0px",
+                },
+              }}
+              size="small"
+            >
               <InputLabel>Category</InputLabel>
               <Select
                 value={filters.categoryId?.toString() || "all"}
@@ -694,7 +756,15 @@ export default function ServicesPage() {
               </Select>
             </FormControl>
 
-            <FormControl sx={{ minWidth: 120 }} size="small">
+            <FormControl
+              sx={{
+                minWidth: 120,
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: "0px",
+                },
+              }}
+              size="small"
+            >
               <InputLabel>Status</InputLabel>
               <Select
                 value={filters.status || "all"}
@@ -712,7 +782,15 @@ export default function ServicesPage() {
               </Select>
             </FormControl>
 
-            <FormControl sx={{ minWidth: 120 }} size="small">
+            <FormControl
+              sx={{
+                minWidth: 120,
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: "0px",
+                },
+              }}
+              size="small"
+            >
               <InputLabel>Type</InputLabel>
               <Select
                 value={
@@ -746,6 +824,7 @@ export default function ServicesPage() {
                 textTransform: "none",
                 fontWeight: 600,
                 px: 3,
+                borderRadius: "0px",
               }}
             >
               Add New Service
@@ -904,13 +983,15 @@ export default function ServicesPage() {
                         startIcon={
                           <Edit sx={{ fontSize: "18px !important" }} />
                         }
-                        onClick={() => handleEdit(service)}
+                        onClick={() => {
+                          router.push(`/services/${service.id}`);
+                        }}
                         sx={{
                           bgcolor: "#f39c12",
                           "&:hover": { bgcolor: "#e67e22" },
                           textTransform: "none",
                           fontWeight: 600,
-                          borderRadius: "6px",
+                          borderRadius: "0px",
                           px: 2,
                           minWidth: "80px",
                           boxShadow: "none",

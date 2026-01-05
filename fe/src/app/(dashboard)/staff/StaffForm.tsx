@@ -65,7 +65,9 @@ import {
   createStaff,
   updateStaff,
   deleteStaff,
+  getStaffById,
 } from "@/lib/api/staffs";
+import { useRouter } from "next/navigation";
 
 import { useAuth } from "@/lib/hooks/useAuth";
 import StaffDetail from "./StaffDetail";
@@ -87,13 +89,12 @@ interface AxiosErrorResponse {
   };
 }
 
-
 const isAxiosError = (error: unknown): error is AxiosErrorResponse => {
   return (
-    typeof error === 'object' &&
+    typeof error === "object" &&
     error !== null &&
-    'response' in error &&
-    typeof (error as AxiosErrorResponse).response === 'object'
+    "response" in error &&
+    typeof (error as AxiosErrorResponse).response === "object"
   );
 };
 
@@ -142,9 +143,10 @@ const getSalaryTypeLabel = (type: SalaryType) => {
   }
 };
 
-export default function StaffPage() {
+export default function StaffPage({ slug }: { slug?: string[] }) {
   const { user: currentUser } = useAuth();
   const canManageStaff = currentUser?.role !== "staff";
+  const router = useRouter();
 
   const [staff, setStaff] = useState<Staff[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -186,7 +188,16 @@ export default function StaffPage() {
     };
     fetchStores();
   }, []);
-
+  useEffect(() => {
+    if (sessionStorage.getItem("showStaffUpdateSuccess")) {
+      setSnackbar({
+        open: true,
+        message: "Staff member updated successfully",
+        severity: "success",
+      });
+      sessionStorage.removeItem("showStaffUpdateSuccess");
+    }
+  }, []);
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
     message: string;
@@ -215,7 +226,29 @@ export default function StaffPage() {
     commission_rate: 0,
     status: "active",
   };
+  useEffect(() => {
+    const staffId = slug?.[0];
 
+    if (staffId) {
+      if (selectedStaff?.id === Number(staffId) && showDetail) {
+        return;
+      }
+
+      getStaffById(Number(staffId))
+        .then((Response: Staff | { data: Staff }) => {
+          const staffData = "data" in Response ? Response.data : Response;
+          handleEdit(staffData);
+        })
+        .catch(() => {
+          router.push("/staff");
+        });
+    } else {
+      if (showDetail && dialogMode === "edit") {
+        setShowDetail(false);
+        setSelectedStaff(null);
+      }
+    }
+  }, [slug]);
   const [formData, setFormData] = useState<StaffFormDataType>(initialFormData);
 
   const fetchStaffData = useCallback(async () => {
@@ -266,34 +299,68 @@ export default function StaffPage() {
     try {
       if (dialogMode === "add") {
         await createStaff(submitData);
+        setSnackbar({
+          open: true,
+          message: "Staff member added successfully.",
+          severity: "success",
+        });
+        setShowDetail(false);
+        fetchStaffData();
       } else if (dialogMode === "edit" && selectedStaff) {
         await updateStaff({ id: selectedStaff.id, data: submitData });
-      }
+        sessionStorage.setItem("showStaffUpdateSuccess", "true");
+        const query: { status?: string; keyword?: string } = {};
 
-      setSnackbar({ open: true, message: "Staff saved successfully", severity: "success" });
-      setShowDetail(false);
-      fetchStaffData();
-    } catch (error) {
-      console.error("Failed to fetch dropdown data:", error);
+        if (filterStatus !== "all") {
+          query.status = filterStatus;
+        }
+        if (searchQuery) {
+          query.keyword = searchQuery;
+        }
+
+        const queryString = new URLSearchParams(query as any).toString();
+        router.push(queryString ? `/staff?${queryString}` : "/staff");
+      }
+    } catch (error: unknown) {
+      console.error("Failed to save staff:", error);
+      let backendError: string | string[] | undefined;
+      if (isAxiosError(error)) {
+        backendError = error.response?.data?.message;
+      }
+      const displayMessage = Array.isArray(backendError)
+        ? backendError[0]
+        : backendError || "An error occurred. Please try again.";
+
+      setSnackbar({
+        open: true,
+        message: displayMessage,
+        severity: "error",
+      });
     }
   };
 
   useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      fetchStaffData();
-    }, 500);
+    if (!showDetail) {
+      const timeoutId = setTimeout(() => {
+        fetchStaffData();
+      }, 500);
 
-    return () => clearTimeout(timeoutId);
-  }, [fetchStaffData]);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [showDetail, fetchStaffData]);
 
   if (showDetail) {
     return (
       <StaffDetail
-        key={selectedStaff?.id || 'new'}
+        key={selectedStaff?.id || "new"}
         mode={dialogMode}
         initialData={selectedStaff}
         storeList={storeList}
-        onBack={() => setShowDetail(false)}
+        onBack={() => {
+          setShowDetail(false);
+          setSelectedStaff(null);
+          router.push("/staff");
+        }}
         onSave={handleSaveStaff}
         loading={loading}
       />
@@ -407,13 +474,24 @@ export default function StaffPage() {
 
   const handleFormChange =
     (field: keyof StaffFormDataType) =>
-      (
-        event:
-          | React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-          | { target: { value: string | number | StaffStatus | SalaryType | Gender | null | '' } }
-      ) => {
-        setFormData({ ...formData, [field]: event.target.value });
-      };
+    (
+      event:
+        | React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+        | {
+            target: {
+              value:
+                | string
+                | number
+                | StaffStatus
+                | SalaryType
+                | Gender
+                | null
+                | "";
+            };
+          }
+    ) => {
+      setFormData({ ...formData, [field]: event.target.value });
+    };
   const validateForm = (data: StaffFormDataType): string | null => {
     if (!data.full_name?.trim()) return "Full Name is required.";
     if (!data.phone?.trim()) return "Phone number is required.";
@@ -525,13 +603,7 @@ export default function StaffPage() {
   };
 
   return (
-     <ThemeProvider theme={blueTheme}>
-      <Backdrop
-        sx={{ color: "#fff", zIndex: (theme) => theme.zIndex.drawer + 1 }}
-        open={loading}
-      >
-        <CircularProgress color="inherit" />
-      </Backdrop>
+    <ThemeProvider theme={blueTheme}>
       {/* Header */}
       {/* <Box sx={{ mb: 3 }}>
         <Typography variant="h4" fontWeight="bold" gutterBottom>
@@ -545,7 +617,7 @@ export default function StaffPage() {
       {/* Stats Cards */}
       <Grid container spacing={3} sx={{ mb: 3 }}>
         <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-          <Card>
+          <Card sx={{ borderRadius: 0 }}>
             <CardContent>
               <Box
                 sx={{
@@ -580,7 +652,7 @@ export default function StaffPage() {
           </Card>
         </Grid>
         <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-          <Card>
+          <Card sx={{ borderRadius: 0 }}>
             <CardContent>
               <Box
                 sx={{
@@ -615,7 +687,7 @@ export default function StaffPage() {
           </Card>
         </Grid>
         <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-          <Card>
+          <Card sx={{ borderRadius: 0 }}>
             <CardContent>
               <Box
                 sx={{
@@ -650,7 +722,7 @@ export default function StaffPage() {
           </Card>
         </Grid>
         <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-          <Card>
+          <Card sx={{ borderRadius: 0 }}>
             <CardContent>
               <Box
                 sx={{
@@ -687,15 +759,28 @@ export default function StaffPage() {
       </Grid>
 
       {/* Actions Bar */}
-      <Card sx={{ mb: 3}}>
-        <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
-          <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap", alignItems: "center" }}>
+      <Card sx={{ mb: 3, borderRadius: 0 }}>
+        <CardContent sx={{ py: 1.5, "&:last-child": { pb: 1.5 } }}>
+          <Box
+            sx={{
+              display: "flex",
+              gap: 1.5,
+              flexWrap: "wrap",
+              alignItems: "center",
+            }}
+          >
             <TextField
               size="small"
               placeholder="Search staff..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              sx={{ flex: 1, minWidth: 200 }}
+              sx={{
+                flex: 1,
+                minWidth: 200,
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: "0px",
+                },
+              }}
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
@@ -705,12 +790,22 @@ export default function StaffPage() {
               }}
             />
 
-            <FormControl sx={{ minWidth: 140 }} size="small">
+            <FormControl
+              sx={{
+                minWidth: 140,
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: "0px",
+                },
+              }}
+              size="small"
+            >
               <InputLabel>Status</InputLabel>
               <Select
                 value={filterStatus}
                 label="Status"
-                onChange={(e) => setFilterStatus(e.target.value as StaffStatus | "all")}
+                onChange={(e) =>
+                  setFilterStatus(e.target.value as StaffStatus | "all")
+                }
                 startAdornment={
                   <InputAdornment position="start">
                     <FilterList sx={{ color: PRIMARY_COLOR, fontSize: 18 }} />
@@ -736,7 +831,8 @@ export default function StaffPage() {
                 "&:hover": { bgcolor: PRIMARY_DARK },
                 textTransform: "none",
                 fontWeight: 600,
-                px: 3
+                px: 3,
+                borderRadius: "0px",
               }}
             >
               Add New Staff
@@ -859,23 +955,23 @@ export default function StaffPage() {
                       <Button
                         variant="contained"
                         size="small"
-                        startIcon={<Edit sx={{ fontSize: '18px !important' }} />}
+                        startIcon={
+                          <Edit sx={{ fontSize: "18px !important" }} />
+                        }
                         onClick={() => {
-                          setSelectedStaff(staffMember);
-                          setDialogMode("edit");
-                          setShowDetail(true);
+                          router.push(`/staff/${staffMember.id}`);
                         }}
                         disabled={!canManageStaff}
                         sx={{
-                          bgcolor: '#f39c12',
-                          '&:hover': { bgcolor: '#e67e22' },
-                          textTransform: 'none',
+                          bgcolor: "#f39c12",
+                          "&:hover": { bgcolor: "#e67e22" },
+                          textTransform: "none",
                           fontWeight: 600,
-                          borderRadius: '6px',
+                          borderRadius: "0px",
                           px: 2,
-                          minWidth: '80px',
-                          boxShadow: 'none',
-                          height: '32px'
+                          minWidth: "80px",
+                          boxShadow: "none",
+                          height: "32px",
                         }}
                       >
                         Edit
@@ -919,8 +1015,6 @@ export default function StaffPage() {
           onRowsPerPageChange={handleChangeRowsPerPage}
         />
       </Card>
-
-
 
       {/* Delete Confirmation Dialog */}
       <Dialog

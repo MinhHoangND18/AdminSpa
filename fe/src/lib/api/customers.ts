@@ -1,6 +1,8 @@
 import { API_ENDPOINTS } from '@/constants/api-endpoints';
 import { CreateCustomerDto, Customer, UpdateCustomerDto, CustomerResponse } from '@/types/customer';
 import api from './axios';
+import apiClient from './axios';
+
 interface CustomerDetailResponse {
   data: Customer;
 }
@@ -36,7 +38,10 @@ export const getCustomer = async (id: number): Promise<CustomerDetailResponse> =
   const { data } = await api.get<CustomerDetailResponse>(`${API_ENDPOINTS.CUSTOMERS}/${id}`);
   return data;
 };
-
+export const getCustomerById = async (id: number): Promise<Customer> => {
+  const response = await apiClient.get<Customer>(`/customers/${id}`);
+  return response.data;
+};
 export const createCustomer = async (customer: CreateCustomerDto): Promise<CustomerDetailResponse> => {
   const { data } = await api.post<CustomerDetailResponse>(API_ENDPOINTS.CUSTOMERS, customer);
   return data;

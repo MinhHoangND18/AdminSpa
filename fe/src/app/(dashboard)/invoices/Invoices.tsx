@@ -100,6 +100,7 @@ import {
   createInvoice,
   updateInvoice,
   deleteInvoice,
+  getInvoiceById,
 } from "@/lib/api/invoices";
 import {
   createInvoiceItems,
@@ -110,13 +111,14 @@ import { getCustomers } from "@/lib/api/customers";
 import { storesApi } from "@/lib/api/stores";
 import { getBookings } from "@/lib/api/bookings";
 import { getStaff } from "@/lib/api/staffs";
-import { getProducts } from "@/lib/api/products";
+
 import { getServices } from "@/lib/api/services";
 import { Customer as CustomerType } from "@/types/customer";
 import { Store as StoreType } from "@/types/store";
 import { Booking as BookingType } from "@/types/booking";
 import { Staff as StaffType } from "@/types/staff";
-import { Product as ProductType } from "@/types/product";
+import { useRouter } from "next/navigation";
+
 import { Service as ServiceType } from "@/types/service";
 import InvoiceDetail from "./InvoiceDetail";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
@@ -262,7 +264,6 @@ const getItemTypeColor = (type: ItemType) => {
   }
 };
 
-
 const formatCurrency = (amount: number) => {
   return new Intl.NumberFormat("vi-VN", {
     style: "currency",
@@ -291,22 +292,23 @@ function useDebounce<T>(value: T, delay: number): T {
   return debouncedValue;
 }
 
-export default function InvoicesPage() {
+export default function InvoicesPage({ slug }: { slug?: string[] }) {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [totalItems, setTotalItems] = useState(0);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isItemsLoading, setIsItemsLoading] = useState(false);
   const [itemsForView, setItemsForView] = useState<InvoiceItem[]>([]);
   const [selectedBooking, setSelectedBooking] = useState<BookingType | null>(
     null
   );
+  const router = useRouter();
 
   const [customers, setCustomers] = useState<CustomerType[]>([]);
   const [stores, setStores] = useState<StoreType[]>([]);
   const [bookings, setBookings] = useState<BookingType[]>([]);
   const [staff, setStaff] = useState<StaffType[]>([]);
-  const [products, setProducts] = useState<ProductType[]>([]);
+
   const [services, setServices] = useState<ServiceType[]>([]);
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -342,7 +344,61 @@ export default function InvoicesPage() {
     }),
     []
   );
+  useEffect(() => {
+    const invoiceId = slug?.[0];
 
+    const loadInvoiceForDetail = async (id: number) => {
+      try {
+        setIsItemsLoading(true); 
+        const apiInvoice: InvoiceType = await getInvoiceById(id);
+        const invoiceData: Invoice = {
+          ...apiInvoice,
+          booking_id: apiInvoice.bookingId,
+          customer_id: apiInvoice.customerId,
+          store_id: apiInvoice.storeId,
+          discount_amount: apiInvoice.discountAmount,
+          discount_type: apiInvoice.discountType as DiscountType | null,
+          tax_amount: apiInvoice.taxAmount,
+          total_amount: apiInvoice.totalAmount,
+          paid_amount: apiInvoice.paidAmount,
+          payment_status: apiInvoice.paymentStatus as PaymentStatus,
+          created_by: apiInvoice.createdBy,
+          created_at: apiInvoice.createdAt,
+          updated_at: apiInvoice.updatedAt,
+          customer: undefined,
+          store: undefined,
+          booking: undefined,
+        };
+
+        const items = await getItemsByInvoiceId(id);
+        setSelectedInvoice({ ...invoiceData, items });
+        setDialogMode("edit");
+        setShowDetail(true);
+      } catch (err) {
+        alert("Failed to load invoice details.");
+        console.error("Failed to load invoice details:", err);
+        router.push("/invoices"); // Redirect if invoice not found or error
+      } finally {
+        setIsItemsLoading(false);
+      }
+    };
+
+    if (invoiceId) {
+      if (
+        selectedInvoice?.id === Number(invoiceId) &&
+        showDetail &&
+        dialogMode === "edit"
+      ) {
+        return;
+      }
+      loadInvoiceForDetail(Number(invoiceId));
+    } else {
+      if (showDetail) {
+        setShowDetail(false);
+        setSelectedInvoice(null);
+      }
+    }
+  }, [slug, router, selectedInvoice?.id, showDetail, dialogMode]);
   const initialItemFormData: InvoiceItemFormData = useMemo(
     () => ({
       item_type: "service",
@@ -404,26 +460,6 @@ export default function InvoicesPage() {
     }
   };
 
-  const fetchStaff = async () => {
-    try {
-      const data = (await getStaff({
-        limit: 1000,
-      })) as unknown as ApiResponseWrapper<StaffType>;
-      setStaff(data?.data?.data ?? []);
-    } catch (err) {
-      console.error("Failed to fetch staff:", err);
-    }
-  };
-
-  const fetchProducts = async () => {
-    try {
-      const data = await getProducts({ limit: 1000 });
-      setProducts(Array.isArray(data) ? data : []);
-    } catch (err) {
-      console.error("Failed to fetch products:", err);
-    }
-  };
-
   const fetchServices = async () => {
     try {
       const data = await getServices({ limit: 1000 });
@@ -441,11 +477,11 @@ export default function InvoicesPage() {
       setIsLoading(true);
 
       try {
-        await Promise.all([fetchCustomers(), fetchStores(), fetchStaff()]);
+        await Promise.all([fetchCustomers(), fetchStores()]);
 
-        if (isMountedRef.current) {
-          fetchBookings();
-        }
+        // if (isMountedRef.current) {
+        //   fetchBookings();
+        // }
       } catch (err) {
         console.error("Failed to load initial data:", err);
       } finally {
@@ -596,7 +632,7 @@ export default function InvoicesPage() {
       pending: filteredInvoices.filter((i) => i.payment_status === "pending")
         .length,
       totalRevenue: filteredInvoices.reduce(
-        (sum, i) => sum + (Number(i.total_amount) || 0),
+        (sum, i) => sum + (Number(i.paid_amount) || 0),
         0
       ),
       collectedRevenue: filteredInvoices.reduce(
@@ -633,11 +669,25 @@ export default function InvoicesPage() {
     setItemsForView([]);
 
     try {
+      let currentStaff = staff;
+      if (staff.length === 0) {
+        try {
+          const staffData = (await getStaff({
+            limit: 1000,
+          })) as unknown as ApiResponseWrapper<StaffType>;
+          currentStaff = staffData?.data?.data ?? [];
+          setStaff(currentStaff);
+        } catch (err) {
+          console.error("Failed to fetch staff:", err);
+        }
+      }
+
       const items = await getItemsByInvoiceId(selectedInvoice.id);
 
       const processedItems: InvoiceItem[] = items.map((apiItem) => ({
         ...apiItem,
-        staff_name: staff.find((s) => s.id === apiItem.staffId)?.full_name,
+        staff_name: currentStaff.find((s) => s.id === apiItem.staffId)
+          ?.full_name,
       }));
 
       setItemsForView(processedItems);
@@ -682,28 +732,22 @@ export default function InvoicesPage() {
     handleMenuClose();
   };
 
-  const handleEdit = async (invoice: Invoice) => {
-    setSelectedInvoice(invoice);
-    setIsItemsLoading(true);
-    try {
-      const items = await getItemsByInvoiceId(invoice.id);
-      setSelectedInvoice({ ...invoice, items });
-      setDialogMode("edit");
-      setShowDetail(true);
-    } catch (err) {
-      alert("Failed to load invoice items");
-    } finally {
-      setIsItemsLoading(false);
-    }
+  const handleEdit = (invoice: Invoice) => {
+    router.push(`/invoices/${invoice.id}`);
   };
 
-  const handleSaveInvoice = async (submissionData: CreateInvoiceDto | UpdateInvoiceDto) => {
+  const handleSaveInvoice = async (
+    submissionData: CreateInvoiceDto | UpdateInvoiceDto
+  ) => {
     try {
       setLoading(true);
       if (dialogMode === "add") {
         await createInvoice(submissionData as CreateInvoiceDto);
       } else if (dialogMode === "edit" && selectedInvoice) {
-        await updateInvoice(selectedInvoice.id, submissionData as UpdateInvoiceDto);
+        await updateInvoice(
+          selectedInvoice.id,
+          submissionData as UpdateInvoiceDto
+        );
       }
       fetchInvoices();
       setShowDetail(false);
@@ -726,17 +770,6 @@ export default function InvoicesPage() {
   }, [currentItem.item_type]);
 
   const selectableItems = useMemo((): SelectableItem[] => {
-
-    if (currentItem.item_type === "product") {
-      const items = (products || []).map((product) => ({
-        id: product.id,
-        name: product.name,
-        price: product.price,
-        discount: product.discount || 0,
-        type: "product" as const,
-      }));
-      return items;
-    }
     if (currentItem.item_type === "service") {
       const items = (services || [])
         .filter((service) => !service.isCombo)
@@ -766,7 +799,7 @@ export default function InvoicesPage() {
       return items;
     }
     return [];
-  }, [products, services, currentItem.item_type]);
+  }, [services, currentItem.item_type]);
 
   if (showDetail) {
     return (
@@ -775,9 +808,10 @@ export default function InvoicesPage() {
         initialData={selectedInvoice}
         customers={customers}
         stores={stores}
-        staff={staff}
         onSave={handleSaveInvoice}
-        onBack={() => setShowDetail(false)}
+        onBack={() => {
+          setShowDetail(false), router.push("/invoices");
+        }}
         loading={loading}
       />
     );
@@ -828,21 +862,21 @@ export default function InvoicesPage() {
 
   const handleFormChange =
     (field: keyof InvoiceFormData) =>
-      (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-        setFormData({
-          ...formData,
-          [field]: event.target.value as InvoiceFormData[typeof field],
-        });
-      };
+    (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      setFormData({
+        ...formData,
+        [field]: event.target.value as InvoiceFormData[typeof field],
+      });
+    };
 
   const handleItemChange =
     (field: keyof InvoiceItemFormData) =>
-      (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-        setCurrentItem({
-          ...currentItem,
-          [field]: event.target.value as InvoiceItemFormData[typeof field],
-        });
-      };
+    (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      setCurrentItem({
+        ...currentItem,
+        [field]: event.target.value as InvoiceItemFormData[typeof field],
+      });
+    };
 
   const addItem = () => {
     if (currentItem.item_name && parseFloat(currentItem.unit_price) > 0) {
@@ -883,7 +917,7 @@ export default function InvoicesPage() {
     return {
       subtotal,
       discountAmount: finalDiscountAmount,
-      taxAmount: calculatedTaxAmount, 
+      taxAmount: calculatedTaxAmount,
       total: Math.max(0, total),
     };
   };
@@ -1034,10 +1068,10 @@ export default function InvoicesPage() {
 
   const invoiceToView: Invoice | null = selectedInvoice
     ? {
-      ...selectedInvoice,
-      items: itemsForView.length > 0 ? itemsForView : selectedInvoice.items,
-      tax_amount: selectedInvoice.tax_amount,
-    }
+        ...selectedInvoice,
+        items: itemsForView.length > 0 ? itemsForView : selectedInvoice.items,
+        tax_amount: selectedInvoice.tax_amount,
+      }
     : null;
 
   const handleItemSelection = (item: SelectableItem | null) => {
@@ -1061,14 +1095,11 @@ export default function InvoicesPage() {
     }));
   };
   const isAnyLoading =
-    isLoading || 
-    isInitialLoad || 
-    isFormDataLoading || 
-    isItemsLoading ||
-    false;
+    (isInitialLoad || isFormDataLoading || isItemsLoading) &&
+    invoices.length === 0;
 
   return (
-     <ThemeProvider theme={blueTheme}>
+    <ThemeProvider theme={blueTheme}>
       {/* <Box sx={{ mb: 3 }}>
                 <Typography variant="h4" fontWeight="bold" gutterBottom>
                     Invoice Management
@@ -1086,7 +1117,7 @@ export default function InvoicesPage() {
       {/* Stats Cards */}
       <Grid container spacing={3} sx={{ mb: 3 }}>
         <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-          <Card>
+          <Card sx={{ borderRadius: 0 }}>
             <CardContent>
               <Box
                 sx={{
@@ -1121,7 +1152,7 @@ export default function InvoicesPage() {
           </Card>
         </Grid>
         <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-          <Card>
+          <Card sx={{ borderRadius: 0 }}>
             <CardContent>
               <Box
                 sx={{
@@ -1160,7 +1191,7 @@ export default function InvoicesPage() {
           </Card>
         </Grid>
         <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-          <Card>
+          <Card sx={{ borderRadius: 0 }}>
             <CardContent>
               <Box
                 sx={{
@@ -1199,7 +1230,7 @@ export default function InvoicesPage() {
           </Card>
         </Grid>
         <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-          <Card>
+          <Card sx={{ borderRadius: 0 }}>
             <CardContent>
               <Box
                 sx={{
@@ -1236,37 +1267,53 @@ export default function InvoicesPage() {
       </Grid>
 
       {/* Actions Bar */}
-      <Card sx={{ mb: 3 }}> 
-        <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}> 
+      <Card sx={{ mb: 3, borderRadius: 0 }}>
+        <CardContent sx={{ py: 1.5, "&:last-child": { pb: 1.5 } }}>
           <Box
             sx={{
               display: "flex",
-              gap: 1.5, 
+              gap: 1.5,
               flexWrap: "wrap",
               alignItems: "center",
             }}
           >
             <TextField
-              size="small" 
+              size="small"
               placeholder="Search by invoice code..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              sx={{ flex: 1, minWidth: 200 }} 
+              sx={{
+                flex: 1,
+                minWidth: 200,
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: "0px",
+                },
+              }}
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
-                    <Search sx={{ color: PRIMARY_COLOR, fontSize: 20 }} /> 
+                    <Search sx={{ color: PRIMARY_COLOR, fontSize: 20 }} />
                   </InputAdornment>
                 ),
               }}
             />
 
-            <FormControl sx={{ minWidth: 130 }} size="small"> 
+            <FormControl
+              sx={{
+                minWidth: 130,
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: "0px",
+                },
+              }}
+              size="small"
+            >
               <InputLabel>Payment Status</InputLabel>
               <Select
                 value={filterStatus}
                 label="Payment Status"
-                onChange={(e) => setFilterStatus(e.target.value as PaymentStatus | "all")}
+                onChange={(e) =>
+                  setFilterStatus(e.target.value as PaymentStatus | "all")
+                }
               >
                 <MenuItem value="all">All Status</MenuItem>
                 <MenuItem value="paid">Paid</MenuItem>
@@ -1274,12 +1321,22 @@ export default function InvoicesPage() {
               </Select>
             </FormControl>
 
-            <FormControl sx={{ minWidth: 150 }} size="small">
+            <FormControl
+              sx={{
+                minWidth: 150,
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: "0px",
+                },
+              }}
+              size="small"
+            >
               <InputLabel>Store</InputLabel>
               <Select
                 value={filterStore}
                 label="Store"
-                onChange={(e) => setFilterStore(e.target.value as number | "all")}
+                onChange={(e) =>
+                  setFilterStore(e.target.value as number | "all")
+                }
               >
                 <MenuItem value="all">All Stores</MenuItem>
                 {stores.map((store) => (
@@ -1296,12 +1353,13 @@ export default function InvoicesPage() {
               startIcon={<Add />}
               onClick={handleAddNew}
               sx={{
-                height: 40, 
+                height: 40,
                 bgcolor: PRIMARY_COLOR,
                 "&:hover": { bgcolor: PRIMARY_DARK },
                 textTransform: "none",
                 fontWeight: 600,
-                px: 3, 
+                px: 3,
+                borderRadius: "0px",
               }}
             >
               Create Invoice
@@ -1428,18 +1486,22 @@ export default function InvoicesPage() {
                       <Button
                         variant="contained"
                         size="small"
-                        startIcon={<Edit sx={{ fontSize: '18px !important' }} />}
-                        onClick={() => handleEdit(invoice)}
+                        startIcon={
+                          <Edit sx={{ fontSize: "18px !important" }} />
+                        }
+                        onClick={() => {
+                          handleEdit(invoice);
+                        }}
                         sx={{
-                          bgcolor: '#f39c12',
-                          '&:hover': { bgcolor: '#e67e22' },
-                          textTransform: 'none',
+                          bgcolor: "#f39c12",
+                          "&:hover": { bgcolor: "#e67e22" },
+                          textTransform: "none",
                           fontWeight: 600,
-                          borderRadius: '6px',
+                          borderRadius: "0px",
                           px: 2,
-                          minWidth: '80px',
-                          boxShadow: 'none',
-                          height: '32px'
+                          minWidth: "80px",
+                          boxShadow: "none",
+                          height: "32px",
                         }}
                       >
                         Edit
@@ -1463,8 +1525,8 @@ export default function InvoicesPage() {
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
                         {searchQuery ||
-                          filterStatus !== "all" ||
-                          filterStore !== "all"
+                        filterStatus !== "all" ||
+                        filterStore !== "all"
                           ? "Try adjusting your search or filters"
                           : "Get started by creating your first invoice"}
                       </Typography>
@@ -1487,7 +1549,11 @@ export default function InvoicesPage() {
       </Card>
 
       {/* Menu for invoice actions */}
-      <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleMenuClose}>
+      <Menu
+        anchorEl={anchorEl}
+        open={Boolean(anchorEl)}
+        onClose={handleMenuClose}
+      >
         <MenuItem onClick={handleViewItems}>
           <Inventory sx={{ mr: 1, fontSize: 20 }} />
           View Items
@@ -1516,7 +1582,6 @@ export default function InvoicesPage() {
           Delete
         </MenuItem>
       </Menu>
-
 
       <Dialog
         open={openItemsDialog}

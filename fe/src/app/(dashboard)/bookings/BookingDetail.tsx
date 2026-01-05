@@ -49,7 +49,8 @@ import { Booking, BookingStatus, PendingInvoiceItem } from "@/types/booking";
 import { Staff as StaffType } from "@/types/staff";
 import { ItemType } from "@/types/invoice-item";
 import { Service as ServiceType } from "@/types/service";
-import { Product as ProductType } from "@/types/product";
+
+import { PaymentStatus } from "@/types/invoice";
 
 const PRIMARY_COLOR = "#3b82f6";
 const SUCCESS_COLOR = "#10b981";
@@ -59,7 +60,7 @@ interface BookingDetailProps {
   booking: Booking;
   staff: StaffType[];
   services: ServiceType[];
-  products: ProductType[];
+
   onBack: () => void;
   onUpdateStatus: (id: number, status: BookingStatus) => void;
   onStartService: (id: number) => void;
@@ -75,7 +76,7 @@ export default function BookingDetail({
   booking,
   staff,
   services,
-  products,
+
   onBack,
   onUpdateStatus,
   onStartService,
@@ -113,6 +114,10 @@ export default function BookingDetail({
   };
 
   const [currentItem, setCurrentItem] = useState(initialItemFormData);
+
+  const isPaid = useMemo(() => {
+    return booking.status === BookingStatus.COMPLETED || booking.invoices?.some(invoice => invoice.paymentStatus === PaymentStatus.PAID) || false;
+  }, [booking.invoices, booking.status]);
 
   const financialSummary = useMemo(() => {
     const subtotal =
@@ -218,22 +223,14 @@ export default function BookingDetail({
 
   const selectableItems = useMemo(() => {
     const currentServices = services || [];
-    const currentProducts = products || [];
-    if (currentItem.itemType === ItemType.PRODUCT) {
-      return products.map((p) => ({
-        id: p.id,
-        name: p.name,
-        price: p.price,
-        discount: p.discount || 0,
-      }));
-    }
+
     return services.map((s) => ({
       id: s.id,
       name: s.name,
       price: s.price,
       discount: s.discountPrice ? s.price - s.discountPrice : 0,
     }));
-  }, [currentItem.itemType, products, services]);
+  }, [currentItem.itemType, services]);
 
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: "#f4f6f8", pb: 5 }}>
@@ -562,7 +559,7 @@ export default function BookingDetail({
                     color="text.secondary"
                     sx={{ opacity: 0.6 }}
                   >
-                    ✌️ {booking.status.toUpperCase()}
+                    ✌️ {booking.status ? booking.status.toUpperCase() : ''}
                   </Typography>
                 </Box>
                 <Stack spacing={1}>
@@ -603,6 +600,7 @@ export default function BookingDetail({
                     fullWidth
                     variant="contained"
                     startIcon={<Cancel />}
+                    disabled={isPaid}
                     onClick={() =>
                       onUpdateStatus(booking.id, BookingStatus.CANCELLED)
                     }
@@ -610,6 +608,7 @@ export default function BookingDetail({
                       bgcolor: ERROR_COLOR,
                       borderRadius: 0,
                       fontWeight: 700,
+                      opacity: isPaid ? 0.5 : 1,
                     }}
                   >
                     Cancel Order

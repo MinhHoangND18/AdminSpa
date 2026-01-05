@@ -84,9 +84,11 @@ import {
   deleteCustomer,
   createCustomer,
   updateCustomer,
-  getCustomer,
   CustomerStats,
+  getCustomerById,
 } from "@/lib/api/customers";
+import { useRouter } from "next/navigation";
+
 import { storesApi } from "@/lib/api/stores";
 import { Store, StoreResponse } from "@/types/store";
 import CustomerDetail from "./CustomerDetail";
@@ -121,7 +123,6 @@ const getErrorMessage = (error: unknown): string => {
   return "An unexpected error occurred.";
 };
 
-// --- Giữ nguyên các hằng số màu sắc và Helper ---
 const PRIMARY_COLOR = "#3b82f6";
 const PRIMARY_DARK = "#0f766e";
 const SUCCESS_COLOR = "#10b981";
@@ -193,7 +194,7 @@ const formatCurrency = (amount: number) => {
   }).format(Number(amount));
 };
 
-export default function CustomersPage() {
+export default function CustomersPage({ slug }: { slug?: string[] }) {
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
   const [filters, setFilters] = useState({
@@ -216,6 +217,7 @@ export default function CustomersPage() {
     message: string;
     severity: "success" | "error";
   } | null>(null);
+  const router = useRouter();
 
   useEffect(() => {
     const fetchStores = async () => {
@@ -277,11 +279,29 @@ export default function CustomersPage() {
     mutationFn: (data: { id: number; customer: UpdateCustomerDto }) =>
       updateCustomer(data.id, data.customer),
     onSuccess: () => {
-      handleSnackbarOpen("Customer updated successfully!");
       queryClient.invalidateQueries({ queryKey: ["customers"] });
       queryClient.invalidateQueries({ queryKey: ["customerStats"] });
+
+      sessionStorage.setItem("showCustomerUpdateSuccess", "true");
+
+      const query: Record<string, string> = {};
+      if (filters.customerType) {
+        query.customerType = filters.customerType;
+      }
+      if (filters.status) {
+        query.status = filters.status;
+      }
+      if (searchQuery) {
+        query.search = searchQuery;
+      }
+
+      const queryString = new URLSearchParams(query).toString();
+
+      router.push(queryString ? `/customers?${queryString}` : "/customers");
+
       setOpenDialog(false);
       setShowDetail(false);
+      setSelectedCustomerId(null);
     },
     onError: (error) =>
       handleSnackbarOpen(`Error: ${getErrorMessage(error)}`, "error"),
@@ -298,7 +318,39 @@ export default function CustomersPage() {
     onError: (error) =>
       handleSnackbarOpen(`Error: ${getErrorMessage(error)}`, "error"),
   });
+  useEffect(() => {
+    if (sessionStorage.getItem("showCustomerUpdateSuccess")) {
+      setSnackbar({
+        open: true,
+        message: "Customer updated successfully!",
+        severity: "success",
+      });
+      sessionStorage.removeItem("showCustomerUpdateSuccess");
+    }
+  }, []);
+  useEffect(() => {
+    const customerId = slug?.[0];
 
+    if (customerId) {
+      if (selectedCustomer?.id === Number(customerId) && showDetail) {
+        return;
+      }
+
+      getCustomerById(Number(customerId))
+        .then((Response: Customer | { data: Customer }) => {
+          const customerData = "data" in Response ? Response.data : Response;
+          handleEdit(customerData);
+        })
+        .catch(() => {
+          router.push("/customers");
+        });
+    } else {
+      if (showDetail && dialogMode === "edit") {
+        setShowDetail(false);
+        setSelectedCustomerId(null);
+      }
+    }
+  }, [slug]);
   const selectedCustomer = useMemo(
     () => customers.find((c) => c.id === selectedCustomerId),
     [customers, selectedCustomerId]
@@ -349,8 +401,12 @@ export default function CustomersPage() {
     setSelectedCustomerId(null);
     setShowDetail(true);
   };
-  const handleEdit = () => {
-    if (selectedCustomerId) {
+  const handleEdit = (customer?: Customer | any) => {
+    if (customer && customer.id) {
+      setSelectedCustomerId(customer.id);
+      setDialogMode("edit");
+      setShowDetail(true);
+    } else if (selectedCustomerId) {
       setDialogMode("edit");
       setShowDetail(true);
     }
@@ -365,8 +421,24 @@ export default function CustomersPage() {
   };
 
   const handleBack = () => {
+    const query: Record<string, string> = {};
+
+    if (filters.customerType) {
+      query.customerType = filters.customerType;
+    }
+    if (filters.status) {
+      query.status = filters.status;
+    }
+    if (searchQuery) {
+      query.search = searchQuery;
+    }
+
+    const queryString = new URLSearchParams(query).toString();
+
     setShowDetail(false);
     setSelectedCustomerId(null);
+
+    router.push(queryString ? `/customers?${queryString}` : "/customers");
   };
   const handleDelete = () => {
     setDeleteConfirmOpen(true);
@@ -402,7 +474,7 @@ export default function CustomersPage() {
 
           <Grid container spacing={3} sx={{ mb: 3 }}>
             <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-              <Card>
+              <Card sx={{ borderRadius: 0 }}>
                 <CardContent>
                   <Box
                     sx={{
@@ -439,7 +511,7 @@ export default function CustomersPage() {
               </Card>
             </Grid>
             <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-              <Card>
+              <Card sx={{ borderRadius: 0 }}>
                 <CardContent>
                   <Box
                     sx={{
@@ -474,7 +546,7 @@ export default function CustomersPage() {
               </Card>
             </Grid>
             <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-              <Card>
+              <Card sx={{ borderRadius: 0 }}>
                 <CardContent>
                   <Box
                     sx={{
@@ -509,7 +581,7 @@ export default function CustomersPage() {
               </Card>
             </Grid>
             <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-              <Card>
+              <Card sx={{ borderRadius: 0 }}>
                 <CardContent>
                   <Box
                     sx={{
@@ -527,7 +599,7 @@ export default function CustomersPage() {
                         Total Revenue
                       </Typography>
                       <Typography variant="h4" fontWeight="bold">
-                        ${(stats.totalRevenue / 1000000).toFixed(1)}M
+                        {formatCurrency(stats.totalRevenue)}
                       </Typography>
                     </Box>
                     <Avatar
@@ -545,7 +617,7 @@ export default function CustomersPage() {
             </Grid>
           </Grid>
 
-          <Card sx={{ mb: 3 }}>
+          <Card sx={{ mb: 3, borderRadius: 0 }}>
             <CardContent sx={{ py: 1.5, "&:last-child": { pb: 1.5 } }}>
               <Box
                 sx={{
@@ -712,6 +784,7 @@ export default function CustomersPage() {
                                 sx={{ fontSize: 14, color: "text.secondary" }}
                               />
                               <Typography variant="body2">
+                                {" "}
                                 {customer.country_code
                                   ? `(${customer.country_code}) `
                                   : ""}
@@ -832,16 +905,14 @@ export default function CustomersPage() {
                               <Edit sx={{ fontSize: "18px !important" }} />
                             }
                             onClick={() => {
-                              setSelectedCustomerId(customer.id);
-                              setDialogMode("edit");
-                              setShowDetail(true);
+                              router.push(`/customers/${customer.id}`);
                             }}
                             sx={{
                               bgcolor: "#f39c12",
                               "&:hover": { bgcolor: "#e67e22" },
                               textTransform: "none",
                               fontWeight: 600,
-                              borderRadius: "6px",
+                              borderRadius: "0px",
                               px: 2,
                               minWidth: "80px",
                               boxShadow: "none",

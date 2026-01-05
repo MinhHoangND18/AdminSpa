@@ -8,6 +8,7 @@ import {
 } from '@/types/booking';
 import { DiscountType } from '@/types/invoice';
 import api from './axios';
+import apiClient from './axios';
 
 interface CompleteServicePayload {
   storeId: number;
@@ -42,10 +43,6 @@ export const getBookings = async (filters: BookingFilters): Promise<BookingRespo
   return response.data.data; 
 }
 
-export const getBooking = async (id: number) => {
-  const { data } = await api.get(`${API_ENDPOINTS.BOOKINGS}/${id}`);
-  return data as Booking;
-};
 
 
 export const createBooking = async (booking: CreateBookingPayload) => {
@@ -57,7 +54,10 @@ export const updateBooking = async (id: number, booking: UpdateBookingPayload) =
   const { data } = await api.patch(`${API_ENDPOINTS.BOOKINGS}/${id}`, booking);
   return data;
 };
-
+export const getBookingById = async (id: number): Promise<{ data: Booking }> => {
+  const response = await apiClient.get<{ data: Booking }>(`/bookings/${id}`);
+  return response.data;
+};
 export const deleteBooking = async (id: number) => {
   const { data } = await api.delete(`${API_ENDPOINTS.BOOKINGS}/${id}`);
   return data;

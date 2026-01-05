@@ -75,6 +75,7 @@ export default function StaffDetail({
         };
     });
 
+
     const [errors, setErrors] = useState<Partial<Record<keyof StaffFormData, string>>>({});
 
     const handleChange = (field: keyof StaffFormData) => (
