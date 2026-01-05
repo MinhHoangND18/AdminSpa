@@ -5,7 +5,8 @@ import {
     Grid, Box, Button, TextField, MenuItem, FormControl,
     InputLabel, Select, Paper, Stack, Typography, IconButton,
     Divider, Avatar, alpha, InputAdornment, CircularProgress,
-    Switch, FormControlLabel, SelectChangeEvent, FormHelperText
+    Switch, FormControlLabel, SelectChangeEvent, FormHelperText,
+
 } from "@mui/material";
 import {
     Save, ArrowBack, Store as StoreIcon, Phone, Email,
@@ -48,6 +49,7 @@ export default function StoreDetail({
     saveError
 }: StoreDetailProps) {
     const isView = mode === "view";
+    const [isSaving, setIsSaving] = useState(false);
 
     const [formData, setFormData] = useState<StoreFormData>({
         code: initialData?.code || "",
@@ -102,7 +104,22 @@ export default function StoreDetail({
 
     const handleSave = async () => {
         if (validate()) {
-            await onSave(formData);
+            setIsSaving(true); // Bắt đầu xoay
+
+            try {
+                // Chờ song song: Gọi API save (từ cha) VÀ chờ 500ms
+                await Promise.all([
+                    onSave(formData),
+                    new Promise((resolve) => setTimeout(resolve, 500))
+                ]);
+
+                onBack();
+
+            } catch (error) {
+                console.error("Save failed", error);
+            } finally {
+                setIsSaving(false);
+            }
         }
     };
 
@@ -337,15 +354,14 @@ export default function StoreDetail({
                 {/* Action Buttons */}
                 {!isView && (
                     <Box sx={{ mt: 2, display: "flex", justifyContent: "flex-end", gap: 2 }}>
-
                         <Button
                             variant="contained"
-                            startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <Save />}
+                            startIcon={(loading || isSaving) ? <CircularProgress size={20} color="inherit" /> : <Save />}
                             onClick={handleSave}
-                            disabled={loading}
+                            disabled={loading || isSaving}
                             sx={{ px: 6, bgcolor: "#3b82f6", height: 48, borderRadius: 0 }}
                         >
-                            {loading ? "Processing..." : mode === "add" ? "Create Store" : "Save Changes"}
+                            {mode === "add" ? "Create Store" : "Save Changes"}
                         </Button>
                     </Box>
                 )}

@@ -168,6 +168,8 @@ export default function ServicesPage() {
   const [openDialog, setOpenDialog] = useState(false);
   const [dialogMode, setDialogMode] = useState<"add" | "edit" | "view">("add");
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [isAddLoading, setIsAddLoading] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
     message: string;
@@ -280,7 +282,7 @@ export default function ServicesPage() {
         message: "Service created successfully!",
         severity: "success",
       });
-      handleBack();
+      // handleBack();
     },
     onError: (error: Error) => {
       setSnackbar({
@@ -301,7 +303,7 @@ export default function ServicesPage() {
         message: "Service updated successfully!",
         severity: "success",
       });
-      handleBack();
+      // handleBack();
     },
     onError: (error: Error) => {
       setSnackbar({
@@ -383,16 +385,26 @@ export default function ServicesPage() {
   };
 
   const handleAddNew = () => {
-    setDialogMode("add");
-    setSelectedService(null);
-    setShowDetail(true);
+    setIsAddLoading(true);
+
+    setTimeout(() => {
+      setDialogMode("add");
+      setSelectedService(null);
+      setShowDetail(true);
+      setIsAddLoading(false);
+    }, 500);
   };
 
   const handleEdit = (service: Service) => {
-    setSelectedService(service);
-    setDialogMode("edit");
-    setShowDetail(true);
-    handleMenuClose();
+    setEditingId(service.id);
+
+    setTimeout(() => {
+      setSelectedService(service);
+      setDialogMode("edit");
+      setShowDetail(true);
+      handleMenuClose();
+      setEditingId(null);
+    }, 500);
   };
 
   const handleView = () => {
@@ -420,7 +432,7 @@ export default function ServicesPage() {
         });
       }
     } catch (error) {
-      console.error("Failed to save service:", error);
+      throw error;
     }
   };
 
@@ -525,7 +537,7 @@ export default function ServicesPage() {
       {/* Stats Cards */}
       <Grid container spacing={3} sx={{ mb: 3 }}>
         <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
-          <Card sx={{borderRadius: 0}}>
+          <Card sx={{ borderRadius: 0 }}>
             <CardContent>
               <Box
                 sx={{
@@ -755,7 +767,8 @@ export default function ServicesPage() {
             <Button
               variant="contained"
               size="small"
-              startIcon={<Add />}
+              startIcon={isAddLoading ? <CircularProgress size={20} color="inherit" /> : <Add />}
+              disabled={isAddLoading}
               onClick={handleAddNew}
               sx={{
                 height: 40,
@@ -921,8 +934,13 @@ export default function ServicesPage() {
                         variant="contained"
                         size="small"
                         startIcon={
-                          <Edit sx={{ fontSize: "18px !important" }} />
+                          editingId === service.id ? (
+                            <CircularProgress size={16} color="inherit" />
+                          ) : (
+                            <Edit sx={{ fontSize: "18px !important" }} />
+                          )
                         }
+                        disabled={editingId === service.id} 
                         onClick={() => handleEdit(service)}
                         sx={{
                           bgcolor: "#f39c12",

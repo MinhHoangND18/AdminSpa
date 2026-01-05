@@ -65,7 +65,7 @@ export class NestedCreateInvoiceItemDto {
   totalPrice: number;
 }
 
-// DTO cho việc tạo invoice mới
+
 export class CreateInvoiceDto {
   @ApiProperty({ example: 'INV-2025-0001', maxLength: 20 })
   @IsNotEmpty()

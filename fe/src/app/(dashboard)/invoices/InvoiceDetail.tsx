@@ -5,7 +5,8 @@ import {
   Grid, Box, Button, MenuItem, FormControl,
   InputLabel, Select, Paper, Stack, Typography, IconButton,
   Divider, alpha, Table, TableBody, TableCell,
-  TableContainer, TableHead, TableRow, SelectChangeEvent
+  TableContainer, TableHead, TableRow, SelectChangeEvent,
+  CircularProgress
 } from "@mui/material";
 import { Save, ArrowBack, Person } from "@mui/icons-material";
 import {
@@ -43,6 +44,7 @@ export default function InvoiceDetail({
   const isView = mode === "view";
   const isEdit = mode === "edit";
 
+  const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState({
     customer_id: initialData?.customerId || "",
     store_id: initialData?.storeId || "",
@@ -122,14 +124,21 @@ export default function InvoiceDetail({
       }))
     };
 
+    setIsSaving(true);
+
     try {
-      await onSave(submissionData);
+      await Promise.all([
+        onSave(submissionData),
+        new Promise((resolve) => setTimeout(resolve, 500))
+      ]);
+      onBack();
+
     } catch (error: unknown) {
       const err = error as ApiError;
       const message = err.response?.data?.message || "Error saving invoice";
       alert(Array.isArray(message) ? message[0] : message);
-
-      console.error("Chi tiết lỗi lưu hóa đơn:", err);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -267,12 +276,12 @@ export default function InvoiceDetail({
         <Box sx={{ mt: 4, display: 'flex', justifyContent: 'flex-end' }}>
           <Button
             variant="contained"
-            startIcon={<Save />}
+            startIcon={(loading || isSaving) ? <CircularProgress size={20} color="inherit" /> : <Save />}
             onClick={handleSave}
-            disabled={loading || !formData.customer_id || items.length === 0}
+            disabled={loading || isSaving || !formData.customer_id || items.length === 0}
             sx={{ px: 6, bgcolor: '#3b82f6', height: 48, borderRadius: 0 }}
           >
-            {loading ? "Saving..." : "Confirm & Save"}
+            Confirm & Save
           </Button>
         </Box>
       )}

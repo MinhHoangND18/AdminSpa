@@ -164,6 +164,8 @@ export default function StaffPage() {
   const [storeList, setStoreList] = useState<Store[]>([]);
 
   const [showDetail, setShowDetail] = useState(false);
+  const [isAddLoading, setIsAddLoading] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
 
   useEffect(() => {
     const fetchStores = async () => {
@@ -247,9 +249,24 @@ export default function StaffPage() {
     }
   }, [page, rowsPerPage, searchQuery, filterStatus]);
   const handleAddNew = () => {
-    setDialogMode("add");
-    setSelectedStaff(null);
-    setShowDetail(true);
+    setIsAddLoading(true);
+
+    setTimeout(() => {
+      setDialogMode("add");
+      setSelectedStaff(null);
+      setShowDetail(true);
+      setIsAddLoading(false);
+    }, 500);
+  };
+  const handleRowEdit = (staffMember: Staff) => {
+    setEditingId(staffMember.id);
+
+    setTimeout(() => {
+      setSelectedStaff(staffMember);
+      setDialogMode("edit");
+      setShowDetail(true);
+      setEditingId(null);
+    }, 500);
   };
 
   const handleEdit = (staffMember?: Staff) => {
@@ -271,10 +288,13 @@ export default function StaffPage() {
       }
 
       setSnackbar({ open: true, message: "Staff saved successfully", severity: "success" });
-      setShowDetail(false);
+
+    
       fetchStaffData();
     } catch (error) {
       console.error("Failed to fetch dropdown data:", error);
+
+      throw error;
     }
   };
 
@@ -525,7 +545,7 @@ export default function StaffPage() {
   };
 
   return (
-     <ThemeProvider theme={blueTheme}>
+    <ThemeProvider theme={blueTheme}>
       <Backdrop
         sx={{ color: "#fff", zIndex: (theme) => theme.zIndex.drawer + 1 }}
         open={loading}
@@ -695,9 +715,11 @@ export default function StaffPage() {
               placeholder="Search staff..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              sx={{ flex: 1, minWidth: 200,  "& .MuiOutlinedInput-root": {
-                                            borderRadius: "0px",
-                                        } }}
+              sx={{
+                flex: 1, minWidth: 200, "& .MuiOutlinedInput-root": {
+                  borderRadius: "0px",
+                }
+              }}
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
@@ -707,9 +729,11 @@ export default function StaffPage() {
               }}
             />
 
-            <FormControl sx={{ minWidth: 140,   "& .MuiOutlinedInput-root": {
-                                            borderRadius: "0px",
-                                        } }} size="small">
+            <FormControl sx={{
+              minWidth: 140, "& .MuiOutlinedInput-root": {
+                borderRadius: "0px",
+              }
+            }} size="small">
               <InputLabel>Status</InputLabel>
               <Select
                 value={filterStatus}
@@ -731,9 +755,9 @@ export default function StaffPage() {
             <Button
               variant="contained"
               size="small"
-              startIcon={<Add />}
+              startIcon={isAddLoading ? <CircularProgress size={20} color="inherit" /> : <Add />}
               onClick={handleAddNew}
-              disabled={!canManageStaff}
+              disabled={!canManageStaff || isAddLoading}
               sx={{
                 height: 40,
                 bgcolor: PRIMARY_COLOR,
@@ -768,13 +792,7 @@ export default function StaffPage() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={7} align="center" sx={{ py: 6 }}>
-                    <CircularProgress sx={{ color: PRIMARY_COLOR }} />
-                  </TableCell>
-                </TableRow>
-              ) : staff.length > 0 ? (
+              {staff.length > 0 ? (
                 staff.map((staffMember) => (
                   <TableRow
                     key={staffMember.id}
@@ -864,13 +882,15 @@ export default function StaffPage() {
                       <Button
                         variant="contained"
                         size="small"
-                        startIcon={<Edit sx={{ fontSize: '18px !important' }} />}
-                        onClick={() => {
-                          setSelectedStaff(staffMember);
-                          setDialogMode("edit");
-                          setShowDetail(true);
-                        }}
-                        disabled={!canManageStaff}
+                        startIcon={
+                          editingId === staffMember.id ? (
+                            <CircularProgress size={16} color="inherit" />
+                          ) : (
+                            <Edit sx={{ fontSize: '18px !important' }} />
+                          )
+                        }
+                        onClick={() => handleRowEdit(staffMember)}
+                        disabled={!canManageStaff || editingId === staffMember.id}
                         sx={{
                           bgcolor: '#f39c12',
                           '&:hover': { bgcolor: '#e67e22' },

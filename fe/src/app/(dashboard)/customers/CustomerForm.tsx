@@ -122,7 +122,6 @@ const getErrorMessage = (error: unknown): string => {
   return "An unexpected error occurred.";
 };
 
-// --- Giữ nguyên các hằng số màu sắc và Helper ---
 const PRIMARY_COLOR = "#3b82f6";
 const PRIMARY_DARK = "#0f766e";
 const SUCCESS_COLOR = "#10b981";
@@ -194,6 +193,8 @@ export default function CustomersPage() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [showDetail, setShowDetail] = useState(false);
   const [storeList, setStoreList] = useState<Store[]>([]);
+  const [isAddLoading, setIsAddLoading] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
     message: string;
@@ -237,8 +238,8 @@ export default function CustomersPage() {
       handleSnackbarOpen("Customer created successfully!");
       queryClient.invalidateQueries({ queryKey: ["customers"] });
       queryClient.invalidateQueries({ queryKey: ["customerStats"] });
-      setOpenDialog(false);
-      setShowDetail(false);
+      // setOpenDialog(false);
+      // setShowDetail(false);
     },
     onError: (error) => handleSnackbarOpen(`Error: ${getErrorMessage(error)}`, "error"),
   });
@@ -249,8 +250,8 @@ export default function CustomersPage() {
       handleSnackbarOpen("Customer updated successfully!");
       queryClient.invalidateQueries({ queryKey: ["customers"] });
       queryClient.invalidateQueries({ queryKey: ["customerStats"] });
-      setOpenDialog(false);
-      setShowDetail(false);
+      // setOpenDialog(false);
+      // setShowDetail(false);
     },
     onError: (error) => handleSnackbarOpen(`Error: ${getErrorMessage(error)}`, "error"),
   });
@@ -278,13 +279,17 @@ export default function CustomersPage() {
       ...data,
     };
 
-    if (dialogMode === "edit" && selectedCustomerId) {
-      updateMutation.mutate({
-        id: selectedCustomerId,
-        customer: dataToSubmit as UpdateCustomerDto
-      });
-    } else {
-      createMutation.mutate(dataToSubmit as CreateCustomerDto);
+    try {
+      if (dialogMode === "edit" && selectedCustomerId) {
+        await updateMutation.mutateAsync({
+          id: selectedCustomerId,
+          customer: dataToSubmit as UpdateCustomerDto
+        });
+      } else {
+        await createMutation.mutateAsync(dataToSubmit as CreateCustomerDto);
+      }
+    } catch (error) {
+      throw error;
     }
   };
   const handleFilterChange = <K extends keyof typeof filters>(
@@ -304,9 +309,24 @@ export default function CustomersPage() {
   };
 
   const handleAddNew = () => {
-    setDialogMode("add");
-    setSelectedCustomerId(null);
-    setShowDetail(true);
+    setIsAddLoading(true);
+
+    setTimeout(() => {
+      setDialogMode("add");
+      setSelectedCustomerId(null);
+      setShowDetail(true);
+      setIsAddLoading(false);
+    }, 500);
+  };
+  const handleRowEdit = (customer: Customer) => {
+    setEditingId(customer.id);
+
+    setTimeout(() => {
+      setSelectedCustomerId(customer.id);
+      setDialogMode("edit");
+      setShowDetail(true);
+      setEditingId(null);
+    }, 500);
   };
   const handleEdit = () => {
     if (selectedCustomerId) {
@@ -403,7 +423,7 @@ export default function CustomersPage() {
                   <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                     <Box>
                       <Typography color="text.secondary" variant="body2" gutterBottom>Total Revenue</Typography>
-                      <Typography variant="h4" fontWeight="bold">${(stats.totalRevenue / 1000000).toFixed(1)}M</Typography>
+                      <Typography variant="h4" fontWeight="bold">{formatCurrency(stats.totalRevenue)}</Typography>
                     </Box>
                     <Avatar sx={{ bgcolor: alpha(INFO_COLOR, 0.1), width: 56, height: 56 }}>
                       <TrendingUp sx={{ color: INFO_COLOR, fontSize: 28 }} />
@@ -465,7 +485,8 @@ export default function CustomersPage() {
                 <Button
                   variant="contained"
                   size="small"
-                  startIcon={<Add />}
+                  startIcon={isAddLoading ? <CircularProgress size={20} color="inherit" /> : <Add />}
+                  disabled={isAddLoading}
                   onClick={handleAddNew}
                   sx={{
                     height: 40,
@@ -473,7 +494,8 @@ export default function CustomersPage() {
                     "&:hover": { bgcolor: PRIMARY_DARK },
                     textTransform: "none",
                     fontWeight: 600,
-                    px: 3
+                    px: 3,
+                    borderRadius: "0px"
                   }}
                 >
                   Add New Customer
@@ -533,12 +555,15 @@ export default function CustomersPage() {
                           <Button
                             variant="contained"
                             size="small"
-                            startIcon={<Edit sx={{ fontSize: '18px !important' }} />}
-                            onClick={() => {
-                              setSelectedCustomerId(customer.id);
-                              setDialogMode("edit");
-                              setShowDetail(true);
-                            }}
+                            startIcon={
+                              editingId === customer.id ? (
+                                <CircularProgress size={16} color="inherit" />
+                              ) : (
+                                <Edit sx={{ fontSize: '18px !important' }} />
+                              )
+                            }
+                            disabled={editingId === customer.id}
+                            onClick={() => handleRowEdit(customer)}
                             sx={{
                               bgcolor: '#f39c12',
                               '&:hover': { bgcolor: '#e67e22' },

@@ -34,12 +34,11 @@ export class BookingsService {
   async createBookingFromOrder(orderDto: CreateBookingOrderDto): Promise<Booking> {
     const { customer: customerData, booking: bookingData, invoice: invoiceData } = orderDto;
 
-    // Set default country_code if not provided
+
     if (!customerData.country_code) {
       customerData.country_code = '+84';
     }
 
-    // Log for debugging
     console.log('Received country_code:', customerData.country_code);
     console.log('Customer data:', {
       fullName: customerData.fullName,

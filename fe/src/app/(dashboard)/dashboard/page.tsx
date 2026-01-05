@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Grid,
   Card,
@@ -48,8 +48,13 @@ import {
   Pie,
   Cell,
 } from 'recharts';
+import { getInvoices } from '@/lib/api/invoices';
+import { Invoice as InvoiceType } from '@/types/invoice';
+import { getBookings } from '@/lib/api/bookings';
+import { Booking as BookingType } from '@/types/booking';
+import { getCustomers } from '@/lib/api/customers';
+import { Customer as CustomerType } from '@/types/customer';
 
-// Primary colors
 const PRIMARY_COLOR = '#3b82f6';
 const PRIMARY_LIGHT = '#2dd4bf';
 const PRIMARY_DARK = '#0f766e';
@@ -57,9 +62,9 @@ const ACCENT_COLOR = '#ec4899';
 const SUCCESS_COLOR = '#10b981';
 const WARNING_COLOR = '#f59e0b';
 const ERROR_COLOR = '#ef4444';
-const INFO_COLOR = '#3b82f6';
+const INFO_COLOR = '#8b5cf6';
 
-// Mock data - Revenue
+
 const revenueData = [
   { name: 'Mon', revenue: 4500, appointments: 120, customers: 98 },
   { name: 'Tue', revenue: 5200, appointments: 145, customers: 118 },
@@ -70,7 +75,6 @@ const revenueData = [
   { name: 'Sun', revenue: 7200, appointments: 203, customers: 175 },
 ];
 
-// Top services
 const topServices = [
   { name: 'Body Massage', bookings: 450, revenue: 135000000 },
   { name: 'Foot Massage', bookings: 320, revenue: 64000000 },
@@ -79,15 +83,13 @@ const topServices = [
   { name: 'Hot Stone', bookings: 160, revenue: 80000000 },
 ];
 
-// Booking status
 const bookingStatus = [
   { name: 'Completed', value: 156, color: SUCCESS_COLOR },
-  { name: 'Confirmed', value: 48, color: PRIMARY_COLOR },
+  { name: 'Progresing', value: 48, color: INFO_COLOR },
   { name: 'Pending', value: 24, color: WARNING_COLOR },
   { name: 'Cancelled', value: 12, color: ERROR_COLOR },
 ];
 
-// Top staff
 const topStaff = [
   { name: 'Nguyen Thi Mai', services: 89, revenue: 26700000, rating: 4.9 },
   { name: 'Tran Van Hung', services: 76, revenue: 22800000, rating: 4.8 },
@@ -95,7 +97,6 @@ const topStaff = [
   { name: 'Pham Minh Tuan', services: 62, revenue: 18600000, rating: 4.6 },
 ];
 
-// Recent activities
 type Activity = {
   type: 'booking' | 'payment' | 'customer' | 'complete' | 'cancel';
   icon: React.ReactElement<SvgIconProps>;
@@ -142,18 +143,15 @@ const recentActivities: Activity[] = [
   },
 ];
 
-// Stat Card Component
 const StatCard = ({
   title,
   value,
-  change,
   icon,
   color,
   subtitle,
 }: {
   title: string;
   value: string;
-  change: number;
   icon: React.ReactNode;
   color: string;
   subtitle?: string;
@@ -173,20 +171,7 @@ const StatCard = ({
               {subtitle}
             </Typography>
           )}
-          <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
-            <Chip
-              label={`${change > 0 ? '+' : ''}${change}%`}
-              size="small"
-              sx={{
-                bgcolor: change > 0 ? alpha(SUCCESS_COLOR, 0.1) : alpha(ERROR_COLOR, 0.1),
-                color: change > 0 ? SUCCESS_COLOR : ERROR_COLOR,
-                fontWeight: 600,
-              }}
-            />
-            <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
-              vs last month
-            </Typography>
-          </Box>
+          
         </Box>
         <Box
           sx={{
@@ -208,6 +193,88 @@ const StatCard = ({
 );
 
 export default function DashboardPage() {
+  const [monthlyRevenue, setMonthlyRevenue] = useState(0);
+  const [totalBookings, setTotalBookings] = useState(0);
+  const [todaysPaidInvoices, setTodaysPaidInvoices] = useState(0);
+  const [newCustomersThisMonth, setNewCustomersThisMonth] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const [invoiceResponse, bookingResponse, customerResponse] = await Promise.all([
+          getInvoices({ limit: 9999 }),
+          getBookings({ limit: 9999 }),
+          getCustomers({ limit: 9999 }),
+        ]);
+
+        const invoices: InvoiceType[] = invoiceResponse.data;
+        const bookings: BookingType[] = bookingResponse.data;
+        const customers: CustomerType[] = customerResponse.data.data;
+
+        const currentDate = new Date();
+        const currentMonth = currentDate.getMonth();
+        const currentYear = currentDate.getFullYear();
+        const currentDay = currentDate.getDate();
+
+        const revenue = invoices.reduce((acc, invoice) => {
+          const invoiceDate = new Date(invoice.createdAt);
+          if (
+            invoice.paymentStatus === 'paid' &&
+            invoiceDate.getMonth() === currentMonth &&
+            invoiceDate.getFullYear() === currentYear
+          ) {
+            return acc + invoice.totalAmount;
+          }
+          return acc;
+        }, 0);
+        setMonthlyRevenue(revenue);
+
+        const paidToday = invoices.filter(invoice => {
+            const invoiceDate = new Date(invoice.createdAt);
+            return (
+                invoice.paymentStatus === 'paid' &&
+                invoiceDate.getDate() === currentDay &&
+                invoiceDate.getMonth() === currentMonth &&
+                invoiceDate.getFullYear() === currentYear
+            );
+        }).length;
+        setTodaysPaidInvoices(paidToday);
+
+        const newCustomers = customers.filter(customer => {
+            const customerCreationDate = new Date(customer.createdAt);
+            return (
+                customer.customerType === 'new' &&
+                customerCreationDate.getMonth() === currentMonth &&
+                customerCreationDate.getFullYear() === currentYear
+            );
+        }).length;
+        setNewCustomersThisMonth(newCustomers);
+
+        const completedBookings = bookings.filter(booking => {
+            const bookingDate = new Date(booking.bookingDate);
+            return (
+                booking.status === 'completed' &&
+                bookingDate.getMonth() === currentMonth &&
+                bookingDate.getFullYear() === currentYear
+            );
+        }).length;
+        setTotalBookings(completedBookings);
+
+      } catch (err) {
+        setError('Failed to fetch dashboard data.');
+        console.error(err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+  }, []);
+
   return (
     <>
       {/* Stats Cards */}
@@ -215,41 +282,40 @@ export default function DashboardPage() {
         <Grid size={{ xs: 12, sm: 6, md: 3}}>
           <StatCard
             title="Monthly Revenue"
-            value="$72.5K"
-            change={12.5}
+            value={new Intl.NumberFormat('vi-VN', {
+              style: 'currency',
+              currency: 'VND',
+            }).format(monthlyRevenue)}
             icon={<TrendingUp sx={{ fontSize: 32 }} />}
             color={SUCCESS_COLOR}
-            subtitle="USD"
+            subtitle={'revenue this month'}
           />
         </Grid>
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <StatCard
             title="Total Bookings"
-            value="203"
-            change={8.2}
+            value={totalBookings.toString()}
             icon={<CalendarToday sx={{ fontSize: 32 }} />}
             color={PRIMARY_COLOR}
-            subtitle="appointments"
+            subtitle="appointments this month"
           />
         </Grid>
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <StatCard
             title="New Customers"
-            value="48"
-            change={-3.1}
+            value={newCustomersThisMonth.toString()}
             icon={<PersonAdd sx={{ fontSize: 32 }} />}
             color={INFO_COLOR}
-            subtitle="registered"
+            subtitle="new this month"
           />
         </Grid>
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <StatCard
             title="Today's Schedule"
-            value="24"
-            change={5.7}
+            value={todaysPaidInvoices.toString()}
             icon={<Schedule sx={{ fontSize: 32 }} />}
             color={WARNING_COLOR}
-            subtitle="18 completed"
+            subtitle="paid invoices today"
           />
         </Grid>
       </Grid>
@@ -407,6 +473,8 @@ export default function DashboardPage() {
                         </Avatar>
                       </ListItemIcon>
                       <ListItemText
+                        primaryTypographyProps={{ component: 'div' }}
+                        secondaryTypographyProps={{ component: 'div' }}
                         primary={
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                             <Typography variant="body1" fontWeight="600">
@@ -499,6 +567,7 @@ export default function DashboardPage() {
                             {activity.text}
                           </Typography>
                         }
+                        secondaryTypographyProps={{ component: 'div' }}
                         secondary={
                           <Box sx={{ display: 'flex', alignItems: 'center', mt: 0.5 }}>
                             <AccessTime sx={{ fontSize: 14, mr: 0.5, color: 'text.secondary' }} />

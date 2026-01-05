@@ -6,7 +6,7 @@ import {
     InputLabel, Select, Switch, FormControlLabel, Paper,
     Stack, Typography, IconButton, Divider, Avatar, alpha,
     FormHelperText,
-    SelectChangeEvent // Import for Select typing
+    SelectChangeEvent, CircularProgress
 } from "@mui/material";
 import {
     Save, ArrowBack, Person, PhotoCamera, Badge
@@ -72,6 +72,7 @@ export default function UserDetail({
         }
     });
 
+    const [isSaving, setIsSaving] = useState(false);
     const [errors, setErrors] = useState<Partial<Record<keyof UserFormData, string>>>({});
     const handleChange = (field: keyof UserFormData) => (
         event: React.ChangeEvent<HTMLInputElement | { name?: string; value: unknown }> | SelectChangeEvent<string>
@@ -105,9 +106,21 @@ export default function UserDetail({
         return Object.keys(newErrors).length === 0;
     };
 
-    const handleSave = () => {
+    const handleSave = async () => {
         if (validate()) {
-            onSave(formData);
+            setIsSaving(true);
+
+            try {
+                await Promise.all([
+                    onSave(formData),
+                    new Promise((resolve) => setTimeout(resolve, 500))
+                ]);
+                onBack();
+            } catch (error) {
+                console.error("Save failed", error);
+            } finally {
+                setIsSaving(false);
+            }
         }
     };
 
@@ -281,9 +294,9 @@ export default function UserDetail({
                                 <Box sx={{ mt: 4, pt: 2, display: 'flex', justifyContent: 'flex-end', gap: 2, borderTop: `1px solid ${alpha("#000", 0.05)}` }}>
                                     <Button
                                         variant="contained"
-                                        startIcon={<Save />}
+                                        startIcon={(loading || isSaving) ? <CircularProgress size={20} color="inherit" /> : <Save />}
                                         onClick={handleSave}
-                                        disabled={loading}
+                                        disabled={loading || isSaving}
                                         sx={{ px: 4, bgcolor: '#004aad', borderRadius: 0 }}
                                     >
                                         {mode === "add" ? "Create Account" : "Update Information"}

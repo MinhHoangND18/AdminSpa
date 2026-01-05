@@ -293,7 +293,7 @@ export default function BookingsPage() {
             }}
           />
           <Tab
-            label="In Progress"
+            label="Progressing"
             value={BookingStatus.IN_PROGRESS}
             sx={{
               "&.Mui-selected": {

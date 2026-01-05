@@ -4,7 +4,8 @@ import React, { useState, useEffect } from "react";
 import {
     Grid, Box, Button, TextField, MenuItem, FormControl,
     InputLabel, Select, Paper, Stack, Typography, IconButton,
-    Divider, Avatar, alpha, InputAdornment, FormHelperText
+    Divider, Avatar, alpha, InputAdornment, FormHelperText,
+    CircularProgress
 } from "@mui/material";
 import {
     Save, ArrowBack, Person, Phone, Email,
@@ -76,6 +77,7 @@ export default function StaffDetail({
     });
 
     const [errors, setErrors] = useState<Partial<Record<keyof StaffFormData, string>>>({});
+    const [isSaving, setIsSaving] = useState(false);
 
     const handleChange = (field: keyof StaffFormData) => (
         e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | { target: { value: string | number | null } }
@@ -99,7 +101,7 @@ export default function StaffDetail({
         return Object.keys(newErrors).length === 0;
     };
 
-    const handleSave = () => {
+    const handleSave = async () => {
         if (validate()) {
             const submitData = {
                 ...formData,
@@ -107,7 +109,19 @@ export default function StaffDetail({
                 base_salary: formData.base_salary ? Number(formData.base_salary) : 0,
                 commission_rate: formData.commission_rate ? Number(formData.commission_rate) : undefined,
             };
-            onSave(submitData as StaffFormData);
+            setIsSaving(true);
+
+            try {
+                await Promise.all([
+                    onSave(submitData as StaffFormData),
+                    new Promise((resolve) => setTimeout(resolve, 500))
+                ]);
+                onBack();
+            } catch (error) {
+                console.error("Save failed", error);
+            } finally {
+                setIsSaving(false);
+            }
         }
     };
 
@@ -224,11 +238,11 @@ export default function StaffDetail({
                             </Grid>
                             <Grid size={{ xs: 12, sm: 6 }}>
                                 <FormControl fullWidth disabled={isView} error={!!errors.gender}
-                                sx={{
-                                    "& .MuiOutlinedInput-root": {
-                                        borderRadius: "0px",
-                                    }
-                                }}>
+                                    sx={{
+                                        "& .MuiOutlinedInput-root": {
+                                            borderRadius: "0px",
+                                        }
+                                    }}>
                                     <InputLabel>Gender</InputLabel>
                                     <Select value={formData.gender} label="Gender" onChange={handleChange("gender")}>
                                         <MenuItem value="male">Male</MenuItem>
@@ -252,11 +266,11 @@ export default function StaffDetail({
                             </Grid>
                             <Grid size={{ xs: 12, sm: 6 }}>
                                 <FormControl fullWidth required disabled={isView} error={!!errors.store_id}
-                                sx={{
-                                    "& .MuiOutlinedInput-root": {
-                                        borderRadius: "0px",
-                                    }
-                                }}>
+                                    sx={{
+                                        "& .MuiOutlinedInput-root": {
+                                            borderRadius: "0px",
+                                        }
+                                    }}>
                                     <InputLabel>Assigned Store</InputLabel>
                                     <Select
                                         value={formData.store_id}
@@ -346,10 +360,13 @@ export default function StaffDetail({
                         {mode !== "view" && (
                             <Box sx={{ mt: 2, pt: 2, display: 'flex', justifyContent: 'flex-end', gap: 2, borderTop: `0px solid ${alpha("#000", 0.05)}` }}>
                                 <Button
-                                    variant="contained" startIcon={<Save />}
-                                    onClick={handleSave} disabled={loading}
-                                    sx={{ px: 4, bgcolor: '#004aad' , borderRadius: 0 }}
+                                    variant="contained"
+                                    startIcon={(loading || isSaving) ? <CircularProgress size={20} color="inherit" /> : <Save />}
+                                    onClick={handleSave}
+                                    disabled={loading || isSaving}
+                                    sx={{ px: 4, bgcolor: '#004aad', borderRadius: 0 }}
                                 >
+                        
                                     {mode === "add" ? "Add Staff Member" : "Save Profile Changes"}
                                 </Button>
                             </Box>

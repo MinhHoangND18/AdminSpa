@@ -211,6 +211,8 @@ export default function UsersPage() {
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(false);
+  const [isAddLoading, setIsAddLoading] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
 
   const [snackbar, setSnackbar] = useState({
     open: false,
@@ -353,7 +355,7 @@ export default function UsersPage() {
               : undefined,
         is_locked: filterStatus === "locked" ? true : undefined,
         page: 1,
-        limit: 99999, 
+        limit: 99999,
       };
 
       try {
@@ -386,10 +388,26 @@ export default function UsersPage() {
   };
 
   const handleAddNew = () => {
-    setDialogMode("add");
-    setSelectedUser(null);
-    setShowDetail(true);
-    setSaveError(null);
+    setIsAddLoading(true);
+
+    setTimeout(() => {
+      setDialogMode("add");
+      setSelectedUser(null);
+      setShowDetail(true);
+      setSaveError(null);
+      setIsAddLoading(false);
+    }, 500);
+  };
+  const handleRowEdit = (user: User) => {
+    setEditingId(user.id);
+
+    setTimeout(() => {
+      setSelectedUser(user);
+      setDialogMode("edit");
+      setShowDetail(true);
+      setSaveError(null);
+      setEditingId(null);
+    }, 500);
   };
 
   const handleEdit = () => {
@@ -432,14 +450,14 @@ export default function UsersPage() {
         await usersApi.update(selectedUser.id, dataToSend);
       }
 
-      setShowDetail(false);
+      // setShowDetail(false);
       fetchUsers();
       setSnackbar({
         open: true,
         message: dialogMode === "add" ? "User created successfully" : "Update successful",
         severity: "success",
       });
-      setSaveError(null); 
+      setSaveError(null);
     } catch (error: unknown) {
       console.error("Failed to save user:", error);
       let errorMessage = "An unknown error occurred.";
@@ -533,6 +551,7 @@ export default function UsersPage() {
         setLockConfirmOpen(false);
         setSelectedUser(null);
         fetchUsers();
+
         setSnackbar({
           open: true,
           message: `User ${selectedUser.username} has been ${isLocked ? "locked" : "unlocked"
@@ -707,7 +726,7 @@ export default function UsersPage() {
 
         <Grid container spacing={3} sx={{ mb: 3 }}>
           <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
-            <Card sx={{borderRadius: 0}}>
+            <Card sx={{ borderRadius: 0 }}>
               <CardContent>
                 <Box
                   sx={{
@@ -742,7 +761,7 @@ export default function UsersPage() {
             </Card>
           </Grid>
           <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
-            <Card sx={{borderRadius: 0}}>
+            <Card sx={{ borderRadius: 0 }}>
               <CardContent>
                 <Box
                   sx={{
@@ -820,7 +839,7 @@ export default function UsersPage() {
             </Card>
           </Grid> */}
           <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
-            <Card sx={{borderRadius: 0}}>
+            <Card sx={{ borderRadius: 0 }}>
               <CardContent>
                 <Box
                   sx={{
@@ -877,9 +896,11 @@ export default function UsersPage() {
                 placeholder="Search users..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                sx={{ flex: 1, minWidth: 200,   "& .MuiOutlinedInput-root": {
-                                            borderRadius: "0px",
-                                        } }}
+                sx={{
+                  flex: 1, minWidth: 200, "& .MuiOutlinedInput-root": {
+                    borderRadius: "0px",
+                  }
+                }}
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
@@ -889,9 +910,11 @@ export default function UsersPage() {
                 }}
               />
 
-              <FormControl sx={{ minWidth: 130,   "& .MuiOutlinedInput-root": {
-                                            borderRadius: "0px",
-                                        } }} size="small">
+              <FormControl sx={{
+                minWidth: 130, "& .MuiOutlinedInput-root": {
+                  borderRadius: "0px",
+                }
+              }} size="small">
                 <InputLabel>Role</InputLabel>
                 <Select
                   value={filterRole}
@@ -907,9 +930,11 @@ export default function UsersPage() {
                 </Select>
               </FormControl>
 
-              <FormControl sx={{ minWidth: 130,   "& .MuiOutlinedInput-root": {
-                                            borderRadius: "0px",
-                                        } }} size="small">
+              <FormControl sx={{
+                minWidth: 130, "& .MuiOutlinedInput-root": {
+                  borderRadius: "0px",
+                }
+              }} size="small">
                 <InputLabel>Status</InputLabel>
                 <Select
                   value={filterStatus}
@@ -930,7 +955,8 @@ export default function UsersPage() {
               <Button
                 variant="contained"
                 size="small"
-                startIcon={<Add />}
+                startIcon={isAddLoading ? <CircularProgress size={20} color="inherit" /> : <Add />}
+                disabled={isAddLoading}
                 onClick={handleAddNew}
                 sx={{
                   height: 40,
@@ -1122,13 +1148,15 @@ export default function UsersPage() {
                         <Button
                           variant="contained"
                           size="small"
-                          startIcon={<Edit sx={{ fontSize: '18px !important' }} />}
-                          onClick={() => {
-                            setSelectedUser(user);
-                            setDialogMode("edit");
-                            setShowDetail(true);
-                          }}
-                          disabled={!canModifyUser(user)}
+                          startIcon={
+                            editingId === user.id ? (
+                              <CircularProgress size={16} color="inherit" />
+                            ) : (
+                              <Edit sx={{ fontSize: '18px !important' }} />
+                            )
+                          }
+                          onClick={() => handleRowEdit(user)}
+                          disabled={!canModifyUser(user) || editingId === user.id}
                           sx={{
                             bgcolor: '#f39c12',
                             '&:hover': { bgcolor: '#e67e22' },

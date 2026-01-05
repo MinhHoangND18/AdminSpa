@@ -127,7 +127,7 @@ const StatCard = ({
   color: string;
 }) => (
   <Grid size={{ xs: 12, sm: 4 }}>
-    <Card sx={{borderRadius: 0}}>
+    <Card sx={{ borderRadius: 0 }}>
       <CardContent>
         <Box
           sx={{
@@ -162,6 +162,8 @@ export default function StoresPage() {
   const [openDialog, setOpenDialog] = useState(false);
   const [dialogMode, setDialogMode] = useState<"add" | "edit" | "view">("add");
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [isAddLoading, setIsAddLoading] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const {
     data: availableManagers = [],
     isLoading: isLoadingManagers
@@ -295,37 +297,47 @@ export default function StoresPage() {
   };
 
   const handleAddNew = () => {
-    setDialogMode("add");
-    setFormData(initialFormData);
-    setSaveError(null);
-    setShowDetail(true);
+    setIsAddLoading(true);
+
+    setTimeout(() => {
+      setDialogMode("add");
+      setFormData(initialFormData);
+      setSaveError(null);
+      setShowDetail(true);
+      setIsAddLoading(false);
+    }, 500);
   };
 
   const handleEdit = (store: Store) => {
-    setSelectedStore(store);
-    setDialogMode("edit");
-    setSaveError(null);
+    setEditingId(store.id);
 
-    const matchedManager = availableManagers.find(
-      (manager) => manager.id === store.manager_id
-    );
-    setFormData({
-      code: store.code,
-      name: store.name,
-      domain: store.domain || "",
-      address: store.address,
-      phone: store.phone || "",
-      email: store.email || "",
-      description: store.description || "",
-      openingHours: store.openingHours || "",
-      latitude: store.latitude?.toString() || "",
-      longitude: store.longitude?.toString() || "",
-      manager_id: matchedManager ? String(matchedManager.id) : (store.manager_id?.toString() || ""),
-      isActive: store.isActive,
-    });
+    setTimeout(() => {
+      setSelectedStore(store);
+      setDialogMode("edit");
+      setSaveError(null);
 
-    setShowDetail(true);
-    handleMenuClose();
+      const matchedManager = availableManagers.find(
+        (manager) => manager.id === store.manager_id
+      );
+      setFormData({
+        code: store.code,
+        name: store.name,
+        domain: store.domain || "",
+        address: store.address,
+        phone: store.phone || "",
+        email: store.email || "",
+        description: store.description || "",
+        openingHours: store.openingHours || "",
+        latitude: store.latitude?.toString() || "",
+        longitude: store.longitude?.toString() || "",
+        manager_id: matchedManager ? String(matchedManager.id) : (store.manager_id?.toString() || ""),
+        isActive: store.isActive,
+      });
+
+      setShowDetail(true);
+      handleMenuClose();
+      setEditingId(null);
+    }, 500);
   };
   const handleView = () => {
     if (selectedStore) {
@@ -455,7 +467,7 @@ export default function StoresPage() {
               severity: "success",
             });
 
-            setShowDetail(false);
+            // setShowDetail(false);
             setSaveError(null);
           } catch (err) {
             let errorMessage: string = "An unexpected error occurred.";
@@ -470,6 +482,7 @@ export default function StoresPage() {
               errorMessage = err.message;
             }
             setSaveError(errorMessage);
+            throw err;
           }
         }}
         loading={storeMutation.isPending}
@@ -521,7 +534,7 @@ export default function StoresPage() {
         </Grid>
 
         {/* Actions Bar */}
-        <Card sx={{ mb: 3 , borderRadius: 0}}>
+        <Card sx={{ mb: 3, borderRadius: 0 }}>
           <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
             <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap", alignItems: "center" }}>
               <TextField
@@ -545,7 +558,8 @@ export default function StoresPage() {
               <Button
                 variant="contained"
                 size="small"
-                startIcon={<Add />}
+                startIcon={isAddLoading ? <CircularProgress size={20} color="inherit" /> : <Add />}
+                disabled={isAddLoading}
                 onClick={handleAddNew}
                 sx={{
                   height: 40,
@@ -608,7 +622,14 @@ export default function StoresPage() {
                         <Button
                           variant="contained"
                           size="small"
-                          startIcon={<Edit sx={{ fontSize: '18px !important' }} />}
+                          startIcon={
+                            editingId === store.id ? (
+                              <CircularProgress size={16} color="inherit" />
+                            ) : (
+                              <Edit sx={{ fontSize: '18px !important' }} />
+                            )
+                          }
+                          disabled={editingId === store.id}
                           onClick={() => handleEdit(store)}
                           sx={{
                             bgcolor: '#f39c12',

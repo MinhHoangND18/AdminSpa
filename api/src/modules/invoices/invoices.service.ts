@@ -13,7 +13,6 @@ import {
   QueryInvoiceDto,
   UpdatePaymentDto,
 } from './invoices.dto';
-import { Product } from '../products/entities/products.entity';
 import {
   InvoiceItem,
   ItemType,
@@ -25,8 +24,7 @@ export class InvoicesService {
     private readonly dataSource: DataSource,
     @InjectRepository(Invoice)
     private readonly invoiceRepository: Repository<Invoice>,
-    @InjectRepository(Product)
-    private readonly productRepository: Repository<Product>,
+ 
     @InjectRepository(InvoiceItem)
     private readonly invoiceItemRepository: Repository<InvoiceItem>,
   ) {}
@@ -64,40 +62,22 @@ export class InvoicesService {
       }
       const savedInvoice = await queryRunner.manager.save(invoice);
 
-      for (const item of items) {
-        if (item.itemType === ItemType.PRODUCT) {
-          const product = await queryRunner.manager.findOne(Product, {
-            where: { id: item.itemId },
-            lock: { mode: 'pessimistic_write' }, // Lock the row for update
-          });
-
-          if (!product) {
-            throw new NotFoundException(`Product with ID ${item.itemId} not found.`);
-          }
-
-          if (product.quantity_stock < item.quantity) {
-            throw new BadRequestException(
-              `Insufficient stock for product "${product.name}". Available: ${product.quantity_stock}, Requested: ${item.quantity}`,
-            );
-          }
-
-          product.quantity_stock -= item.quantity;
-          await queryRunner.manager.save(product);
-        }
-
-        // Create and save the invoice item
-        const invoiceItem = queryRunner.manager.create(InvoiceItem, {
+      // Create invoice items if provided
+      if (items && items.length > 0) {
+        const invoiceItems = items.map(item => ({
           ...item,
           invoiceId: savedInvoice.id,
-        });
-        await queryRunner.manager.save(invoiceItem);
+          quantity: item.quantity || 1,
+          totalPrice: item.totalPrice || ((item.unitPrice * (item.quantity || 1)) - (item.discount || 0)),
+        }));
+        await queryRunner.manager.save(InvoiceItem, invoiceItems);
       }
 
       await queryRunner.commitTransaction();
       return savedInvoice;
     } catch (err) {
       await queryRunner.rollbackTransaction();
-      throw err; // Re-throw the original error
+      throw err;
     } finally {
       await queryRunner.release();
     }
@@ -247,21 +227,10 @@ export class InvoicesService {
         where: { invoiceId: id },
       });
 
-      for (const item of items) {
-        if (item.itemType === ItemType.PRODUCT) {
-          const product = await queryRunner.manager.findOne(Product, {
-            where: { id: item.itemId },
-            lock: { mode: 'pessimistic_write' },
-          });
-          if (product) {
-            product.quantity_stock += item.quantity;
-            await queryRunner.manager.save(product);
-          }
-        }
-      }
+    
 
-      await queryRunner.manager.remove(items); // remove invoice items
-      await queryRunner.manager.remove(invoice); // remove invoice
+      await queryRunner.manager.remove(items); 
+      await queryRunner.manager.remove(invoice); 
 
       await queryRunner.commitTransaction();
     } catch (err) {

@@ -20,4 +20,3 @@ export * from "./user";
 export * from "./invoice";
 export * from "./invoice-item";
 export * from "./customer";
-export * from "./product";

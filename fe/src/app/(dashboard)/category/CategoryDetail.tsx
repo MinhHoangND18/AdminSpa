@@ -60,6 +60,7 @@ export default function CategoryDetail({
   }));
 
   const [errors, setErrors] = useState<Partial<Record<keyof CategoryFormData, string>>>({});
+  const [isSaving, setIsSaving] = useState(false);
 
   const validate = () => {
     const newErrors: Partial<Record<keyof CategoryFormData, string>> = {};
@@ -79,7 +80,19 @@ export default function CategoryDetail({
 
   const handleSave = async () => {
     if (validate()) {
-      await onSave(formData);
+      setIsSaving(true);
+
+      try {
+        await Promise.all([
+          onSave(formData),
+          new Promise((resolve) => setTimeout(resolve, 500))
+        ]);
+        onBack();
+      } catch (error) {
+        console.error("Save failed", error);
+      } finally {
+        setIsSaving(false);
+      }
     }
   };
 
@@ -213,10 +226,10 @@ export default function CategoryDetail({
 
                     <Button
                       variant="contained"
-                      startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <Save />}
+                      startIcon={(loading || isSaving) ? <CircularProgress size={20} color="inherit" /> : <Save />}
                       onClick={handleSave}
-                      disabled={loading}
-                      sx={{ px: 4, bgcolor: '#3b82f6', height: 40, borderRadius: 0 }} 
+                      disabled={loading || isSaving} 
+                      sx={{ px: 4, bgcolor: '#3b82f6', height: 40, borderRadius: 0 }}
                     >
                       {mode === "add" ? "Save Category" : "Update Category"}
                     </Button>

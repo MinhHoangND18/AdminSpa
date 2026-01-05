@@ -124,6 +124,8 @@ export default function CategoryForm() {
   const [showDetail, setShowDetail] = useState(false);
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' } | null>(null);
   const [validationErrors, setValidationErrors] = useState<Partial<Record<keyof CategoryFormData, string>>>({});
+  const [isAddLoading, setIsAddLoading] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
 
   const initialFormData: CategoryFormData = {
     name: '',
@@ -263,16 +265,26 @@ export default function CategoryForm() {
   };
 
   const handleAddNew = () => {
-    setDialogMode('add');
-    setSelectedCategory(null);
-    setShowDetail(true);
+    setIsAddLoading(true);
+
+    setTimeout(() => {
+      setDialogMode("add");
+      setSelectedCategory(null);
+      setShowDetail(true);
+      setIsAddLoading(false);
+    }, 500);
   };
 
   const handleEdit = (category: ServiceCategory) => {
-    setSelectedCategory(category);
-    setDialogMode('edit');
-    setShowDetail(true);
-    handleMenuClose();
+    setEditingId(category.id);
+
+    setTimeout(() => {
+      setSelectedCategory(category);
+      setDialogMode("edit");
+      setShowDetail(true);
+      handleMenuClose();
+      setEditingId(null);
+    }, 500);
   };
   const handleBack = () => {
     setShowDetail(false);
@@ -299,7 +311,7 @@ export default function CategoryForm() {
         data: submissionData as UpdateServiceCategoryDto
       });
     }
-    setShowDetail(false);
+    // setShowDetail(false);
   };
 
   const confirmDelete = () => {
@@ -377,7 +389,7 @@ export default function CategoryForm() {
       {/* Stats Cards */}
       <Grid container spacing={3} sx={{ mb: 3 }}>
         <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
-          <Card sx={{borderRadius: 0}}>
+          <Card sx={{ borderRadius: 0 }}>
             <CardContent>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Box>
@@ -487,18 +499,17 @@ export default function CategoryForm() {
             <Button
               variant="contained"
               size="small"
-              startIcon={<Add />}
+              startIcon={isAddLoading ? <CircularProgress size={20} color="inherit" /> : <Add />}
+              disabled={isAddLoading}
               onClick={handleAddNew}
               sx={{
                 height: 40,
                 bgcolor: PRIMARY_COLOR,
-                '&:hover': { bgcolor: PRIMARY_DARK },
-                textTransform: 'none',
+                "&:hover": { bgcolor: PRIMARY_DARK },
+                textTransform: "none",
                 fontWeight: 600,
                 px: 3,
-
                 borderRadius: "0px",
-
               }}
             >
               Add New Category
@@ -602,18 +613,25 @@ export default function CategoryForm() {
                       <Button
                         variant="contained"
                         size="small"
-                        startIcon={<Edit sx={{ fontSize: '18px !important' }} />}
+                        startIcon={
+                          editingId === category.id ? (
+                            <CircularProgress size={16} color="inherit" />
+                          ) : (
+                            <Edit sx={{ fontSize: "18px !important" }} />
+                          )
+                        }
+                        disabled={editingId === category.id}
                         onClick={() => handleEdit(category)}
                         sx={{
-                          bgcolor: '#f39c12',
-                          '&:hover': { bgcolor: '#e67e22' },
-                          textTransform: 'none',
+                          bgcolor: "#f39c12",
+                          "&:hover": { bgcolor: "#e67e22" },
+                          textTransform: "none",
                           fontWeight: 600,
-                          borderRadius: '0px',
+                          borderRadius: "0px",
                           px: 2,
-                          minWidth: '80px',
-                          boxShadow: 'none',
-                          height: '32px'
+                          minWidth: "80px",
+                          boxShadow: "none",
+                          height: "32px",
                         }}
                       >
                         Edit

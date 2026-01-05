@@ -329,6 +329,8 @@ export default function InvoicesPage() {
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [loading, setLoading] = useState(false);
   const [showDetail, setShowDetail] = useState(false);
+  const [isCreateLoading, setIsCreateLoading] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
 
   const initialFormData: InvoiceFormData = useMemo(
     () => ({
@@ -415,7 +417,7 @@ export default function InvoicesPage() {
     }
   };
 
-  
+
 
   const fetchServices = async () => {
     try {
@@ -613,9 +615,13 @@ export default function InvoicesPage() {
   };
 
   const handleAddNew = () => {
-    setDialogMode("add");
-    setSelectedInvoice(null);
-    setShowDetail(true);
+    setIsCreateLoading(true);
+    setTimeout(() => {
+      setDialogMode("add");
+      setSelectedInvoice(null);
+      setShowDetail(true);
+      setIsCreateLoading(false);
+    }, 500);
   };
   const fetchInvoiceItemsAndOpenDialog = async (
     mode: "view" | "edit" | "view_items"
@@ -678,15 +684,22 @@ export default function InvoicesPage() {
   const handleEdit = async (invoice: Invoice) => {
     setSelectedInvoice(invoice);
     setIsItemsLoading(true);
+    setEditingId(invoice.id);
     try {
-      const items = await getItemsByInvoiceId(invoice.id);
+
+      const [items] = await Promise.all([
+        getItemsByInvoiceId(invoice.id),
+        new Promise((resolve) => setTimeout(resolve, 500))
+      ]);
+
       setSelectedInvoice({ ...invoice, items });
       setDialogMode("edit");
       setShowDetail(true);
     } catch (err) {
       alert("Failed to load invoice items");
     } finally {
-      setIsItemsLoading(false);
+
+      setEditingId(null);
     }
   };
 
@@ -699,10 +712,10 @@ export default function InvoicesPage() {
         await updateInvoice(selectedInvoice.id, submissionData as UpdateInvoiceDto);
       }
       fetchInvoices();
-      setShowDetail(false);
+      // setShowDetail(false);
     } catch (err) {
       console.error(err);
-      alert("Error saving invoice");
+      throw err;
     } finally {
       setLoading(false);
     }
@@ -720,7 +733,7 @@ export default function InvoicesPage() {
 
   const selectableItems = useMemo((): SelectableItem[] => {
 
- 
+
     if (currentItem.item_type === "service") {
       const items = (services || [])
         .filter((service) => !service.isCombo)
@@ -1044,7 +1057,7 @@ export default function InvoicesPage() {
       discount: item.discount.toString(),
     }));
   };
-const isAnyLoading = (isInitialLoad || isFormDataLoading || isItemsLoading) && invoices.length === 0;
+  const isAnyLoading = (isInitialLoad || isFormDataLoading || isItemsLoading) && invoices.length === 0;
 
   return (
     <ThemeProvider theme={blueTheme}>
@@ -1065,7 +1078,7 @@ const isAnyLoading = (isInitialLoad || isFormDataLoading || isItemsLoading) && i
       {/* Stats Cards */}
       <Grid container spacing={3} sx={{ mb: 3 }}>
         <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-          <Card sx={{borderRadius: 0}}>
+          <Card sx={{ borderRadius: 0 }}>
             <CardContent>
               <Box
                 sx={{
@@ -1284,7 +1297,8 @@ const isAnyLoading = (isInitialLoad || isFormDataLoading || isItemsLoading) && i
             <Button
               variant="contained"
               size="small"
-              startIcon={<Add />}
+              startIcon={isCreateLoading ? <CircularProgress size={20} color="inherit" /> : <Add />}
+              disabled={isCreateLoading}
               onClick={handleAddNew}
               sx={{
                 height: 40,
@@ -1420,7 +1434,14 @@ const isAnyLoading = (isInitialLoad || isFormDataLoading || isItemsLoading) && i
                       <Button
                         variant="contained"
                         size="small"
-                        startIcon={<Edit sx={{ fontSize: '18px !important' }} />}
+                        startIcon={
+                          editingId === invoice.id ? (
+                            <CircularProgress size={16} color="inherit" />
+                          ) : (
+                            <Edit sx={{ fontSize: '18px !important' }} />
+                          )
+                        }
+                        disabled={editingId === invoice.id}
                         onClick={() => handleEdit(invoice)}
                         sx={{
                           bgcolor: '#f39c12',

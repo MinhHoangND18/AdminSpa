@@ -29,6 +29,7 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  CircularProgress
 } from "@mui/material";
 import { Delete, Inventory, ExpandLess, ExpandMore } from "@mui/icons-material";
 import { NumericFormat } from "react-number-format";
@@ -88,6 +89,10 @@ export default function BookingDetail({
   const [itemDialogOpen, setItemDialogOpen] = useState(false);
   const [discountDialogOpen, setDiscountDialogOpen] = useState(false);
   const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
+  const [isAddItemsLoading, setIsAddItemsLoading] = useState(false);
+  const [isProgressingLoading, setIsProgressingLoading] = useState(false);
+  const [isCompleteLoading, setIsCompleteLoading] = useState(false);
+  const [isCancelLoading, setIsCancelLoading] = useState(false);
 
   // State cho discount toàn đơn hàng
   const [orderDiscount, setOrderDiscount] = useState<number>(
@@ -143,9 +148,40 @@ export default function BookingDetail({
 
   const handleOpenAddDialog = () => {
     if (booking.status === BookingStatus.COMPLETED) return;
-    setEditingItemIndex(null);
-    setCurrentItem(initialItemFormData);
-    setItemDialogOpen(true);
+    setIsAddItemsLoading(true);
+
+    setTimeout(() => {
+      setEditingItemIndex(null);
+      setCurrentItem(initialItemFormData);
+      setItemDialogOpen(true);
+      setIsAddItemsLoading(false);
+    }, 500);
+  };
+  const handleStartService = () => {
+    setIsProgressingLoading(true);
+    setTimeout(() => {
+      onStartService(booking.id);
+      setIsProgressingLoading(false);
+    }, 500);
+  };
+
+  const handleCompleteService = () => {
+    setIsCompleteLoading(true);
+    setTimeout(() => {
+      onCompleteService(booking.id, {
+        orderDiscount,
+        discountReason,
+      });
+      setIsCompleteLoading(false);
+    }, 500);
+  };
+
+  const handleCancelOrder = () => {
+    setIsCancelLoading(true);
+    setTimeout(() => {
+      onUpdateStatus(booking.id, BookingStatus.CANCELLED);
+      setIsCancelLoading(false);
+    }, 500);
   };
 
   const handleOpenEditItem = (index: number) => {
@@ -270,11 +306,11 @@ export default function BookingDetail({
                   </Typography>
                   <Stack direction="row" spacing={1}>
                     <Button
-                      startIcon={<Add />}
+                      startIcon={isAddItemsLoading ? <CircularProgress size={20} color="inherit" /> : <Add />}
                       size="small"
                       variant="contained"
                       onClick={handleOpenAddDialog}
-                      disabled={booking.status === BookingStatus.COMPLETED}
+                      disabled={booking.status === BookingStatus.COMPLETED || isAddItemsLoading}
                       sx={{ bgcolor: "#3b82f6", borderRadius: 0 }}
                     >
                       ADD Items
@@ -412,11 +448,11 @@ export default function BookingDetail({
                           "&:hover":
                             booking.status !== BookingStatus.COMPLETED
                               ? {
-                                  bgcolor: alpha(PRIMARY_COLOR, 0.05),
-                                  borderRadius: 1,
-                                  px: 1,
-                                  mx: -1,
-                                }
+                                bgcolor: alpha(PRIMARY_COLOR, 0.05),
+                                borderRadius: 0,
+                                px: 1,
+                                mx: -1,
+                              }
                               : {},
                         }}
                       >
@@ -566,28 +602,23 @@ export default function BookingDetail({
                   <Button
                     fullWidth
                     variant="contained"
-                    startIcon={<PlayArrow />}
-                    disabled={booking.status !== BookingStatus.PENDING}
-                    onClick={() => onStartService(booking.id)}
+                    startIcon={isProgressingLoading ? <CircularProgress size={20} color="inherit" /> : <PlayArrow />}
+                    disabled={booking.status !== BookingStatus.PENDING || isProgressingLoading}
+                    onClick={handleStartService}
                     sx={{
                       bgcolor: "#3498db",
                       borderRadius: 0,
                       fontWeight: 700,
                     }}
                   >
-                    In Progress
+                    Progressing
                   </Button>
                   <Button
                     fullWidth
                     variant="contained"
-                    startIcon={<Done />}
-                    disabled={booking.status !== BookingStatus.IN_PROGRESS}
-                    onClick={() =>
-                      onCompleteService(booking.id, {
-                        orderDiscount,
-                        discountReason,
-                      })
-                    }
+                    startIcon={isCompleteLoading ? <CircularProgress size={20} color="inherit" /> : <Done />}
+                    disabled={booking.status !== BookingStatus.IN_PROGRESS || isCompleteLoading}
+                    onClick={handleCompleteService}
                     sx={{
                       bgcolor: SUCCESS_COLOR,
                       borderRadius: 0,
@@ -599,11 +630,9 @@ export default function BookingDetail({
                   <Button
                     fullWidth
                     variant="contained"
-                    startIcon={<Cancel />}
-                    disabled={isPaid}
-                    onClick={() =>
-                      onUpdateStatus(booking.id, BookingStatus.CANCELLED)
-                    }
+                    startIcon={isCancelLoading ? <CircularProgress size={20} color="inherit" /> : <Cancel />}
+                    disabled={isPaid || isCancelLoading}
+                    onClick={handleCancelOrder}
                     sx={{
                       bgcolor: ERROR_COLOR,
                       borderRadius: 0,
@@ -643,7 +672,7 @@ export default function BookingDetail({
         onClose={() => setItemDialogOpen(false)}
         maxWidth="sm"
         fullWidth
-        PaperProps={{ sx: { borderRadius: 2 } }}
+        PaperProps={{ sx: { borderRadius: 0 } }}
       >
         <DialogTitle
           sx={{ fontWeight: 700, bgcolor: alpha(PRIMARY_COLOR, 0.05), py: 2 }}
@@ -657,7 +686,12 @@ export default function BookingDetail({
           <Stack spacing={3}>
             <Grid container spacing={2}>
               <Grid size={{ xs: 12, sm: 6 }}>
-                <FormControl fullWidth size="small">
+                <FormControl fullWidth size="small"
+                  sx={{
+                    "& .MuiOutlinedInput-root": {
+                      borderRadius: "0px",
+                    }
+                  }}>
                   <InputLabel>Category Type</InputLabel>
                   <Select
                     value={currentItem.itemType}
@@ -676,7 +710,12 @@ export default function BookingDetail({
                 </FormControl>
               </Grid>
               <Grid size={{ xs: 12, sm: 6 }}>
-                <FormControl fullWidth size="small">
+                <FormControl fullWidth size="small"
+                  sx={{
+                    "& .MuiOutlinedInput-root": {
+                      borderRadius: "0px",
+                    }
+                  }}>
                   <InputLabel>Assign Staff</InputLabel>
                   <Select
                     value={currentItem.staffId}
@@ -724,15 +763,20 @@ export default function BookingDetail({
               renderInput={(params) => (
                 <TextField
                   {...params}
-                  label="Search Service/Product"
+                  label="Search Service"
                   size="small"
+                  sx={{
+                    "& .MuiOutlinedInput-root": {
+                      borderRadius: "0px",
+                    }
+                  }}
                 />
               )}
             />
 
             <Paper
               variant="outlined"
-              sx={{ p: 2, bgcolor: "#fafafa", borderStyle: "dashed" }}
+              sx={{ p: 2, bgcolor: "#fafafa", borderStyle: "dashed", borderRadius: 0 }}
             >
               <Grid container spacing={2}>
                 <Grid size={{ xs: 12 }}>
@@ -792,6 +836,11 @@ export default function BookingDetail({
                     label="Quantity"
                     type="number"
                     size="small"
+                    sx={{
+                      "& .MuiOutlinedInput-root": {
+                        borderRadius: "0px",
+                      }
+                    }}
                     value={currentItem.quantity}
                     onChange={(e) =>
                       setCurrentItem({
@@ -823,14 +872,19 @@ export default function BookingDetail({
               onClick={() => setItemDialogOpen(false)}
               variant="outlined"
               color="inherit"
+              sx={{
+                borderRadius: "0px",
+
+              }}
             >
               Cancel
             </Button>
             <Button
               variant="contained"
               onClick={handleSaveItem}
-              sx={{ bgcolor: PRIMARY_COLOR, px: 3, fontWeight: 700 }}
+              sx={{ bgcolor: PRIMARY_COLOR, px: 3, fontWeight: 700, borderRadius: "0px" }}
               disabled={!currentItem.itemId || currentItem.quantity <= 0}
+
             >
               {editingItemIndex !== null ? "Update Item" : "Add to Invoice"}
             </Button>

@@ -1,7 +1,7 @@
 'use client';
 
-import React from 'react';
-import {usePathname} from 'next/navigation';
+import React, { useState, useEffect } from 'react'; //
+import { usePathname } from 'next/navigation';
 import {
   Box,
   Drawer,
@@ -14,6 +14,8 @@ import {
   ListItemText,
   Paper,
   alpha,
+  Backdrop,
+  CircularProgress,
 } from '@mui/material';
 import {
   Dashboard as DashboardIcon,
@@ -23,8 +25,7 @@ import {
   EventNote as EventNoteIcon,
   Receipt as ReceiptIcon,
   LocalOffer as LocalOfferIcon,
-  Assessment as AssessmentIcon,
-  Settings as SettingsIcon,
+
   AccountBox as AccountBoxIcon,
   Category as CategoryOutlinedIcon,
 } from '@mui/icons-material';
@@ -42,13 +43,10 @@ const menuItems: MenuItem[] = [
   { text: 'User', icon: <AccountBoxIcon />, path: '/users' },
   { text: 'Staff', icon: <PeopleIcon />, path: '/staff' },
   { text: 'Customers', icon: <PersonOutlineIcon />, path: '/customers' },
-   { text: 'Category', icon: <CategoryOutlinedIcon />, path: '/category' },
+  { text: 'Category', icon: <CategoryOutlinedIcon />, path: '/category' },
   { text: 'Services', icon: <LocalOfferIcon />, path: '/services' },
- 
   { text: 'Bookings', icon: <EventNoteIcon />, path: '/bookings' },
   { text: 'Invoices', icon: <ReceiptIcon />, path: '/invoices' },
-  // { text: 'Reports', icon: <AssessmentIcon />, path: '/report' },
-  // { text: 'Settings', icon: <SettingsIcon />, path: '/#' },
 ];
 
 interface SidebarProps {
@@ -59,42 +57,42 @@ interface SidebarProps {
   drawerWidth: number;
 }
 
-//Teal/Cyan
-// const PRIMARY_COLOR = '#3b82f6';
-// const PRIMARY_LIGHT = '#2dd4bf';
-// const PRIMARY_DARK = '#0f766e';
-// const ACCENT_COLOR = '#ec4899';
 
-// Purple
-// const PRIMARY_COLOR = '#a855f7';
-// const PRIMARY_LIGHT = '#c084fc';
-// const PRIMARY_DARK = '#7e22ce';
-
-// Blue 
 const PRIMARY_COLOR = '#3b82f6';
-const PRIMARY_LIGHT = '#60a5fa';
+// const PRIMARY_LIGHT = '#60a5fa';
 const PRIMARY_DARK = '#1e40af';
-
-// Green 
-// const PRIMARY_COLOR = '#10b981';
-// const PRIMARY_LIGHT = '#34d399';
-// const PRIMARY_DARK = '#047857';
 
 export default function Sidebar({
   mobileOpen,
   onDrawerToggle,
-  selectedMenu,
+
   onMenuSelect,
   drawerWidth,
 }: SidebarProps) {
   const pathname = usePathname();
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 500); 
+
+    return () => clearTimeout(timer);
+  }, [pathname]);
+
   const isSelected = (itemPath: string) => {
-  
     if (itemPath === '/dashboard' && pathname === '/dashboard') return true;
-   
     if (itemPath !== '/#' && pathname.startsWith(itemPath)) return true;
     return false;
   };
+
+  const handleLinkClick = (path: string) => {
+    if (path !== pathname && !isSelected(path)) {
+      setIsLoading(true);
+    }
+
+  };
+
   const drawerContent = (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <Box sx={{ p: 2.5 }}>
@@ -112,9 +110,13 @@ export default function Sidebar({
 
           return (
             <ListItem key={item.text} disablePadding sx={{ mb: 0.5 }}>
-              <Link href={item.path} style={{ textDecoration: 'none', width: '100%' }}>
+              <Link
+                href={item.path}
+                style={{ textDecoration: 'none', width: '100%' }}
+                onClick={() => handleLinkClick(item.path)}
+              >
                 <ListItemButton
-                  selected={active} 
+                  selected={active}
                   onClick={() => onMenuSelect(item.text)}
                   sx={{
                     borderRadius: 0,
@@ -136,18 +138,18 @@ export default function Sidebar({
                   <ListItemIcon
                     sx={{
                       minWidth: 40,
-                      color: active ? 'white' : PRIMARY_COLOR  
+                      color: active ? 'white' : PRIMARY_COLOR
                     }}
                   >
                     {item.icon}
                   </ListItemIcon>
                   <ListItemText
                     sx={{
-                      color: active ? 'white' : PRIMARY_COLOR 
+                      color: active ? 'white' : PRIMARY_COLOR
                     }}
                     primary={item.text}
                     primaryTypographyProps={{
-                      fontWeight: active ? 600 : 400, 
+                      fontWeight: active ? 600 : 400,
                     }}
                   />
                 </ListItemButton>
@@ -179,6 +181,22 @@ export default function Sidebar({
       component="nav"
       sx={{ width: { sm: drawerWidth }, flexShrink: { sm: 0 } }}
     >
+      {/* Component Loading toàn màn hình */}
+      <Backdrop
+        sx={{
+          color: PRIMARY_COLOR,
+          zIndex: (theme) => theme.zIndex.drawer + 999, 
+          bgcolor: '#fff',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 2
+        }}
+        open={isLoading}
+      >
+        <CircularProgress color="inherit" size={40} thickness={4} />
+        <Typography variant="h6" color="text.secondary"></Typography>
+      </Backdrop>
+
       {/* Mobile drawer */}
       <Drawer
         variant="temporary"
