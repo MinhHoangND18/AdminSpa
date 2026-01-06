@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Grid,
   Card,
@@ -68,6 +68,7 @@ import {
   deleteService,
   createService,
   updateService,
+  getServiceById,
 } from "@/lib/api/services";
 import { getActiveServiceCategories } from "@/lib/api/service-categories";
 import {
@@ -79,6 +80,7 @@ import {
   CreateServiceDto,
   PaginatedServices,
 } from "@/types";
+import { useRouter, useSearchParams } from "next/navigation";
 import ServiceDetail from "./ServiceDetail";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
 const blueTheme = createTheme({
@@ -150,16 +152,51 @@ const formatDuration = (minutes: number) => {
   return `${minutes}m`;
 };
 
-export default function ServicesPage() {
+// Maps for URL query params (using numbers for shorter URLs)
+const statusToIdMap: Record<ServiceStatus, number> = {
+  active: 1,
+  inactive: 2,
+};
+
+const idToStatusMap: Record<number, ServiceStatus> = {
+  1: "active",
+  2: "inactive",
+};
+
+const isComboToId = (isCombo: boolean): number => {
+  return isCombo ? 1 : 0;
+};
+
+const idToIsCombo = (id: number): boolean | undefined => {
+  if (id === 1) return true;
+  if (id === 0) return false;
+  return undefined;
+};
+
+export default function ServicesPage({ slug }: { slug?: string[] }) {
   const queryClient = useQueryClient();
-  const [searchQuery, setSearchQuery] = useState("");
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const [searchQuery, setSearchQuery] = useState(() => {
+    return searchParams.get("search") || "";
+  });
   const [filters, setFilters] = useState<
     Omit<QueryServiceDto, "page" | "limit">
-  >({
-    search: "",
-    categoryId: undefined,
-    status: undefined,
-    isCombo: undefined,
+  >(() => {
+    const search = searchParams.get("search") || "";
+    const categoryIdParam = searchParams.get("categoryId");
+    const statusIdParam = searchParams.get("status");
+    const isComboIdParam = searchParams.get("isCombo");
+    
+    return {
+      search: search,
+      categoryId: categoryIdParam ? parseInt(categoryIdParam, 10) : undefined,
+      status: statusIdParam && idToStatusMap[parseInt(statusIdParam, 10)]
+        ? idToStatusMap[parseInt(statusIdParam, 10)]
+        : undefined,
+      isCombo: isComboIdParam !== null ? idToIsCombo(parseInt(isComboIdParam, 10)) : undefined,
+    };
   });
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -180,7 +217,19 @@ export default function ServicesPage() {
   >({});
   const [loading, setLoading] = useState(false);
   const [showDetail, setShowDetail] = useState(false);
-
+  useEffect(() => {
+    if (sessionStorage.getItem("showServiceUpdateSuccess")) {
+      // Defer state update to avoid cascading renders
+      setTimeout(() => {
+        setSnackbar({
+          open: true,
+          message: "Service updated successfully!",
+          severity: "success",
+        });
+        sessionStorage.removeItem("showServiceUpdateSuccess");
+      }, 0);
+    }
+  }, []);
   const initialFormData: ServiceFormData = {
     name: "",
     categoryId: "",
@@ -271,6 +320,21 @@ export default function ServicesPage() {
   const handleBack = () => {
     setShowDetail(false);
     setSelectedService(null);
+    const query: Record<string, string> = {};
+    if (filters.search) {
+      query.search = filters.search;
+    }
+    if (filters.categoryId) {
+      query.categoryId = filters.categoryId.toString();
+    }
+    if (filters.status) {
+      query.status = statusToIdMap[filters.status].toString();
+    }
+    if (filters.isCombo !== undefined) {
+      query.isCombo = isComboToId(filters.isCombo).toString();
+    }
+    const queryString = new URLSearchParams(query).toString();
+    router.push(queryString ? `/services?${queryString}` : "/services");
   };
 
   const createMutation = useMutation({
@@ -282,7 +346,7 @@ export default function ServicesPage() {
         message: "Service created successfully!",
         severity: "success",
       });
-      // handleBack();
+      handleBack();
     },
     onError: (error: Error) => {
       setSnackbar({
@@ -293,17 +357,120 @@ export default function ServicesPage() {
     },
   });
 
+  const handleMenuClose = () => {
+    setAnchorEl(null);
+  };
+
+  const handleEdit = (service: Service) => {
+    setEditingId(service.id);
+
+    setTimeout(() => {
+      setSelectedService(service);
+      setDialogMode("edit");
+      setShowDetail(true);
+      handleMenuClose();
+      setEditingId(null);
+    }, 500);
+  };
+  
+  useEffect(() => {
+    const serviceId = slug?.[0];
+
+    if (serviceId) {
+      if (selectedService?.id === Number(serviceId) && showDetail) {
+        return;
+      }
+
+      getServiceById(Number(serviceId))
+        .then((Response: Service | { data: Service }) => {
+          const serviceData = "data" in Response ? Response.data : Response;
+          handleEdit(serviceData);
+          setEditingId(null); // Reset editingId after successful load
+        })
+        .catch(() => {
+          const query: Record<string, string> = {};
+          if (filters.search) {
+            query.search = filters.search;
+          }
+          if (filters.categoryId) {
+            query.categoryId = filters.categoryId.toString();
+          }
+          if (filters.status) {
+            query.status = statusToIdMap[filters.status].toString();
+          }
+          if (filters.isCombo !== undefined) {
+            query.isCombo = isComboToId(filters.isCombo).toString();
+          }
+          const queryString = new URLSearchParams(query).toString();
+          router.push(queryString ? `/services?${queryString}` : "/services");
+          setEditingId(null); // Reset editingId on error
+        });
+    } else {
+      if (showDetail && dialogMode === "edit") {
+        // Defer state updates to avoid cascading renders
+        setTimeout(() => {
+          setShowDetail(false);
+          setSelectedService(null);
+          setEditingId(null); // Reset editingId when closing detail view
+        }, 0);
+      }
+    }
+  }, [slug, filters, router, selectedService, showDetail, dialogMode]);
+
+  useEffect(() => {
+    const serviceId = slug?.[0];
+    if (serviceId) {
+      return;
+    }
+
+    const query: Record<string, string> = {};
+    if (filters.search) {
+      query.search = filters.search;
+    }
+    if (filters.categoryId) {
+      query.categoryId = filters.categoryId.toString();
+    }
+    if (filters.status) {
+      query.status = statusToIdMap[filters.status].toString();
+    }
+    if (filters.isCombo !== undefined) {
+      query.isCombo = isComboToId(filters.isCombo).toString();
+    }
+
+    const queryString = new URLSearchParams(query).toString();
+    const currentPath = "/services";
+    const newUrl = queryString ? `${currentPath}?${queryString}` : currentPath;
+
+    if (
+      typeof window !== "undefined" &&
+      window.location.pathname + window.location.search !== newUrl
+    ) {
+      router.push(newUrl, {
+        scroll: false,
+      });
+    }
+  }, [filters, slug, router]);
+
+  
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: UpdateServiceDto }) =>
       updateService(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["services"] });
-      setSnackbar({
-        open: true,
-        message: "Service updated successfully!",
-        severity: "success",
-      });
-      // handleBack();
+      // queryClient.invalidateQueries({ queryKey: ["services"] });
+      sessionStorage.setItem("showServiceUpdateSuccess", "true");
+      const query: Record<string, string> = {};
+
+      if (filters.search) query.search = filters.search;
+      if (filters.categoryId) query.categoryId = filters.categoryId.toString();
+      if (filters.status) query.status = statusToIdMap[filters.status].toString();
+      if (filters.isCombo !== undefined)
+        query.isCombo = isComboToId(filters.isCombo).toString();
+
+      const queryString = new URLSearchParams(query).toString();
+      router.push(queryString ? `/services?${queryString}` : "/services");
+
+      setShowDetail(false);
+      setSelectedService(null);
     },
     onError: (error: Error) => {
       setSnackbar({
@@ -380,10 +547,6 @@ export default function ServicesPage() {
     setSelectedService(service);
   };
 
-  const handleMenuClose = () => {
-    setAnchorEl(null);
-  };
-
   const handleAddNew = () => {
     setIsAddLoading(true);
 
@@ -392,18 +555,6 @@ export default function ServicesPage() {
       setSelectedService(null);
       setShowDetail(true);
       setIsAddLoading(false);
-    }, 500);
-  };
-
-  const handleEdit = (service: Service) => {
-    setEditingId(service.id);
-
-    setTimeout(() => {
-      setSelectedService(service);
-      setDialogMode("edit");
-      setShowDetail(true);
-      handleMenuClose();
-      setEditingId(null);
     }, 500);
   };
 
@@ -432,6 +583,7 @@ export default function ServicesPage() {
         });
       }
     } catch (error) {
+
       throw error;
     }
   };
@@ -443,7 +595,25 @@ export default function ServicesPage() {
         initialData={selectedService}
         categories={categories}
         onSave={handleSave}
-        onBack={handleBack}
+        onBack={() => {
+          setShowDetail(false);
+          setSelectedService(null);
+          const query: Record<string, string> = {};
+          if (filters.search) {
+            query.search = filters.search;
+          }
+          if (filters.categoryId) {
+            query.categoryId = filters.categoryId.toString();
+          }
+          if (filters.status) {
+            query.status = statusToIdMap[filters.status].toString();
+          }
+          if (filters.isCombo !== undefined) {
+            query.isCombo = isComboToId(filters.isCombo).toString();
+          }
+          const queryString = new URLSearchParams(query).toString();
+          router.push(queryString ? `/services?${queryString}` : "/services");
+        }}
         loading={createMutation.isPending || updateMutation.isPending}
       />
     );
@@ -940,8 +1110,11 @@ export default function ServicesPage() {
                             <Edit sx={{ fontSize: "18px !important" }} />
                           )
                         }
-                        disabled={editingId === service.id} 
-                        onClick={() => handleEdit(service)}
+                        disabled={editingId === service.id}
+                        onClick={() => {
+                          setEditingId(service.id);
+                          router.push(`/services/${service.id}`);
+                        }}
                         sx={{
                           bgcolor: "#f39c12",
                           "&:hover": { bgcolor: "#e67e22" },
@@ -952,6 +1125,7 @@ export default function ServicesPage() {
                           minWidth: "80px",
                           boxShadow: "none",
                           height: "32px",
+                          color: "#fff",
                         }}
                       >
                         Edit

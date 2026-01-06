@@ -40,7 +40,6 @@ import {
   CircularProgress,
 } from "@mui/material";
 import { usersApi } from "@/lib/api/users";
-import {UserResponse} from "@/types/user"
 import {
   getStaff,
   createStaff,
@@ -67,6 +66,19 @@ import {
   Group,
   Close as CloseIcon,
 } from "@mui/icons-material";
+import UserDetail from "./UserDetail";
+import { User, UserFormData, UserResponse } from "@/types/user";
+import { Staff } from "@/types/staff";
+import { Store as StoreType } from "@/types/store";
+import { createTheme, ThemeProvider } from "@mui/material/styles";
+const blueTheme = createTheme({
+  palette: {
+    primary: {
+      main: "#3b82f6",
+    },
+  },
+});
+import { useRouter, useSearchParams } from "next/navigation";
 
 interface AxiosErrorResponse {
   response?: {
@@ -79,9 +91,9 @@ interface AxiosErrorResponse {
 
 const isAxiosError = (error: unknown): error is AxiosErrorResponse => {
   return (
-    typeof error === 'object' &&
+    typeof error === "object" &&
     error !== null &&
-    ('response' in error || 'message' in error)
+    ("response" in error || "message" in error)
   );
 };
 const PRIMARY_COLOR = "#3b82f6";
@@ -97,7 +109,7 @@ const roleHierarchy: UserRole[] = [
   "store_admin",
   "manager",
   "receptionist",
-  // "staff",
+  "staff",
 ];
 
 type UserRole =
@@ -106,45 +118,6 @@ type UserRole =
   | "manager"
   | "receptionist"
   | "staff";
-
-interface Staff {
-  id: number;
-  full_name: string;
-}
-
-interface StoreData {
-  id: number;
-  name: string;
-}
-
-interface User {
-  id: number;
-  username: string;
-  email: string | null;
-  fullname: string | null;
-  role: UserRole;
-  staff_id: number | null;
-  staff_name?: string;
-  store_id: number | null;
-  store_name?: string;
-  last_login: string | null;
-  login_attempts: number;
-  is_locked: boolean;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-}
-
-interface UserFormData {
-  username: string;
-  email: string;
-  fullname: string;
-  password: string;
-  role: UserRole;
-  staff_id: string;
-  store_id: string;
-  is_active: boolean;
-}
 
 const StaffApi = {
   getAll: getStaff,
@@ -202,8 +175,40 @@ const getRoleLabel = (role: UserRole) => {
   }
 };
 
-export default function UsersPage() {
+const roleToIdMap: Record<UserRole, number> = {
+  super_admin: 1,
+  store_admin: 2,
+  manager: 3,
+  receptionist: 4,
+  staff: 5,
+};
+
+const idToRoleMap: Record<number, UserRole> = {
+  1: "super_admin",
+  2: "store_admin",
+  3: "manager",
+  4: "receptionist",
+  5: "staff",
+};
+
+const statusToIdMap: Record<string, number> = {
+  active: 1,
+  inactive: 2,
+  locked: 3,
+};
+
+const idToStatusMap: Record<number, string> = {
+  1: "active",
+  2: "inactive",
+  3: "locked",
+};
+
+
+
+export default function UsersPage({ slug }: { slug?: string[] }) {
   const { user: currentUser, loading: authLoading } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
   const currentUserRoleIndex = currentUser
     ? roleHierarchy.indexOf(currentUser.role)
@@ -215,13 +220,31 @@ export default function UsersPage() {
 
   const [users, setUsers] = useState<User[]>([]);
   const [totalUsers, setTotalUsers] = useState(0);
+  const [aggregateStats, setAggregateStats] = useState({
+    active: 0,
+    admins: 0,
+  });
   const [availableStaff, setAvailableStaff] = useState<Staff[]>([]);
-  const [availableStores, setAvailableStores] = useState<StoreData[]>([]);
+  const [availableStores, setAvailableStores] = useState<StoreType[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterRole, setFilterRole] = useState<UserRole | "all">("all");
+  const [filterRole, setFilterRole] = useState<UserRole | "all">(() => {
+    const roleId = searchParams.get("role");
+    return roleId && idToRoleMap[parseInt(roleId)]
+      ? idToRoleMap[parseInt(roleId)]
+      : "all";
+  });
   const [filterStatus, setFilterStatus] = useState<
     "all" | "active" | "inactive" | "locked"
-  >("all");
+  >(() => {
+    const statusId = searchParams.get("status");
+    return statusId && idToStatusMap[parseInt(statusId)]
+      ? (idToStatusMap[parseInt(statusId)] as
+          | "all"
+          | "active"
+          | "inactive"
+          | "locked")
+      : "all";
+  });
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
@@ -233,6 +256,8 @@ export default function UsersPage() {
   const [validationErrors, setValidationErrors] = useState<
     Partial<Record<keyof UserFormData, string>>
   >({});
+  const [showDetail, setShowDetail] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(false);
 
@@ -255,6 +280,8 @@ export default function UsersPage() {
 
   const [formData, setFormData] = useState<UserFormData>(initialFormData);
 
+  const userId = slug?.[0];
+
   const validateForm = () => {
     const errors: Partial<Record<keyof UserFormData, string>> = {};
 
@@ -269,7 +296,9 @@ export default function UsersPage() {
     if (formData.email && !/^\S+@\S+\.\S+$/.test(formData.email)) {
       errors.email = "Invalid email format.";
     }
-
+    if (!formData.fullname.trim()) {
+      errors.fullname = "Full Name is required.";
+    }
     if (!formData.role) {
       errors.role = "Role is required.";
     }
@@ -291,7 +320,50 @@ export default function UsersPage() {
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
   };
+  
+  useEffect(() => {
+    if (sessionStorage.getItem('showUserUpdateSuccess')) {
+      setSnackbar({
+        open: true,
+        message: "Update successful",
+        severity: "success",
+      });
+      sessionStorage.removeItem('showUserUpdateSuccess');
+    }
+  }, []);
 
+  useEffect(() => {
+    if (userId) {
+      if (selectedUser?.id === Number(userId) && showDetail) {
+        return;
+      }
+
+      usersApi
+        .getById(Number(userId))
+        .then((response: User | { data: User }) => {
+          const userData = "data" in response ? response.data : response;
+          setSelectedUser(userData);
+          setDialogMode("edit");
+          setShowDetail(true);
+        })
+        .catch(() => {
+          const query: { role?: string; status?: string } = {};
+          if (filterRole !== "all") {
+            query.role = roleToIdMap[filterRole].toString();
+          }
+          if (filterStatus !== "all") {
+            query.status = statusToIdMap[filterStatus].toString();
+          }
+          const queryString = new URLSearchParams(query).toString();
+          router.push(queryString ? `/users?${queryString}` : "/users");
+        });
+    } else {
+      if (showDetail && dialogMode === "edit") {
+        setShowDetail(false);
+        setSelectedUser(null);
+      }
+    }
+  }, [userId, filterRole, filterStatus, router]);
   const fetchUsers = useCallback(async () => {
     setLoading(true);
     const filters = {
@@ -301,8 +373,8 @@ export default function UsersPage() {
         filterStatus === "active" || filterStatus === "locked"
           ? "true"
           : filterStatus === "inactive"
-            ? "false"
-            : undefined,
+          ? "false"
+          : undefined,
       is_locked: filterStatus === "locked" ? true : undefined,
       page: page + 1,
       limit: rowsPerPage,
@@ -310,8 +382,17 @@ export default function UsersPage() {
 
     try {
       const apiResponse = await usersApi.getAll(filters);
-      const responseData: UserResponse['data'] = apiResponse.data || { data: [], total: 0, page: 0, limit: 0 };
+      const responseData: UserResponse["data"] = apiResponse.data || {
+        data: [],
+        total: 0,
+        page: 0,
+        limit: 0,
+      };
       const users = responseData.data || [];
+
+      console.log("Users data:", users);
+      console.log("First user:", users[0]);
+
       const total = responseData.total ?? 0;
 
       setUsers(users);
@@ -337,7 +418,7 @@ export default function UsersPage() {
       const staffResponse = await StaffApi.getAll({});
       const storeResponse = await storesApi.getAll();
 
-      const staffData = staffResponse?.data.data || [];
+      const staffData = staffResponse?.data?.data || [];
       setAvailableStaff(Array.isArray(staffData) ? staffData : []);
 
       const storeData = storeResponse?.data.data || [];
@@ -357,14 +438,75 @@ export default function UsersPage() {
     fetchUsers();
   }, [fetchUsers]);
 
-  const stats = {
-    total: users.length,
-    active: users.filter((u) => u.is_active && !u.is_locked).length,
-    locked: users.filter((u) => u.is_locked).length,
-    admins: users.filter(
-      (u) => u.role === "super_admin" || u.role === "store_admin"
-    ).length,
-  };
+  useEffect(() => {
+    const fetchStats = async () => {
+      const filters = {
+        search: searchQuery,
+        role: filterRole,
+        is_active:
+          filterStatus === "active" || filterStatus === "locked"
+            ? "true"
+            : filterStatus === "inactive"
+            ? "false"
+            : undefined,
+        is_locked: filterStatus === "locked" ? true : undefined,
+        page: 1,
+        limit: 99999,
+      };
+
+      try {
+        const apiResponse = await usersApi.getAll(filters);
+        const responseData: UserResponse["data"] = apiResponse.data || {
+          data: [],
+          total: 0,
+          page: 0,
+          limit: 0,
+        };
+        const allMatchingUsers = responseData.data || [];
+
+        setAggregateStats({
+          active: allMatchingUsers.filter(
+            (u: User) => u.is_active && !u.is_locked
+          ).length,
+          admins: allMatchingUsers.filter(
+            (u: User) => u.role === "super_admin" || u.role === "store_admin"
+          ).length,
+        });
+      } catch (error) {
+        console.error("Failed to fetch aggregate user stats:", error);
+        setAggregateStats({ active: 0, admins: 0 });
+      }
+    };
+
+    fetchStats();
+  }, [searchQuery, filterRole, filterStatus]);
+
+  useEffect(() => {
+    if (userId) {
+      return;
+    }
+
+    const query: { role?: string; status?: string } = {};
+    if (filterRole !== "all") {
+      query.role = roleToIdMap[filterRole].toString();
+    }
+    if (filterStatus !== "all") {
+      query.status = statusToIdMap[filterStatus].toString();
+    }
+
+    const queryString = new URLSearchParams(query).toString();
+    const currentPath = "/users";
+    const newUrl = queryString ? `${currentPath}?${queryString}` : currentPath;
+
+    if (
+      typeof window !== "undefined" &&
+      window.location.pathname + window.location.search !== newUrl
+    ) {
+      router.push(newUrl, {
+        scroll: false,
+      });
+    }
+  }, [filterRole, filterStatus, userId]);
 
   const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, user: User) => {
     setAnchorEl(event.currentTarget);
@@ -377,24 +519,14 @@ export default function UsersPage() {
 
   const handleAddNew = () => {
     setDialogMode("add");
-    setFormData(initialFormData);
-    setOpenDialog(true);
+    setSelectedUser(null);
+    setShowDetail(true);
+    setSaveError(null);
   };
 
   const handleEdit = () => {
     if (selectedUser) {
-      setDialogMode("edit");
-      setFormData({
-        username: selectedUser.username,
-        email: selectedUser.email || "",
-        fullname: selectedUser.fullname || "",
-        password: "",
-        role: selectedUser.role,
-        staff_id: selectedUser.staff_id?.toString() || "",
-        store_id: selectedUser.store_id?.toString() || "",
-        is_active: selectedUser.is_active,
-      });
-      setOpenDialog(true);
+      router.push(`/users/${selectedUser.id}`);
     }
     handleMenuClose();
   };
@@ -406,6 +538,98 @@ export default function UsersPage() {
     }
     handleMenuClose();
   };
+  const handleSaveUser = async (submittedData: UserFormData) => {
+    setLoading(true);
+    try {
+      const dataToSend: Partial<User> & { password?: string } = {
+        username: submittedData.username,
+        email: submittedData.email || null,
+        fullname: submittedData.fullname || null,
+        role: submittedData.role,
+        is_active: submittedData.is_active,
+        staff_id: submittedData.staff_id
+          ? parseInt(submittedData.staff_id, 10)
+          : null,
+        store_id: submittedData.store_id
+          ? parseInt(submittedData.store_id, 10)
+          : null,
+        password: submittedData.password,
+      };
+
+      if (dialogMode === "edit" && !dataToSend.password) {
+        delete dataToSend.password;
+      }
+
+      if (dialogMode === "add") {
+        await usersApi.create(dataToSend);
+        setShowDetail(false);
+        fetchUsers();
+        setSnackbar({
+          open: true,
+          message: "User created successfully",
+          severity: "success",
+        });
+      } else if (dialogMode === "edit" && selectedUser) {
+        await usersApi.update(selectedUser.id, dataToSend);
+        sessionStorage.setItem("showUserUpdateSuccess", "true");
+        const query: { role?: string; status?: string } = {};
+        if (filterRole !== "all") {
+          query.role = roleToIdMap[filterRole].toString();
+        }
+        if (filterStatus !== "all") {
+          query.status = statusToIdMap[filterStatus].toString();
+        }
+        const queryString = new URLSearchParams(query).toString();
+        router.push(queryString ? `/users?${queryString}` : "/users");
+      }
+      setSaveError(null);
+    } catch (error: unknown) {
+      console.error("Failed to save user:", error);
+      let errorMessage = "An unknown error occurred.";
+
+      if (isAxiosError(error)) {
+        errorMessage =
+          error.response?.data?.message || error.message || errorMessage;
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      setSaveError(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+  if (showDetail) {
+    return (
+      <UserDetail
+        mode={dialogMode}
+        initialData={selectedUser}
+        availableStaff={availableStaff}
+        availableStores={availableStores}
+        assignableRoles={assignableRoles}
+        getRoleLabel={getRoleLabel}
+        onBack={() => {
+          const query: { role?: string; status?: string } = {};
+          if (filterRole !== "all") {
+            query.role = roleToIdMap[filterRole].toString();
+          }
+          if (filterStatus !== "all") {
+            query.status = statusToIdMap[filterStatus].toString();
+          }
+          const queryString = new URLSearchParams(query).toString();
+          if (dialogMode === "edit") {
+            router.push(queryString ? `/users?${queryString}` : "/users");
+          } else {
+            setShowDetail(false);
+            setSelectedUser(null);
+            setSaveError(null);
+          }
+        }}
+        onSave={handleSaveUser}
+        loading={loading}
+        saveError={saveError}
+      />
+    );
+  }
 
   const handleDelete = () => {
     setDeleteConfirmOpen(true);
@@ -436,9 +660,7 @@ export default function UsersPage() {
 
         if (isAxiosError(error)) {
           errorMessage =
-            error.response?.data?.message ||
-            error.message ||
-            errorMessage;
+            error.response?.data?.message || error.message || errorMessage;
         } else if (error instanceof Error) {
           errorMessage = error.message;
         }
@@ -464,8 +686,9 @@ export default function UsersPage() {
         fetchUsers();
         setSnackbar({
           open: true,
-          message: `User ${selectedUser.username} has been ${isLocked ? "locked" : "unlocked"
-            }.`,
+          message: `User ${selectedUser.username} has been ${
+            isLocked ? "locked" : "unlocked"
+          }.`,
           severity: isLocked ? "warning" : "success",
         });
       } catch (error: unknown) {
@@ -474,9 +697,7 @@ export default function UsersPage() {
 
         if (isAxiosError(error)) {
           errorMessage =
-            error.response?.data?.message ||
-            error.message ||
-            errorMessage;
+            error.response?.data?.message || error.message || errorMessage;
         } else if (error instanceof Error) {
           errorMessage = error.message;
         }
@@ -507,20 +728,20 @@ export default function UsersPage() {
 
   const handleFormChange =
     (field: keyof UserFormData) =>
-      (
-        event:
-          | React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-          | { target: { value: string } }
-      ) => {
-        setFormData({ ...formData, [field]: event.target.value });
-        setValidationErrors((prev) => ({ ...prev, [field]: undefined }));
-      };
+    (
+      event:
+        | React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+        | { target: { value: string } }
+    ) => {
+      setFormData({ ...formData, [field]: event.target.value });
+      setValidationErrors((prev) => ({ ...prev, [field]: undefined }));
+    };
 
   const handleSwitchChange =
     (field: keyof UserFormData) =>
-      (event: React.ChangeEvent<HTMLInputElement>) => {
-        setFormData({ ...formData, [field]: event.target.checked });
-      };
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      setFormData({ ...formData, [field]: event.target.checked });
+    };
 
   const handleSubmit = async () => {
     if (!validateForm()) {
@@ -529,10 +750,10 @@ export default function UsersPage() {
 
     setLoading(true);
     try {
-      const dataToSend: Partial<Omit<UserFormData, 'staff_id' | 'store_id'>> & {
+      const dataToSend: Partial<Omit<UserFormData, "staff_id" | "store_id">> & {
         staff_id: number | null;
         store_id: number | null;
-        password?: string; // Tạm thời thêm password là tùy chọn
+        password?: string;
       } = {
         ...formData,
         staff_id: formData.staff_id ? parseInt(formData.staff_id) : null,
@@ -566,9 +787,7 @@ export default function UsersPage() {
 
       if (isAxiosError(error)) {
         errorMessage =
-          error.response?.data?.message ||
-          error.message ||
-          errorMessage;
+          error.response?.data?.message || error.message || errorMessage;
       } else if (error instanceof Error) {
         errorMessage = error.message;
       }
@@ -597,8 +816,6 @@ export default function UsersPage() {
   const canModifyUser = (targetUser: User) => {
     if (!currentUser) return false;
     if (targetUser.id === Number(currentUser.id)) return true;
-    //if (currentUser.role === "super_admin") return true;
-
     const currentUserIndex = roleHierarchy.indexOf(currentUser.role);
     const targetUserIndex = roleHierarchy.indexOf(targetUser.role);
 
@@ -619,7 +836,7 @@ export default function UsersPage() {
   }
 
   return (
-    <>
+    <ThemeProvider theme={blueTheme}>
       <Backdrop
         sx={{ color: "#fff", zIndex: (theme) => theme.zIndex.drawer + 1 }}
         open={loading}
@@ -638,7 +855,7 @@ export default function UsersPage() {
 
         <Grid container spacing={3} sx={{ mb: 3 }}>
           <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
-            <Card>
+            <Card sx={{ borderRadius: 0 }}>
               <CardContent>
                 <Box
                   sx={{
@@ -656,7 +873,7 @@ export default function UsersPage() {
                       Total Users
                     </Typography>
                     <Typography variant="h4" fontWeight="bold">
-                      {stats.total}
+                      {totalUsers}
                     </Typography>
                   </Box>
                   <Avatar
@@ -673,7 +890,7 @@ export default function UsersPage() {
             </Card>
           </Grid>
           <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
-            <Card>
+            <Card sx={{ borderRadius: 0 }}>
               <CardContent>
                 <Box
                   sx={{
@@ -695,7 +912,7 @@ export default function UsersPage() {
                       fontWeight="bold"
                       color={SUCCESS_COLOR}
                     >
-                      {stats.active}
+                      {aggregateStats.active}
                     </Typography>
                   </Box>
                   <Avatar
@@ -751,7 +968,7 @@ export default function UsersPage() {
             </Card>
           </Grid> */}
           <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
-            <Card>
+            <Card sx={{ borderRadius: 0 }}>
               <CardContent>
                 <Box
                   sx={{
@@ -773,7 +990,7 @@ export default function UsersPage() {
                       fontWeight="bold"
                       color={INFO_COLOR}
                     >
-                      {stats.admins}
+                      {aggregateStats.admins}
                     </Typography>
                   </Box>
                   <Avatar
@@ -793,29 +1010,46 @@ export default function UsersPage() {
           </Grid>
         </Grid>
 
-        <Card sx={{ mb: 3 }}>
-          <CardContent>
+        <Card sx={{ mb: 3, borderRadius: 0 }}>
+          <CardContent sx={{ py: 1.5, "&:last-child": { pb: 1.5 } }}>
             <Box
               sx={{
                 display: "flex",
-                gap: 2,
+                gap: 1.5,
                 flexWrap: "wrap",
+                alignItems: "center",
               }}
             >
               <TextField
+                size="small"
                 placeholder="Search users..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                sx={{ flex: 1, minWidth: 250 }}
+                sx={{
+                  flex: 1,
+                  minWidth: 200,
+                  "& .MuiOutlinedInput-root": {
+                    borderRadius: "0px",
+                  },
+                }}
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
-                      <Search sx={{ color: PRIMARY_COLOR }} />
+                      <Search sx={{ color: PRIMARY_COLOR, fontSize: 20 }} />
                     </InputAdornment>
                   ),
                 }}
               />
-              <FormControl sx={{ minWidth: 150 }}>
+
+              <FormControl
+                sx={{
+                  minWidth: 130,
+                  "& .MuiOutlinedInput-root": {
+                    borderRadius: "0px",
+                  },
+                }}
+                size="small"
+              >
                 <InputLabel>Role</InputLabel>
                 <Select
                   value={filterRole}
@@ -823,19 +1057,25 @@ export default function UsersPage() {
                   onChange={(e) =>
                     setFilterRole(e.target.value as UserRole | "all")
                   }
-                  sx={{
-                    "& .MuiSelect-select": { paddingRight: "75px !important" },
-                  }}
                 >
                   <MenuItem value="all">All Roles</MenuItem>
                   <MenuItem value="super_admin">Super Admin</MenuItem>
                   <MenuItem value="store_admin">Store Admin</MenuItem>
                   <MenuItem value="manager">Manager</MenuItem>
                   <MenuItem value="receptionist">Receptionist</MenuItem>
-                  {/* <MenuItem value="staff">Staff</MenuItem> */}
+                  <MenuItem value="staff">Staff</MenuItem>
                 </Select>
               </FormControl>
-              <FormControl sx={{ minWidth: 150 }}>
+
+              <FormControl
+                sx={{
+                  minWidth: 130,
+                  "& .MuiOutlinedInput-root": {
+                    borderRadius: "0px",
+                  },
+                }}
+                size="small"
+              >
                 <InputLabel>Status</InputLabel>
                 <Select
                   value={filterStatus}
@@ -845,9 +1085,6 @@ export default function UsersPage() {
                       e.target.value as "all" | "active" | "inactive" | "locked"
                     )
                   }
-                  sx={{
-                    "& .MuiSelect-select": { paddingRight: "75px !important" },
-                  }}
                 >
                   <MenuItem value="all">All Status</MenuItem>
                   <MenuItem value="active">Active</MenuItem>
@@ -855,15 +1092,20 @@ export default function UsersPage() {
                   <MenuItem value="locked">Locked</MenuItem>
                 </Select>
               </FormControl>
+
               <Button
                 variant="contained"
+                size="small"
                 startIcon={<Add />}
                 onClick={handleAddNew}
                 sx={{
+                  height: 40,
                   bgcolor: PRIMARY_COLOR,
                   "&:hover": { bgcolor: PRIMARY_DARK },
                   textTransform: "none",
                   fontWeight: 600,
+                  px: 3,
+                  borderRadius: 0,
                 }}
               >
                 Add New User
@@ -878,7 +1120,7 @@ export default function UsersPage() {
               <TableHead>
                 <TableRow sx={{ bgcolor: alpha(PRIMARY_COLOR, 0.05) }}>
                   <TableCell sx={{ fontWeight: 700 }}>User</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>Full Name</TableCell>
+                  {/* <TableCell sx={{ fontWeight: 700 }}>Full Name</TableCell> */}
                   <TableCell sx={{ fontWeight: 700 }}>Role</TableCell>
                   {/* <TableCell sx={{ fontWeight: 700 }}>Staff</TableCell> */}
                   <TableCell sx={{ fontWeight: 700 }}>Store</TableCell>
@@ -940,11 +1182,11 @@ export default function UsersPage() {
                           </Box>
                         </Box>
                       </TableCell>
-                      <TableCell>
+                      {/* <TableCell>
                         <Typography variant="body2">
                           {user.fullname}
                         </Typography>
-                      </TableCell>
+                      </TableCell> */}
                       <TableCell>
                         <Chip
                           icon={getRoleIcon(user.role)}
@@ -1043,13 +1285,33 @@ export default function UsersPage() {
                         </Box>
                       </TableCell>
                       <TableCell align="center">
-                        <IconButton
+                        <Button
+                          variant="contained"
                           size="small"
-                          onClick={(e) => handleMenuOpen(e, user)}
+                          startIcon={
+                            <Edit sx={{ fontSize: "18px !important" }} />
+                          }
+                          onClick={() => {
+                            router.push(
+                              `/users/${user.id}`
+                            );
+                          }}
                           disabled={!canModifyUser(user)}
+                          sx={{
+                            bgcolor: "#f39c12",
+                            "&:hover": { bgcolor: "#e67e22" },
+                            textTransform: "none",
+                            fontWeight: 600,
+                            borderRadius: "0px",
+                            px: 2,
+                            minWidth: "80px",
+                            boxShadow: "none",
+                            height: "32px",
+                            color: "#fff",
+                          }}
                         >
-                          <MoreVert />
-                        </IconButton>
+                          Edit
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))
@@ -1069,8 +1331,8 @@ export default function UsersPage() {
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
                           {searchQuery ||
-                            filterRole !== "all" ||
-                            filterStatus !== "all"
+                          filterRole !== "all" ||
+                          filterStatus !== "all"
                             ? "Try adjusting your search or filters"
                             : "Get started by adding your first user"}
                         </Typography>
@@ -1148,8 +1410,8 @@ export default function UsersPage() {
             {dialogMode === "add"
               ? "Add New User"
               : dialogMode === "edit"
-                ? "Edit User"
-                : "User Details"}
+              ? "Edit User"
+              : "User Details"}
           </DialogTitle>
           <DialogContent dividers>
             {dialogMode === "view" && selectedUser ? (
@@ -1272,8 +1534,8 @@ export default function UsersPage() {
                     {selectedUser.is_locked
                       ? "Locked"
                       : selectedUser.is_active
-                        ? "Active"
-                        : "Inactive"}
+                      ? "Active"
+                      : "Inactive"}
                   </Typography>
                 </Grid>
                 <Grid sx={{ gridColumn: { xs: "span 12", sm: "span 6" } }}>
@@ -1310,12 +1572,12 @@ export default function UsersPage() {
                 <Grid size={{ xs: 12, sm: 4 }}>
                   <TextField
                     fullWidth
-                    label="Full Name *"
+                    label="Full Name"
                     value={formData.fullname}
                     onChange={handleFormChange("fullname")}
                     disabled={dialogMode === "view"}
-                    error={!!validationErrors.username}
-                    helperText={validationErrors.username}
+                    error={!!validationErrors.fullname}
+                    helperText={validationErrors.fullname}
                   />
                 </Grid>
                 <Grid size={{ xs: 12, sm: 4 }}>
@@ -1459,6 +1721,7 @@ export default function UsersPage() {
                         checked={formData.is_active}
                         onChange={handleSwitchChange("is_active")}
                         disabled={dialogMode === "view"}
+                        sx={{}}
                       />
                     }
                     label="Active User"
@@ -1467,7 +1730,7 @@ export default function UsersPage() {
               </Grid>
             )}
           </DialogContent>
-          <DialogActions sx={{ padding: '16px 24px' }}>
+          <DialogActions sx={{ padding: "16px 24px" }}>
             {dialogMode !== "view" && (
               <>
                 <Button onClick={handleDialogClose}>Cancel</Button>
@@ -1496,8 +1759,9 @@ export default function UsersPage() {
           <DialogTitle>Confirm Delete</DialogTitle>
           <DialogContent>
             <Alert severity="warning" sx={{ mb: 2 }}>
-              Are you sure you want to delete user {selectedUser?.username}? This
-              will deactivate their account and they will no longer be able to log in.
+              Are you sure you want to delete user {selectedUser?.username}?
+              This will deactivate their account and they will no longer be able
+              to log in.
             </Alert>
             {selectedUser && (
               <Box
@@ -1622,6 +1886,6 @@ export default function UsersPage() {
           </Alert>
         </Snackbar>
       </Box>
-    </>
+    </ThemeProvider>
   );
 }

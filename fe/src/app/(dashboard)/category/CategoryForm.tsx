@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Grid,
   Card,
@@ -55,6 +55,7 @@ import {
   deleteServiceCategory,
   createServiceCategory,
   updateServiceCategory,
+  getServiceCategoryById,
 } from '@/lib/api/service-categories';
 import {
   ServiceCategory,
@@ -64,6 +65,7 @@ import {
   CreateServiceCategoryDto,
   PaginatedServiceCategories,
 } from '@/types';
+import { useRouter, useSearchParams } from 'next/navigation';
 import CategoryDetail from './CategoryDetail';
 import { createTheme, ThemeProvider } from "@mui/material/styles";
 const blueTheme = createTheme({
@@ -107,12 +109,32 @@ const getStatusLabel = (isActive: boolean) => {
   return isActive ? 'Active' : 'Inactive';
 };
 
-export default function CategoryForm() {
+// Maps for URL query params (using numbers for shorter URLs)
+const statusToId = (isActive: boolean): number => {
+  return isActive ? 1 : 2;
+};
+
+const idToStatus = (id: number): boolean | undefined => {
+  if (id === 1) return true;
+  if (id === 2) return false;
+  return undefined;
+};
+
+export default function CategoryForm({ slug }: { slug?: string[] }) {
   const queryClient = useQueryClient();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filters, setFilters] = useState<Omit<QueryServiceCategoryDto, 'page' | 'limit'>>({
-    search: '',
-    isActive: undefined,
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const [searchQuery, setSearchQuery] = useState(() => {
+    return searchParams.get("search") || "";
+  });
+  const [filters, setFilters] = useState<Omit<QueryServiceCategoryDto, 'page' | 'limit'>>(() => {
+    const search = searchParams.get("search") || "";
+    const statusId = searchParams.get("status");
+    return {
+      search: search,
+      isActive: statusId ? idToStatus(parseInt(statusId, 10)) : undefined,
+    };
   });
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -181,7 +203,87 @@ export default function CategoryForm() {
     placeholderData: (previousData) => previousData,
   });
 
+  useEffect(() => {
+    const ServiceCategoryId = slug?.[0];
 
+    if (!ServiceCategoryId) {
+      // Defer state updates to avoid cascading renders
+      setTimeout(() => {
+        setShowDetail(false);
+        setSelectedCategory(null);
+        setEditingId(null); // Reset editingId when closing detail view
+      }, 0);
+      return;
+    }
+
+    if (ServiceCategoryId === 'add') {
+      // Defer state updates to avoid cascading renders
+      setTimeout(() => {
+        setDialogMode('add');
+        setSelectedCategory(null);
+        setShowDetail(true);
+      }, 0);
+      return;
+    }
+
+    const numericId = Number(ServiceCategoryId);
+    if (!isNaN(numericId)) {
+      // Defer state updates to avoid cascading renders
+      setTimeout(() => {
+        setDialogMode('edit');
+        setShowDetail(true);
+      }, 0);
+
+      if (selectedCategory?.id !== numericId) {
+        getServiceCategoryById(numericId)
+          .then((response: any) => {
+            const data = "data" in response ? response.data : response;
+            setSelectedCategory(data as ServiceCategory);
+            setEditingId(null); // Reset editingId after successful load
+          })
+          .catch(() => {
+            const query: Record<string, string> = {};
+            if (filters.search) {
+              query.search = filters.search;
+            }
+            if (filters.isActive !== undefined) {
+              query.status = statusToId(filters.isActive).toString();
+            }
+            const queryString = new URLSearchParams(query).toString();
+            router.push(queryString ? `/category?${queryString}` : "/category");
+            setEditingId(null); // Reset editingId on error
+          });
+      }
+    }
+  }, [slug, selectedCategory, router, filters]);
+
+  useEffect(() => {
+    const categoryId = slug?.[0];
+    if (categoryId) {
+      return;
+    }
+
+    const query: Record<string, string> = {};
+    if (filters.search) {
+      query.search = filters.search;
+    }
+    if (filters.isActive !== undefined) {
+      query.status = statusToId(filters.isActive).toString();
+    }
+
+    const queryString = new URLSearchParams(query).toString();
+    const currentPath = "/category";
+    const newUrl = queryString ? `${currentPath}?${queryString}` : currentPath;
+
+    if (
+      typeof window !== "undefined" &&
+      window.location.pathname + window.location.search !== newUrl
+    ) {
+      router.push(newUrl, {
+        scroll: false,
+      });
+    }
+  }, [filters, slug, router]);
 
   const categories = useMemo((): ServiceCategory[] => {
     if (!paginatedCategories?.data) return [];
@@ -197,6 +299,15 @@ export default function CategoryForm() {
       queryClient.invalidateQueries({ queryKey: ['activeServiceCategories'] });
       setSnackbar({ open: true, message: 'Category created successfully!', severity: 'success' });
       handleDialogClose();
+      const query: Record<string, string> = {};
+      if (filters.search) {
+        query.search = filters.search;
+      }
+      if (filters.isActive !== undefined) {
+        query.status = statusToId(filters.isActive).toString();
+      }
+      const queryString = new URLSearchParams(query).toString();
+      router.push(queryString ? `/category?${queryString}` : "/category");
     },
     onError: (error: Error) => {
       setSnackbar({ open: true, message: `Error: ${error.message}`, severity: 'error' });
@@ -211,6 +322,15 @@ export default function CategoryForm() {
       queryClient.invalidateQueries({ queryKey: ['activeServiceCategories'] });
       setSnackbar({ open: true, message: 'Category updated successfully!', severity: 'success' });
       handleDialogClose();
+      const query: Record<string, string> = {};
+      if (filters.search) {
+        query.search = filters.search;
+      }
+      if (filters.isActive !== undefined) {
+        query.status = statusToId(filters.isActive).toString();
+      }
+      const queryString = new URLSearchParams(query).toString();
+      router.push(queryString ? `/category?${queryString}` : "/category");
     },
     onError: (error: Error) => {
       setSnackbar({ open: true, message: `Error: ${error.message}`, severity: 'error' });
@@ -289,6 +409,15 @@ export default function CategoryForm() {
   const handleBack = () => {
     setShowDetail(false);
     setSelectedCategory(null);
+    const query: Record<string, string> = {};
+    if (filters.search) {
+      query.search = filters.search;
+    }
+    if (filters.isActive !== undefined) {
+      query.status = statusToId(filters.isActive).toString();
+    }
+    const queryString = new URLSearchParams(query).toString();
+    router.push(queryString ? `/category?${queryString}` : "/category");
   };
 
   const handleDelete = () => {
@@ -311,7 +440,16 @@ export default function CategoryForm() {
         data: submissionData as UpdateServiceCategoryDto
       });
     }
-    // setShowDetail(false);
+    setShowDetail(false);
+    const query: Record<string, string> = {};
+    if (filters.search) {
+      query.search = filters.search;
+    }
+    if (filters.isActive !== undefined) {
+      query.status = statusToId(filters.isActive).toString();
+    }
+    const queryString = new URLSearchParams(query).toString();
+    router.push(queryString ? `/category?${queryString}` : "/category");
   };
 
   const confirmDelete = () => {
@@ -621,7 +759,10 @@ export default function CategoryForm() {
                           )
                         }
                         disabled={editingId === category.id}
-                        onClick={() => handleEdit(category)}
+                        onClick={() => {
+                          setEditingId(category.id);
+                          router.push(`/category/${category.id}`);
+                        }}
                         sx={{
                           bgcolor: "#f39c12",
                           "&:hover": { bgcolor: "#e67e22" },
@@ -632,6 +773,7 @@ export default function CategoryForm() {
                           minWidth: "80px",
                           boxShadow: "none",
                           height: "32px",
+                          color: "#fff",
                         }}
                       >
                         Edit

@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Grid,
   Card,
@@ -65,6 +66,7 @@ import {
   createStaff,
   updateStaff,
   deleteStaff,
+  getStaffById,
 } from "@/lib/api/staffs";
 
 import { useAuth } from "@/lib/hooks/useAuth";
@@ -86,7 +88,6 @@ interface AxiosErrorResponse {
     status?: number;
   };
 }
-
 
 const isAxiosError = (error: unknown): error is AxiosErrorResponse => {
   return (
@@ -142,7 +143,9 @@ const getSalaryTypeLabel = (type: SalaryType) => {
   }
 };
 
-export default function StaffPage() {
+export default function StaffPage({ slug }: { slug?: string[] }) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const { user: currentUser } = useAuth();
   const canManageStaff = currentUser?.role !== "staff";
 
@@ -166,6 +169,22 @@ export default function StaffPage() {
   const [showDetail, setShowDetail] = useState(false);
   const [isAddLoading, setIsAddLoading] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
+  
+  // Ref để track khi đang fetch từ user action (tránh double fetch)
+  const isFetchingFromUserAction = useRef(false);
+
+  // Map status để chuyển đổi giữa string và number
+  const statusToNumber: Record<StaffStatus, string> = {
+    "active": "1",
+    "inactive": "2",
+    "on_leave": "3"
+  };
+
+  const numberToStatus: Record<string, StaffStatus> = {
+    "1": "active",
+    "2": "inactive",
+    "3": "on_leave"
+  };
 
   useEffect(() => {
     const fetchStores = async () => {
@@ -220,6 +239,161 @@ export default function StaffPage() {
 
   const [formData, setFormData] = useState<StaffFormDataType>(initialFormData);
 
+  // Hàm cập nhật URL với query params
+  const updateURL = useCallback((updates: {
+    status?: StaffStatus | "all";
+    search?: string;
+    page?: number;
+  }) => {
+    const params = new URLSearchParams();
+    
+    // Xử lý status
+    if (updates.status !== undefined && updates.status !== "all") {
+      params.set("status", statusToNumber[updates.status]);
+    }
+    
+    // Xử lý search
+    if (updates.search !== undefined && updates.search) {
+      params.set("search", updates.search);
+    }
+    
+    // Xử lý page
+    if (updates.page !== undefined && updates.page > 0) {
+      params.set("page", (updates.page + 1).toString());
+    }
+    
+    // Tạo URL string
+    const queryString = params.toString();
+    const url = queryString ? `/staff?${queryString}` : `/staff`;
+    
+    // Cập nhật URL
+    router.replace(url, { scroll: false });
+  }, [router, statusToNumber]);
+
+  // Hàm xử lý thay đổi filter status
+  const handleFilterStatusChange = (status: StaffStatus | "all") => {
+    // Đánh dấu đang fetch từ user action
+    isFetchingFromUserAction.current = true;
+    
+    // Update state ngay lập tức
+    setFilterStatus(status);
+    setPage(0);
+    
+    // Update URL
+    updateURL({ status, page: 0, search: searchQuery });
+    
+    // Fetch data ngay với status(không đợi useEffect)
+    const fetchWithNewStatus = async () => {
+      setLoading(true);
+      try {
+        const params: StaffFilters = {
+          page: 1,
+          limit: rowsPerPage,
+          keyword: searchQuery,
+        };
+        if (status !== "all") {
+          params.status = status as StaffStatus;
+        }
+
+        const response = await getStaff(params);
+
+        if (response && response.data && Array.isArray(response.data.data)) {
+          setStaff(response.data.data);
+          setTotalCount(response.data.total);
+        } else {
+          setStaff([]);
+          setTotalCount(0);
+        }
+      } catch (error) {
+        console.error("Failed to fetch staff:", error);
+        setStaff([]);
+      } finally {
+        setLoading(false);
+        // Reset flag sau khi fetch xong
+        setTimeout(() => {
+          isFetchingFromUserAction.current = false;
+        }, 100);
+      }
+    };
+    
+    fetchWithNewStatus();
+  };
+
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value);
+    setPage(0);
+    updateURL({ search: value, page: 0, status: filterStatus !== "all" ? filterStatus : undefined });
+  };
+
+  useEffect(() => {
+    const statusParam = searchParams.get("status");
+    const searchParam = searchParams.get("search");
+    const pageParam = searchParams.get("page");
+    
+    // Xử lý status: nếu có param thì parse, nếu không có thì là "all"
+    if (statusParam) {
+      const status = numberToStatus[statusParam];
+      if (status) {
+        setFilterStatus(status);
+      } else {
+        setFilterStatus("all");
+      }
+    } else {
+      // Nếu không có status param trong URL, set về "all"
+      setFilterStatus("all");
+    }
+    
+    if (searchParam) {
+      setSearchQuery(searchParam);
+    } else {
+      setSearchQuery("");
+    }
+    
+    if (pageParam) {
+      const pageNum = parseInt(pageParam) - 1;
+      if (!isNaN(pageNum) && pageNum >= 0) {
+        setPage(pageNum);
+      }
+    } else {
+      setPage(0);
+    }
+  }, [searchParams, numberToStatus]);
+
+  // Xử lý khi người dùng vào trực tiếp URL /staff/17 hoặc /staff/new
+  useEffect(() => {
+    const staffId = slug?.[0];
+
+    if (staffId) {
+      if (selectedStaff?.id === Number(staffId) && showDetail) {
+        return;
+      }
+
+      if (staffId === 'new') {
+        // Xử lý add new
+        setDialogMode("add");
+        setSelectedStaff(null);
+        setShowDetail(true);
+      } else if (!isNaN(Number(staffId))) {
+        // Fetch staff by id
+        getStaffById(Number(staffId))
+          .then((Response: Staff | { data: Staff }) => {
+            const staffData = "data" in Response ? Response.data : Response;
+            setSelectedStaff(staffData);
+            setDialogMode("edit");
+            setShowDetail(true);
+          })
+          .catch(() => {
+            router.push("/staff");
+          });
+      }
+    } else {
+      if (showDetail && dialogMode === "edit") {
+        setShowDetail(false);
+        setSelectedStaff(null);
+      }
+    }
+  }, [slug, router, selectedStaff?.id, showDetail, dialogMode]);
+
   const fetchStaffData = useCallback(async () => {
     setLoading(true);
     try {
@@ -248,8 +422,12 @@ export default function StaffPage() {
       setLoading(false);
     }
   }, [page, rowsPerPage, searchQuery, filterStatus]);
+
   const handleAddNew = () => {
     setIsAddLoading(true);
+    
+    // Chuyển hướng đến URL /staff/new
+    router.push(`/staff/new`, { scroll: false });
 
     setTimeout(() => {
       setDialogMode("add");
@@ -258,8 +436,12 @@ export default function StaffPage() {
       setIsAddLoading(false);
     }, 500);
   };
+
   const handleRowEdit = (staffMember: Staff) => {
     setEditingId(staffMember.id);
+    
+    // Chuyển hướng đến URL /staff/{id}
+    router.push(`/staff/${staffMember.id}`, { scroll: false });
 
     setTimeout(() => {
       setSelectedStaff(staffMember);
@@ -272,6 +454,9 @@ export default function StaffPage() {
   const handleEdit = (staffMember?: Staff) => {
     const target = staffMember || selectedStaff;
     if (target) {
+      // Chuyển hướng đến URL /staff/{id}
+      router.push(`/staff/${target.id}`, { scroll: false });
+      
       setSelectedStaff(target);
       setDialogMode("edit");
       setShowDetail(true);
@@ -283,28 +468,57 @@ export default function StaffPage() {
     try {
       if (dialogMode === "add") {
         await createStaff(submitData);
+        setSnackbar({ open: true, message: "Staff added successfully", severity: "success" });
       } else if (dialogMode === "edit" && selectedStaff) {
         await updateStaff({ id: selectedStaff.id, data: submitData });
+        setSnackbar({ open: true, message: "Staff updated successfully", severity: "success" });
       }
 
-      setSnackbar({ open: true, message: "Staff saved successfully", severity: "success" });
-
-    
+      // Refresh data
       fetchStaffData();
     } catch (error) {
-      console.error("Failed to fetch dropdown data:", error);
-
+      console.error("Failed to save staff:", error);
       throw error;
     }
   };
 
   useEffect(() => {
+    // Nếu đang fetch từ user action, không fetch lại
+    if (isFetchingFromUserAction.current) {
+      return;
+    }
+    
     const timeoutId = setTimeout(() => {
       fetchStaffData();
     }, 500);
 
     return () => clearTimeout(timeoutId);
   }, [fetchStaffData]);
+
+  // Hàm xử lý back từ detail
+  const handleBackFromDetail = () => {
+    setShowDetail(false);
+    setSelectedStaff(null);
+    
+    // Quay lại danh sách với filter hiện tại
+    const params = new URLSearchParams();
+    
+    if (searchQuery) {
+      params.set("search", searchQuery);
+    }
+    
+    if (filterStatus !== "all") {
+      params.set("status", statusToNumber[filterStatus]);
+    }
+    
+    if (page > 0) {
+      params.set("page", (page + 1).toString());
+    }
+    
+    const queryString = params.toString();
+    const url = queryString ? `/staff?${queryString}` : `/staff`;
+    router.replace(url, { scroll: false });
+  };
 
   if (showDetail) {
     return (
@@ -313,12 +527,13 @@ export default function StaffPage() {
         mode={dialogMode}
         initialData={selectedStaff}
         storeList={storeList}
-        onBack={() => setShowDetail(false)}
+        onBack={handleBackFromDetail}
         onSave={handleSaveStaff}
         loading={loading}
       />
     );
   }
+
   const stats = {
     total: staff.length,
     active: staff.filter((s) => s.status === "active").length,
@@ -337,39 +552,6 @@ export default function StaffPage() {
   const handleMenuClose = () => {
     setAnchorEl(null);
   };
-
-  // const handleAddNew = () => {
-  //   setDialogMode("add");
-  //   setFormData(initialFormData);
-  //   setOpenDialog(true);
-  // };
-
-  // const handleEdit = () => {
-  //   if (selectedStaff) {
-  //     setDialogMode("edit");
-  //     setFormData({
-
-  //       full_name: selectedStaff.full_name,
-  //       phone: selectedStaff.phone,
-  //       email: selectedStaff.email || "",
-  //       gender: selectedStaff.gender,
-  //       birthday: selectedStaff.birthday
-  //         ? new Date(selectedStaff.birthday).toISOString().split("T")[0]
-  //         : "",
-  //       address: selectedStaff.address || "",
-  //       store_id: selectedStaff.store?.id ?? selectedStaff.store_id ?? null,
-  //       hire_date: selectedStaff.hire_date
-  //         ? new Date(selectedStaff.hire_date).toISOString().split("T")[0]
-  //         : "",
-  //       salary_type: selectedStaff.salary_type,
-  //       base_salary: selectedStaff.base_salary || 0,
-  //       commission_rate: selectedStaff.commission_rate || 0,
-  //       status: selectedStaff.status,
-  //     });
-  //     setOpenDialog(true);
-  //   }
-  //   handleMenuClose();
-  // };
 
   const handleView = () => {
     if (selectedStaff) {
@@ -434,6 +616,7 @@ export default function StaffPage() {
       ) => {
         setFormData({ ...formData, [field]: event.target.value });
       };
+
   const validateForm = (data: StaffFormDataType): string | null => {
     if (!data.full_name?.trim()) return "Full Name is required.";
     if (!data.phone?.trim()) return "Phone number is required.";
@@ -471,6 +654,7 @@ export default function StaffPage() {
 
     return null;
   };
+
   const handleSubmit = async () => {
     const errorMsg = validateForm(formData);
 
@@ -535,13 +719,16 @@ export default function StaffPage() {
 
   const handleChangePage = (event: unknown, newPage: number) => {
     setPage(newPage);
+    updateURL({ page: newPage, status: filterStatus !== "all" ? filterStatus : undefined, search: searchQuery });
   };
 
   const handleChangeRowsPerPage = (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
-    setRowsPerPage(parseInt(event.target.value, 10));
+    const newRowsPerPage = parseInt(event.target.value, 10);
+    setRowsPerPage(newRowsPerPage);
     setPage(0);
+    updateURL({ page: 0, status: filterStatus !== "all" ? filterStatus : undefined, search: searchQuery });
   };
 
   return (
@@ -552,15 +739,6 @@ export default function StaffPage() {
       >
         <CircularProgress color="inherit" />
       </Backdrop>
-      {/* Header */}
-      {/* <Box sx={{ mb: 3 }}>
-        <Typography variant="h4" fontWeight="bold" gutterBottom>
-          Staff Management
-        </Typography>
-        <Typography variant="body1" color="text.secondary">
-          Manage your spa staff members and their information
-        </Typography>
-      </Box> */}
 
       {/* Stats Cards */}
       <Grid container spacing={3} sx={{ mb: 3 }}>
@@ -714,7 +892,7 @@ export default function StaffPage() {
               size="small"
               placeholder="Search staff..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => handleSearchChange(e.target.value)}
               sx={{
                 flex: 1, minWidth: 200, "& .MuiOutlinedInput-root": {
                   borderRadius: "0px",
@@ -738,7 +916,7 @@ export default function StaffPage() {
               <Select
                 value={filterStatus}
                 label="Status"
-                onChange={(e) => setFilterStatus(e.target.value as StaffStatus | "all")}
+                onChange={(e) => handleFilterStatusChange(e.target.value as StaffStatus | "all")}
                 startAdornment={
                   <InputAdornment position="start">
                     <FilterList sx={{ color: PRIMARY_COLOR, fontSize: 18 }} />
@@ -944,8 +1122,6 @@ export default function StaffPage() {
           onRowsPerPageChange={handleChangeRowsPerPage}
         />
       </Card>
-
-
 
       {/* Delete Confirmation Dialog */}
       <Dialog

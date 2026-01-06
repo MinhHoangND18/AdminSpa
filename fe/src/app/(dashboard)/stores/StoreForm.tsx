@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Grid,
@@ -56,6 +56,7 @@ import { usersApi } from "@/lib/api/users";
 import { User } from "@/types/user";
 import { storesApi } from "@/lib/api/stores";
 import { Store, StoreFormData, StoreResponse } from "@/types/store";
+import { useRouter } from "next/navigation";
 import StoreDetail from "./StoreDetail";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
 const blueTheme = createTheme({
@@ -153,8 +154,9 @@ const StatCard = ({
   </Grid>
 );
 
-export default function StoresPage() {
+export default function StoresPage({ slug }: { slug?: string[] }) {
   const queryClient = useQueryClient();
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
@@ -170,7 +172,7 @@ export default function StoresPage() {
   } = useQuery<User[], Error>({
     queryKey: ["managers", "available"],
     queryFn: fetchManagers,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 0,
   });
   const [showDetail, setShowDetail] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -190,6 +192,20 @@ export default function StoresPage() {
   // useEffect(() => {
   //   fetchManagers();
   // }, []);
+
+  useEffect(() => {
+    if (sessionStorage.getItem('showStoreUpdateSuccess')) {
+      // Defer state update to avoid cascading renders
+      setTimeout(() => {
+        setSnackbar({
+          open: true,
+          message: "Store updated successfully!",
+          severity: "success",
+        });
+        sessionStorage.removeItem('showStoreUpdateSuccess');
+      }, 0);
+    }
+  }, []);
 
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -213,8 +229,77 @@ export default function StoresPage() {
   } = useQuery<Store[], Error>({
     queryKey: [...QUERY_KEY, debouncedSearch],
     queryFn: () => fetchStores(debouncedSearch),
-    staleTime: 5 * 60 * 1000,
+    staleTime: 0,
   });
+
+  const handleMenuClose = useCallback(() => {
+    setAnchorEl(null);
+  }, []);
+
+  const handleEdit = useCallback((store: Store) => {
+    setEditingId(store.id);
+    setTimeout(() => {
+
+      setSelectedStore(store);
+      setDialogMode("edit");
+      setSaveError(null);
+
+      const matchedManager = availableManagers.find(
+        (manager) => manager.id === store.manager_id
+      );
+      setFormData({
+        code: store.code,
+        name: store.name,
+        domain: store.domain || "",
+        address: store.address,
+        phone: store.phone || "",
+        email: store.email || "",
+        description: store.description || "",
+        openingHours: store.openingHours || "",
+        latitude: store.latitude?.toString() || "",
+        longitude: store.longitude?.toString() || "",
+        manager_id: matchedManager
+          ? String(matchedManager.id)
+          : store.manager_id?.toString() || "",
+        isActive: store.isActive,
+      });
+
+      setShowDetail(true);
+      handleMenuClose();
+      setEditingId(null);
+    }, 500);
+  }, [availableManagers, handleMenuClose]);
+
+  useEffect(() => {
+    const storeId = slug?.[0];
+
+    if (storeId) {
+      if (selectedStore?.id === Number(storeId) && showDetail) {
+        return;
+      }
+
+      storesApi
+        .getById(Number(storeId))
+        .then((response: Store | { data: Store }) => {
+          const storeData = "data" in response ? response.data : response;
+          handleEdit(storeData);
+          setEditingId(null); // Reset editingId after successful load
+        })
+        .catch(() => {
+          router.push("/stores");
+          setEditingId(null); // Reset editingId on error
+        });
+    } else {
+      if (showDetail && dialogMode === "edit") {
+        // Defer state updates to avoid cascading renders
+        setTimeout(() => {
+          setShowDetail(false);
+          setSelectedStore(null);
+          setEditingId(null); // Reset editingId when closing detail view
+        }, 0);
+      }
+    }
+  }, [slug, selectedStore, showDetail, dialogMode, router, availableManagers, handleEdit]);
 
   const stats = {
     total: stores.length,
@@ -291,10 +376,6 @@ export default function StoresPage() {
     setAnchorEl(event.currentTarget);
     setSelectedStore(store);
   };
-  const handleMenuClose = () => {
-    setAnchorEl(null);
-    //setSelectedStore(null);
-  };
 
   const handleAddNew = () => {
     setIsAddLoading(true);
@@ -305,38 +386,6 @@ export default function StoresPage() {
       setSaveError(null);
       setShowDetail(true);
       setIsAddLoading(false);
-    }, 500);
-  };
-
-  const handleEdit = (store: Store) => {
-    setEditingId(store.id);
-
-    setTimeout(() => {
-      setSelectedStore(store);
-      setDialogMode("edit");
-      setSaveError(null);
-
-      const matchedManager = availableManagers.find(
-        (manager) => manager.id === store.manager_id
-      );
-      setFormData({
-        code: store.code,
-        name: store.name,
-        domain: store.domain || "",
-        address: store.address,
-        phone: store.phone || "",
-        email: store.email || "",
-        description: store.description || "",
-        openingHours: store.openingHours || "",
-        latitude: store.latitude?.toString() || "",
-        longitude: store.longitude?.toString() || "",
-        manager_id: matchedManager ? String(matchedManager.id) : (store.manager_id?.toString() || ""),
-        isActive: store.isActive,
-      });
-
-      setShowDetail(true);
-      handleMenuClose();
-      setEditingId(null);
     }, 500);
   };
   const handleView = () => {
@@ -445,9 +494,13 @@ export default function StoresPage() {
         initialData={selectedStore}
         managers={availableManagers}
         onBack={() => {
-          setShowDetail(false);
-          setSelectedStore(null);
-          setSaveError(null);
+          if (dialogMode === "edit") {
+            router.push("/stores");
+          } else {
+            setShowDetail(false);
+            setSelectedStore(null);
+            setSaveError(null);
+          }
         }}
         onSave={async (data) => {
           try {
@@ -461,13 +514,17 @@ export default function StoresPage() {
             const savedStore = await storeMutation.mutateAsync(dataToSend);
 
             queryClient.invalidateQueries({ queryKey: QUERY_KEY });
-            setSnackbar({
-              open: true,
-              message: `Store ${dialogMode === 'edit' ? 'updated' : 'created'} successfully!`,
-              severity: "success",
-            });
-
-            // setShowDetail(false);
+            if (dialogMode === "edit") {
+              sessionStorage.setItem('showStoreUpdateSuccess', 'true');
+              router.push("/stores");
+            } else {
+              setSnackbar({
+                open: true,
+                message: "Store created successfully!",
+                severity: "success",
+              });
+              setShowDetail(false);
+            }
             setSaveError(null);
           } catch (err) {
             let errorMessage: string = "An unexpected error occurred.";
@@ -626,22 +683,25 @@ export default function StoresPage() {
                             editingId === store.id ? (
                               <CircularProgress size={16} color="inherit" />
                             ) : (
-                              <Edit sx={{ fontSize: '18px !important' }} />
+                              <Edit sx={{ fontSize: "18px !important" }} />
                             )
                           }
                           disabled={editingId === store.id}
-                          onClick={() => handleEdit(store)}
+                          onClick={() => {
+                            setEditingId(store.id);
+                            router.push(`/stores/${store.id}`);
+                          }}
                           sx={{
-                            bgcolor: '#f39c12',
-                            '&:hover': { bgcolor: '#e67e22' },
-                            textTransform: 'none',
+                            bgcolor: "#f39c12",
+                            "&:hover": { bgcolor: "#e67e22" },
+                            textTransform: "none",
                             fontWeight: 600,
-                            borderRadius: '0px',
+                            borderRadius: "0px",
                             px: 2,
-                            minWidth: '80px',
-                            boxShadow: 'none',
-                            height: '32px',
-                            color: '#fff'
+                            minWidth: "80px",
+                            boxShadow: "none",
+                            height: "32px",
+                            color: "#fff",
                           }}
                         >
                           Edit

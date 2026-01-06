@@ -1,76 +1,31 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
-  Grid,
-  Card,
-  CardContent,
-  Typography,
-  Box,
-  Button,
-  TextField,
-  InputAdornment,
-  Chip,
-  IconButton,
-  Menu,
-  MenuItem,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  alpha,
-  Avatar,
-  Alert,
-  Select,
-  FormControl,
-  InputLabel,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  TablePagination,
-  Tooltip,
-  Switch,
-  FormControlLabel,
-  FormHelperText,
-  Snackbar,
-  Backdrop,
+  Grid, Card, CardContent, Typography, Box, Button, TextField,
+  InputAdornment, Chip, IconButton, Menu, MenuItem, Dialog,
+  DialogTitle, DialogContent, DialogActions, alpha, Avatar, Alert,
+  Select, FormControl, InputLabel, Table, TableBody, TableCell,
+  TableContainer, TableHead, TableRow, TablePagination, Tooltip,
+  Switch, FormControlLabel, FormHelperText, Snackbar, Backdrop,
   CircularProgress,
 } from "@mui/material";
 import { usersApi } from "@/lib/api/users";
-import {
-  getStaff,
-  createStaff,
-  updateStaff,
-  deleteStaff,
-} from "@/lib/api/staffs";
+import { getStaff } from "@/lib/api/staffs";
 import { storesApi } from "@/lib/api/stores";
 import { useAuth } from "@/lib/hooks/useAuth";
 import {
-  Add,
-  Search,
-  MoreVert,
-  Edit,
-  Delete,
-  Visibility,
-  Person,
-  Lock,
-  LockOpen,
-  AdminPanelSettings,
-  Store,
-  Badge,
-  CalendarToday,
-  Security,
-  Group,
-  Close as CloseIcon,
+  Add, Search, Edit, Delete, Person, LockOpen, AdminPanelSettings,
+  Store, Badge, CalendarToday, Security, Group, Close as CloseIcon,
 } from "@mui/icons-material";
+import { useQuery, keepPreviousData, useQueryClient } from "@tanstack/react-query"; // IMPORT MỚI
 import UserDetail from "./UserDetail";
 import { User, UserFormData, UserResponse } from "@/types/user";
 import { Staff } from "@/types/staff";
 import { Store as StoreType } from "@/types/store";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
+
 const blueTheme = createTheme({
   palette: {
     primary: {
@@ -78,6 +33,7 @@ const blueTheme = createTheme({
     },
   },
 });
+
 interface AxiosErrorResponse {
   response?: {
     data?: {
@@ -94,6 +50,14 @@ const isAxiosError = (error: unknown): error is AxiosErrorResponse => {
     ('response' in error || 'message' in error)
   );
 };
+
+// --- INTERFACES FOR API RESPONSE ---
+interface MasterDataResponse<T> {
+  data: {
+    data: T[];
+  };
+}
+
 const PRIMARY_COLOR = "#3b82f6";
 const PRIMARY_DARK = "#0f766e";
 const SUCCESS_COLOR = "#10b981";
@@ -110,107 +74,105 @@ const roleHierarchy: UserRole[] = [
   "staff",
 ];
 
-type UserRole =
-  | "super_admin"
-  | "store_admin"
-  | "manager"
-  | "receptionist"
-  | "staff";
+type UserRole = "super_admin" | "store_admin" | "manager" | "receptionist" | "staff";
 
-
-
-const StaffApi = {
-  getAll: getStaff,
-  create: createStaff,
-  update: updateStaff,
-  remove: deleteStaff,
-};
 const getRoleColor = (role: UserRole) => {
   switch (role) {
-    case "super_admin":
-      return ERROR_COLOR;
-    case "store_admin":
-      return PURPLE_COLOR;
-    case "manager":
-      return INFO_COLOR;
-    case "receptionist":
-      return WARNING_COLOR;
-    case "staff":
-      return SUCCESS_COLOR;
-    default:
-      return PRIMARY_COLOR;
+    case "super_admin": return ERROR_COLOR;
+    case "store_admin": return PURPLE_COLOR;
+    case "manager": return INFO_COLOR;
+    case "receptionist": return WARNING_COLOR;
+    case "staff": return SUCCESS_COLOR;
+    default: return PRIMARY_COLOR;
   }
 };
 
 const getRoleIcon = (role: UserRole) => {
   switch (role) {
-    case "super_admin":
-      return <AdminPanelSettings />;
+    case "super_admin": return <AdminPanelSettings />;
     case "store_admin":
-    case "manager":
-      return <Security />;
-    case "receptionist":
-      return <Badge />;
-    case "staff":
-      return <Person />;
-    default:
-      return <Person />;
+    case "manager": return <Security />;
+    case "receptionist": return <Badge />;
+    case "staff": return <Person />;
+    default: return <Person />;
   }
 };
 
 const getRoleLabel = (role: UserRole) => {
   switch (role) {
-    case "super_admin":
-      return "Super Admin";
-    case "store_admin":
-      return "Store Admin";
-    case "manager":
-      return "Manager";
-    case "receptionist":
-      return "Receptionist";
-    case "staff":
-      return "Staff";
-    default:
-      return role;
+    case "super_admin": return "Super Admin";
+    case "store_admin": return "Store Admin";
+    case "manager": return "Manager";
+    case "receptionist": return "Receptionist";
+    case "staff": return "Staff";
+    default: return role;
   }
 };
 
-export default function UsersPage() {
+const roleToIdMap: Record<UserRole, number> = {
+  super_admin: 1,
+  store_admin: 2,
+  manager: 3,
+  receptionist: 4,
+  staff: 5,
+};
+
+const idToRoleMap: Record<number, UserRole> = {
+  1: "super_admin",
+  2: "store_admin",
+  3: "manager",
+  4: "receptionist",
+  5: "staff",
+};
+
+const statusToIdMap: Record<string, number> = {
+  active: 1,
+  inactive: 2,
+  locked: 3,
+};
+
+const idToStatusMap: Record<number, string> = {
+  1: "active",
+  2: "inactive",
+  3: "locked",
+};
+
+export default function UsersPage({ slug }: { slug?: string[] }) {
   const { user: currentUser, loading: authLoading } = useAuth();
+  const queryClient = useQueryClient(); 
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
-  const currentUserRoleIndex = currentUser
-    ? roleHierarchy.indexOf(currentUser.role)
-    : -1;
-  const assignableRoles =
-    currentUserRoleIndex !== -1
-      ? roleHierarchy.slice(currentUserRoleIndex + 1)
-      : [];
-
-  const [users, setUsers] = useState<User[]>([]);
-  const [totalUsers, setTotalUsers] = useState(0);
-  const [aggregateStats, setAggregateStats] = useState({ active: 0, admins: 0 });
-  const [availableStaff, setAvailableStaff] = useState<Staff[]>([]);
-  const [availableStores, setAvailableStores] = useState<StoreType[]>([]);
+  // States
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterRole, setFilterRole] = useState<UserRole | "all">("all");
-  const [filterStatus, setFilterStatus] = useState<
-    "all" | "active" | "inactive" | "locked"
-  >("all");
+  const [filterRole, setFilterRole] = useState<UserRole | "all">(() => {
+    const roleId = searchParams.get("role");
+    return roleId && idToRoleMap[parseInt(roleId)]
+      ? idToRoleMap[parseInt(roleId)]
+      : "all";
+  });
+  const [filterStatus, setFilterStatus] = useState<"all" | "active" | "inactive" | "locked">(() => {
+    const statusId = searchParams.get("status");
+    return statusId && idToStatusMap[parseInt(statusId)]
+      ? (idToStatusMap[parseInt(statusId)] as "all" | "active" | "inactive" | "locked")
+      : "all";
+  });
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  
+  // UI States
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [openDialog, setOpenDialog] = useState(false);
   const [dialogMode, setDialogMode] = useState<"add" | "edit" | "view">("add");
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [lockConfirmOpen, setLockConfirmOpen] = useState(false);
-  const [validationErrors, setValidationErrors] = useState<
-    Partial<Record<keyof UserFormData, string>>
-  >({});
+  const [validationErrors, setValidationErrors] = useState<Partial<Record<keyof UserFormData, string>>>({});
   const [showDetail, setShowDetail] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-
-  const [loading, setLoading] = useState(false);
+  
+  // Loading states for actions (not data fetching)
+  const [actionLoading, setActionLoading] = useState(false);
   const [isAddLoading, setIsAddLoading] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
 
@@ -220,214 +182,182 @@ export default function UsersPage() {
     severity: "success" as "success" | "error" | "warning",
   });
 
-  const initialFormData: UserFormData = {
-    username: "",
-    email: "",
-    fullname: "",
-    password: "",
-    role: "" as UserRole,
-    staff_id: "",
-    store_id: "",
-    is_active: true,
-  };
+  const currentUserRoleIndex = currentUser ? roleHierarchy.indexOf(currentUser.role) : -1;
+  const assignableRoles = currentUserRoleIndex !== -1 ? roleHierarchy.slice(currentUserRoleIndex + 1) : [];
 
+  const initialFormData: UserFormData = {
+    username: "", email: "", fullname: "", password: "", role: "" as UserRole,
+    staff_id: "", store_id: "", is_active: true,
+  };
   const [formData, setFormData] = useState<UserFormData>(initialFormData);
+  const { data: availableStaff = [] } = useQuery({
+    queryKey: ['staff'],
+    queryFn: () => getStaff({ limit: 1000 }).then(res => {
+      const response = res as unknown as MasterDataResponse<Staff>;
+      return response?.data?.data || [];
+    }),
+    staleTime: 0,
+  });
+
+  const { data: availableStores = [] } = useQuery({
+    queryKey: ['stores'],
+    queryFn: () => storesApi.getAll().then(res => {
+      const response = res as unknown as MasterDataResponse<StoreType>;
+      return response?.data?.data || [];
+    }),
+    staleTime: 0,
+  });
+  const { 
+    data: usersResponse, 
+    isLoading: isUsersLoading 
+  } = useQuery({
+    queryKey: ['users', page, rowsPerPage, searchQuery, filterRole, filterStatus],
+    queryFn: async () => {
+      const filters = {
+        search: searchQuery,
+        role: filterRole,
+        is_active: filterStatus === "active" || filterStatus === "locked" ? "true" : filterStatus === "inactive" ? "false" : undefined,
+        is_locked: filterStatus === "locked" ? true : undefined,
+        page: page + 1,
+        limit: rowsPerPage,
+      };
+      return usersApi.getAll(filters);
+    },
+    staleTime: 0,
+  });
+
+  // Handle User Data Extraction
+  const usersData = (usersResponse as unknown as { data: UserResponse['data'] })?.data;
+  const users = usersData?.data || [];
+  const totalUsers = usersData?.total || 0;
+
+  const { data: aggregateStats = { active: 0, admins: 0 } } = useQuery({
+    queryKey: ['users_stats', searchQuery, filterRole, filterStatus],
+    queryFn: async () => {
+      const filters = {
+        search: searchQuery,
+        role: filterRole,
+        is_active: filterStatus === "active" || filterStatus === "locked" ? "true" : filterStatus === "inactive" ? "false" : undefined,
+        is_locked: filterStatus === "locked" ? true : undefined,
+        page: 1,
+        limit: 99999, 
+      };
+      const apiResponse = await usersApi.getAll(filters);
+      const responseData = (apiResponse as unknown as { data: UserResponse['data'] })?.data;
+      const allMatchingUsers = responseData?.data || [];
+      
+      return {
+        active: allMatchingUsers.filter((u: User) => u.is_active && !u.is_locked).length,
+        admins: allMatchingUsers.filter((u: User) => u.role === "super_admin" || u.role === "store_admin").length,
+      };
+    },
+    staleTime: 0,
+  });
+
+  const userId = slug?.[0];
+
+  useEffect(() => {
+    if (sessionStorage.getItem('showUserUpdateSuccess')) {
+      // Defer state update to avoid cascading renders
+      setTimeout(() => {
+        setSnackbar({
+          open: true,
+          message: "Update successful",
+          severity: "success",
+        });
+        sessionStorage.removeItem('showUserUpdateSuccess');
+      }, 0);
+    }
+  }, []);
+
+  const handleMenuClose = () => setAnchorEl(null);
+
+  useEffect(() => {
+    if (userId) {
+      if (selectedUser?.id === Number(userId) && showDetail) {
+        return;
+      }
+
+      usersApi
+        .getById(Number(userId))
+        .then((response: User | { data: User }) => {
+          const userData = "data" in response ? response.data : response;
+          setSelectedUser(userData);
+          setDialogMode("edit");
+          setShowDetail(true);
+          setEditingId(null);
+        })
+        .catch(() => {
+          const query: { role?: string; status?: string } = {};
+          if (filterRole !== "all") {
+            query.role = roleToIdMap[filterRole].toString();
+          }
+          if (filterStatus !== "all") {
+            query.status = statusToIdMap[filterStatus].toString();
+          }
+          const queryString = new URLSearchParams(query).toString();
+          router.push(queryString ? `/users?${queryString}` : "/users");
+          setEditingId(null); 
+        });
+    } else {
+      if (showDetail && dialogMode === "edit") {
+        setTimeout(() => {
+          setShowDetail(false);
+          setSelectedUser(null);
+          setEditingId(null);
+        }, 0);
+      }
+    }
+  }, [userId, filterRole, filterStatus, router, selectedUser, showDetail, dialogMode]);
+
+  useEffect(() => {
+    if (userId) {
+      return;
+    }
+
+    const query: { role?: string; status?: string } = {};
+    if (filterRole !== "all") {
+      query.role = roleToIdMap[filterRole].toString();
+    }
+    if (filterStatus !== "all") {
+      query.status = statusToIdMap[filterStatus].toString();
+    }
+
+    const queryString = new URLSearchParams(query).toString();
+    const currentPath = "/users";
+    const newUrl = queryString ? `${currentPath}?${queryString}` : currentPath;
+
+    if (
+      typeof window !== "undefined" &&
+      window.location.pathname + window.location.search !== newUrl
+    ) {
+      router.push(newUrl, {
+        scroll: false,
+      });
+    }
+  }, [filterRole, filterStatus, userId, router]);
+
+  // --- ACTIONS ---
 
   const validateForm = () => {
     const errors: Partial<Record<keyof UserFormData, string>> = {};
-
-    if (!formData.username.trim()) {
-      errors.username = "Username is required.";
-    }
-
-    if (dialogMode === "add" && !formData.password) {
-      errors.password = "Password is required for new users.";
-    }
-
-    if (formData.email && !/^\S+@\S+\.\S+$/.test(formData.email)) {
-      errors.email = "Invalid email format.";
-    }
-    if (!formData.fullname.trim()) {
-      errors.fullname = "Full Name is required.";
-    }
-    if (!formData.role) {
-      errors.role = "Role is required.";
-    }
-
-    const rolesRequiringStaff = ["staff", "receptionist"];
-    // if (rolesRequiringStaff.includes(formData.role) && !formData.staff_id) {
-    //   errors.staff_id = `${getRoleLabel(
-    //     formData.role
-    //   )} must be linked to a Staff member.`;
-    // }
+    if (!formData.username.trim()) errors.username = "Username is required.";
+    if (dialogMode === "add" && !formData.password) errors.password = "Password is required for new users.";
+    if (formData.email && !/^\S+@\S+\.\S+$/.test(formData.email)) errors.email = "Invalid email format.";
+    if (!formData.fullname.trim()) errors.fullname = "Full Name is required.";
+    if (!formData.role) errors.role = "Role is required.";
 
     const rolesRequiringStore = ["store_admin", "manager", "receptionist"];
     if (rolesRequiringStore.includes(formData.role) && !formData.store_id) {
-      errors.store_id = `${getRoleLabel(
-        formData.role
-      )} must be assigned to a Store.`;
+      errors.store_id = `${getRoleLabel(formData.role)} must be assigned to a Store.`;
     }
 
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
   };
 
-  const fetchUsers = useCallback(async () => {
-    setLoading(true);
-    const filters = {
-      search: searchQuery,
-      role: filterRole,
-      is_active:
-        filterStatus === "active" || filterStatus === "locked"
-          ? "true"
-          : filterStatus === "inactive"
-            ? "false"
-            : undefined,
-      is_locked: filterStatus === "locked" ? true : undefined,
-      page: page + 1,
-      limit: rowsPerPage,
-    };
-
-    try {
-      const apiResponse = await usersApi.getAll(filters);
-      const responseData: UserResponse['data'] = apiResponse.data || { data: [], total: 0, page: 0, limit: 0 };
-      const users = responseData.data || [];
-
-      console.log('Users data:', users);
-      console.log('First user:', users[0]);
-
-
-      const total = responseData.total ?? 0;
-
-      setUsers(users);
-      setTotalUsers(total);
-    } catch (error) {
-      console.error("Failed to fetch users:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, [
-    searchQuery,
-    filterRole,
-    filterStatus,
-    page,
-    rowsPerPage,
-    availableStaff,
-    availableStores,
-  ]);
-
-  const fetchDropdownData = async () => {
-    setLoading(true);
-    try {
-      const staffResponse = await StaffApi.getAll({});
-      const storeResponse = await storesApi.getAll();
-
-      const staffData = staffResponse?.data?.data || [];
-      setAvailableStaff(Array.isArray(staffData) ? staffData : []);
-
-      const storeData = storeResponse?.data.data || [];
-      setAvailableStores(Array.isArray(storeData) ? storeData : []);
-    } catch (error) {
-      console.error("Failed to fetch dropdown data:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchDropdownData();
-  }, []);
-
-  useEffect(() => {
-    fetchUsers();
-  }, [fetchUsers]);
-
-  useEffect(() => {
-    const fetchStats = async () => {
-      const filters = {
-        search: searchQuery,
-        role: filterRole,
-        is_active:
-          filterStatus === "active" || filterStatus === "locked"
-            ? "true"
-            : filterStatus === "inactive"
-              ? "false"
-              : undefined,
-        is_locked: filterStatus === "locked" ? true : undefined,
-        page: 1,
-        limit: 99999,
-      };
-
-      try {
-        const apiResponse = await usersApi.getAll(filters);
-        const responseData: UserResponse['data'] = apiResponse.data || { data: [], total: 0, page: 0, limit: 0 };
-        const allMatchingUsers = responseData.data || [];
-
-        setAggregateStats({
-          active: allMatchingUsers.filter((u: User) => u.is_active && !u.is_locked).length,
-          admins: allMatchingUsers.filter(
-            (u: User) => u.role === "super_admin" || u.role === "store_admin"
-          ).length,
-        });
-      } catch (error) {
-        console.error("Failed to fetch aggregate user stats:", error);
-        setAggregateStats({ active: 0, admins: 0 });
-      }
-    };
-
-    fetchStats();
-  }, [searchQuery, filterRole, filterStatus]);
-
-  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, user: User) => {
-    setAnchorEl(event.currentTarget);
-    setSelectedUser(user);
-  };
-
-  const handleMenuClose = () => {
-    setAnchorEl(null);
-  };
-
-  const handleAddNew = () => {
-    setIsAddLoading(true);
-
-    setTimeout(() => {
-      setDialogMode("add");
-      setSelectedUser(null);
-      setShowDetail(true);
-      setSaveError(null);
-      setIsAddLoading(false);
-    }, 500);
-  };
-  const handleRowEdit = (user: User) => {
-    setEditingId(user.id);
-
-    setTimeout(() => {
-      setSelectedUser(user);
-      setDialogMode("edit");
-      setShowDetail(true);
-      setSaveError(null);
-      setEditingId(null);
-    }, 500);
-  };
-
-  const handleEdit = () => {
-    if (selectedUser) {
-      setDialogMode("edit");
-      setShowDetail(true);
-      setSaveError(null);
-    }
-    handleMenuClose();
-  };
-
-  const handleView = () => {
-    if (selectedUser) {
-      setDialogMode("view");
-      setOpenDialog(true);
-    }
-    handleMenuClose();
-  };
   const handleSaveUser = async (submittedData: UserFormData) => {
-    setLoading(true);
+    setActionLoading(true);
     try {
       const dataToSend: Partial<User> & { password?: string } = {
         username: submittedData.username,
@@ -440,184 +370,113 @@ export default function UsersPage() {
         password: submittedData.password,
       };
 
-      if (dialogMode === "edit" && !dataToSend.password) {
-        delete dataToSend.password;
-      }
+      if (dialogMode === "edit" && !dataToSend.password) delete dataToSend.password;
 
       if (dialogMode === "add") {
         await usersApi.create(dataToSend);
+        setShowDetail(false);
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ['users'] }),
+          queryClient.invalidateQueries({ queryKey: ['users_stats'] })
+        ]);
+        setSnackbar({
+          open: true,
+          message: "User created successfully",
+          severity: "success",
+        });
       } else if (dialogMode === "edit" && selectedUser) {
         await usersApi.update(selectedUser.id, dataToSend);
+        sessionStorage.setItem("showUserUpdateSuccess", "true");
+        const query: { role?: string; status?: string } = {};
+        if (filterRole !== "all") {
+          query.role = roleToIdMap[filterRole].toString();
+        }
+        if (filterStatus !== "all") {
+          query.status = statusToIdMap[filterStatus].toString();
+        }
+        const queryString = new URLSearchParams(query).toString();
+        router.push(queryString ? `/users?${queryString}` : "/users");
       }
-
-      // setShowDetail(false);
-      fetchUsers();
-      setSnackbar({
-        open: true,
-        message: dialogMode === "add" ? "User created successfully" : "Update successful",
-        severity: "success",
-      });
       setSaveError(null);
     } catch (error: unknown) {
       console.error("Failed to save user:", error);
       let errorMessage = "An unknown error occurred.";
-
       if (isAxiosError(error)) {
-        errorMessage =
-          error.response?.data?.message ||
-          error.message ||
-          errorMessage;
+        errorMessage = error.response?.data?.message || error.message || errorMessage;
       } else if (error instanceof Error) {
         errorMessage = error.message;
       }
       setSaveError(errorMessage);
     } finally {
-      setLoading(false);
+      setActionLoading(false);
     }
-  };
-  if (showDetail) {
-    return (
-      <UserDetail
-        mode={dialogMode}
-        initialData={selectedUser}
-        availableStaff={availableStaff}
-        availableStores={availableStores}
-        assignableRoles={assignableRoles}
-        getRoleLabel={getRoleLabel}
-        onBack={() => {
-          setShowDetail(false);
-          setSelectedUser(null);
-          setSaveError(null);
-        }}
-        onSave={handleSaveUser}
-        loading={loading}
-        saveError={saveError}
-      />
-    );
-  }
-
-  const handleDelete = () => {
-    setDeleteConfirmOpen(true);
-    handleMenuClose();
-  };
-
-  const handleLockUnlock = () => {
-    setLockConfirmOpen(true);
-    handleMenuClose();
   };
 
   const confirmDelete = async () => {
     if (selectedUser) {
-      setLoading(true);
+      setActionLoading(true);
       try {
         await usersApi.remove(selectedUser.id);
         setDeleteConfirmOpen(false);
         setSelectedUser(null);
-        fetchUsers();
+        
+        await Promise.all([
+            queryClient.invalidateQueries({ queryKey: ['users'] }),
+            queryClient.invalidateQueries({ queryKey: ['users_stats'] })
+        ]);
+
         setSnackbar({
           open: true,
           message: `User ${selectedUser.username} deleted successfully.`,
           severity: "success",
         });
       } catch (error: unknown) {
-        console.error("Failed to delete user:", error);
         let errorMessage = "An unknown error occurred.";
-
         if (isAxiosError(error)) {
-          errorMessage =
-            error.response?.data?.message ||
-            error.message ||
-            errorMessage;
+          errorMessage = error.response?.data?.message || error.message || errorMessage;
         } else if (error instanceof Error) {
           errorMessage = error.message;
         }
-        setSnackbar({
-          open: true,
-          message: `Deletion failed: ${errorMessage}`,
-          severity: "error",
-        });
+        setSnackbar({ open: true, message: `Deletion failed: ${errorMessage}`, severity: "error" });
       } finally {
-        setLoading(false);
+        setActionLoading(false);
       }
     }
   };
 
   const confirmLockUnlock = async () => {
     if (selectedUser) {
-      setLoading(true);
+      setActionLoading(true);
       try {
         const isLocked = !selectedUser.is_locked;
         await usersApi.toggleLock(selectedUser.id, isLocked);
         setLockConfirmOpen(false);
         setSelectedUser(null);
-        fetchUsers();
+        
+        await queryClient.invalidateQueries({ queryKey: ['users'] });
 
         setSnackbar({
           open: true,
-          message: `User ${selectedUser.username} has been ${isLocked ? "locked" : "unlocked"
-            }.`,
+          message: `User ${selectedUser.username} has been ${isLocked ? "locked" : "unlocked"}.`,
           severity: isLocked ? "warning" : "success",
         });
       } catch (error: unknown) {
-        console.error("Failed to toggle lock:", error);
         let errorMessage = "An unknown error occurred.";
-
         if (isAxiosError(error)) {
-          errorMessage =
-            error.response?.data?.message ||
-            error.message ||
-            errorMessage;
+          errorMessage = error.response?.data?.message || error.message || errorMessage;
         } else if (error instanceof Error) {
-          errorMessage = error.message;
+            errorMessage = error.message;
         }
-        setSnackbar({
-          open: true,
-          message: `Action failed: ${errorMessage}`,
-          severity: "error",
-        });
+        setSnackbar({ open: true, message: `Action failed: ${errorMessage}`, severity: "error" });
       } finally {
-        setLoading(false);
+        setActionLoading(false);
       }
     }
   };
 
-  const handleDialogClose = () => {
-    setOpenDialog(false);
-    setFormData(initialFormData);
-    setValidationErrors({});
-  };
-
-  const handleSnackbarClose = (
-    event?: React.SyntheticEvent | Event,
-    reason?: string
-  ) => {
-    if (reason === "clickaway") return;
-    setSnackbar({ ...snackbar, open: false });
-  };
-
-  const handleFormChange =
-    (field: keyof UserFormData) =>
-      (
-        event:
-          | React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-          | { target: { value: string } }
-      ) => {
-        setFormData({ ...formData, [field]: event.target.value });
-        setValidationErrors((prev) => ({ ...prev, [field]: undefined }));
-      };
-
-  const handleSwitchChange =
-    (field: keyof UserFormData) =>
-      (event: React.ChangeEvent<HTMLInputElement>) => {
-        setFormData({ ...formData, [field]: event.target.checked });
-      };
-
   const handleSubmit = async () => {
-    if (!validateForm()) {
-      return;
-    }
-
-    setLoading(true);
+    if (!validateForm()) return;
+    setActionLoading(true);
     try {
       const dataToSend: Partial<Omit<UserFormData, 'staff_id' | 'store_id'>> & {
         staff_id: number | null;
@@ -629,12 +488,9 @@ export default function UsersPage() {
         store_id: formData.store_id ? parseInt(formData.store_id) : null,
       };
 
-      if (dialogMode === "edit" && !dataToSend.password) {
-        delete dataToSend.password;
-      }
+      if (dialogMode === "edit" && !dataToSend.password) delete dataToSend.password;
 
       let successMessage = "";
-
       if (dialogMode === "add") {
         await usersApi.create(dataToSend);
         successMessage = `User ${formData.username} created successfully!`;
@@ -644,116 +500,123 @@ export default function UsersPage() {
       }
 
       handleDialogClose();
-      fetchUsers();
-      setSnackbar({
-        open: true,
-        message: successMessage,
-        severity: "success",
-      });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['users'] }),
+        queryClient.invalidateQueries({ queryKey: ['users_stats'] })
+      ]);
+      setSnackbar({ open: true, message: successMessage, severity: "success" });
     } catch (error: unknown) {
-      console.error(`Failed to ${dialogMode} user:`, error);
       let errorMessage = "An unknown error occurred.";
-
       if (isAxiosError(error)) {
-        errorMessage =
-          error.response?.data?.message ||
-          error.message ||
-          errorMessage;
+        errorMessage = error.response?.data?.message || error.message || errorMessage;
       } else if (error instanceof Error) {
         errorMessage = error.message;
       }
-
-      setSnackbar({
-        open: true,
-        message: `Action failed: ${errorMessage}`,
-        severity: "error",
-      });
+      setSnackbar({ open: true, message: `Action failed: ${errorMessage}`, severity: "error" });
     } finally {
-      setLoading(false);
+      setActionLoading(false);
     }
   };
 
-  const handleChangePage = (event: unknown, newPage: number) => {
-    setPage(newPage);
+  // UI Handlers (unchanged mostly)
+  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, user: User) => {
+    setAnchorEl(event.currentTarget);
+    setSelectedUser(user);
   };
+  const handleAddNew = () => {
+    setIsAddLoading(true);
 
-  const handleChangeRowsPerPage = (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    setRowsPerPage(parseInt(event.target.value, 10));
-    setPage(0);
+    setTimeout(() => {
+      setDialogMode("add");
+      setSelectedUser(null);
+      setShowDetail(true);
+      setSaveError(null);
+      setIsAddLoading(false);
+    }, 500);
   };
-
+  const handleEdit = () => {
+    if (selectedUser) {
+      router.push(`/users/${selectedUser.id}`);
+    }
+    handleMenuClose();
+  };
+  const handleDelete = () => { setDeleteConfirmOpen(true); handleMenuClose(); };
+  const handleDialogClose = () => { setOpenDialog(false); setFormData(initialFormData); setValidationErrors({}); };
+  const handleSnackbarClose = (event?: React.SyntheticEvent | Event, reason?: string) => { if (reason === "clickaway") return; setSnackbar({ ...snackbar, open: false }); };
+  const handleFormChange = (field: keyof UserFormData) => (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | { target: { value: string } }) => { setFormData({ ...formData, [field]: event.target.value }); setValidationErrors((prev) => ({ ...prev, [field]: undefined })); };
+  const handleSwitchChange = (field: keyof UserFormData) => (event: React.ChangeEvent<HTMLInputElement>) => { setFormData({ ...formData, [field]: event.target.checked }); };
+  const handleChangePage = (event: unknown, newPage: number) => setPage(newPage);
+  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => { setRowsPerPage(parseInt(event.target.value, 10)); setPage(0); };
+  
   const canModifyUser = (targetUser: User) => {
     if (!currentUser) return false;
     if (targetUser.id === Number(currentUser.id)) return true;
     const currentUserIndex = roleHierarchy.indexOf(currentUser.role);
     const targetUserIndex = roleHierarchy.indexOf(targetUser.role);
-
     if (currentUserIndex === -1 || targetUserIndex === -1) return false;
-
     return targetUserIndex > currentUserIndex;
   };
 
   if (authLoading || !currentUser) {
     return (
-      <Backdrop
-        sx={{ color: "#fff", zIndex: (theme) => theme.zIndex.drawer + 1 }}
-        open={true}
-      >
+      <Backdrop sx={{ color: "#fff", zIndex: (theme) => theme.zIndex.drawer + 1 }} open={true}>
         <CircularProgress color="inherit" />
       </Backdrop>
     );
   }
 
+  if (showDetail) {
+    return (
+      <UserDetail
+        mode={dialogMode}
+        initialData={selectedUser}
+        availableStaff={availableStaff}
+        availableStores={availableStores}
+        assignableRoles={assignableRoles}
+        getRoleLabel={getRoleLabel}
+        onBack={() => {
+          const query: { role?: string; status?: string } = {};
+          if (filterRole !== "all") {
+            query.role = roleToIdMap[filterRole].toString();
+          }
+          if (filterStatus !== "all") {
+            query.status = statusToIdMap[filterStatus].toString();
+          }
+          const queryString = new URLSearchParams(query).toString();
+          if (dialogMode === "edit") {
+            router.push(queryString ? `/users?${queryString}` : "/users");
+          } else {
+            setShowDetail(false);
+            setSelectedUser(null);
+            setSaveError(null);
+          }
+        }}
+        onSave={handleSaveUser}
+        loading={actionLoading}
+        saveError={saveError}
+      />
+    );
+  }
+
+  const isAnyLoading = isUsersLoading || actionLoading;
+
   return (
     <ThemeProvider theme={blueTheme}>
-      <Backdrop
-        sx={{ color: "#fff", zIndex: (theme) => theme.zIndex.drawer + 1 }}
-        open={loading}
-      >
+      <Backdrop sx={{ color: "#fff", zIndex: (theme) => theme.zIndex.drawer + 1 }} open={isAnyLoading}>
         <CircularProgress color="inherit" />
       </Backdrop>
       <Box>
-        {/* <Box sx={{ mb: 3 }}>
-          <Typography variant="h4" fontWeight="bold" gutterBottom>
-            User Management
-          </Typography>
-          <Typography variant="body1" color="text.secondary">
-            Manage system users and their permissions
-          </Typography>
-        </Box> */}
-
+        {/* Stats Grid */}
         <Grid container spacing={3} sx={{ mb: 3 }}>
           <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
             <Card sx={{ borderRadius: 0 }}>
               <CardContent>
-                <Box
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                  }}
-                >
+                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                   <Box>
-                    <Typography
-                      color="text.secondary"
-                      variant="body2"
-                      gutterBottom
-                    >
-                      Total Users
-                    </Typography>
-                    <Typography variant="h4" fontWeight="bold">
-                      {totalUsers}
-                    </Typography>
+                    <Typography color="text.secondary" variant="body2" gutterBottom>Total Users</Typography>
+                    <Typography variant="h4" fontWeight="bold">{totalUsers}</Typography>
                   </Box>
-                  <Avatar
-                    sx={{
-                      bgcolor: alpha(PRIMARY_COLOR, 0.1),
-                      width: 56,
-                      height: 56,
-                    }}
-                  >
+                  <Avatar sx={{ bgcolor: alpha(PRIMARY_COLOR, 0.1), width: 56, height: 56 }}>
                     <Group sx={{ color: PRIMARY_COLOR, fontSize: 28 }} />
                   </Avatar>
                 </Box>
@@ -763,117 +626,28 @@ export default function UsersPage() {
           <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
             <Card sx={{ borderRadius: 0 }}>
               <CardContent>
-                <Box
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                  }}
-                >
+                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                   <Box>
-                    <Typography
-                      color="text.secondary"
-                      variant="body2"
-                      gutterBottom
-                    >
-                      Active Users
-                    </Typography>
-                    <Typography
-                      variant="h4"
-                      fontWeight="bold"
-                      color={SUCCESS_COLOR}
-                    >
-                      {aggregateStats.active}
-                    </Typography>
+                    <Typography color="text.secondary" variant="body2" gutterBottom>Active Users</Typography>
+                    <Typography variant="h4" fontWeight="bold" color={SUCCESS_COLOR}>{aggregateStats.active}</Typography>
                   </Box>
-                  <Avatar
-                    sx={{
-                      bgcolor: alpha(SUCCESS_COLOR, 0.1),
-                      width: 56,
-                      height: 56,
-                    }}
-                  >
+                  <Avatar sx={{ bgcolor: alpha(SUCCESS_COLOR, 0.1), width: 56, height: 56 }}>
                     <LockOpen sx={{ color: SUCCESS_COLOR, fontSize: 28 }} />
                   </Avatar>
                 </Box>
               </CardContent>
             </Card>
           </Grid>
-          {/* <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-            <Card>
-              <CardContent>
-                <Box
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                  }}
-                >
-                  <Box>
-                    <Typography
-                      color="text.secondary"
-                      variant="body2"
-                      gutterBottom
-                    >
-                      Locked Users
-                    </Typography>
-                    <Typography
-                      variant="h4"
-                      fontWeight="bold"
-                      color={ERROR_COLOR}
-                    >
-                      {stats.locked}
-                    </Typography>
-                  </Box>
-                  <Avatar
-                    sx={{
-                      bgcolor: alpha(ERROR_COLOR, 0.1),
-                      width: 56,
-                      height: 56,
-                    }}
-                  >
-                    <Lock sx={{ color: ERROR_COLOR, fontSize: 28 }} />
-                  </Avatar>
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid> */}
           <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
             <Card sx={{ borderRadius: 0 }}>
               <CardContent>
-                <Box
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                  }}
-                >
+                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                   <Box>
-                    <Typography
-                      color="text.secondary"
-                      variant="body2"
-                      gutterBottom
-                    >
-                      Admin Users
-                    </Typography>
-                    <Typography
-                      variant="h4"
-                      fontWeight="bold"
-                      color={INFO_COLOR}
-                    >
-                      {aggregateStats.admins}
-                    </Typography>
+                    <Typography color="text.secondary" variant="body2" gutterBottom>Admin Users</Typography>
+                    <Typography variant="h4" fontWeight="bold" color={INFO_COLOR}>{aggregateStats.admins}</Typography>
                   </Box>
-                  <Avatar
-                    sx={{
-                      bgcolor: alpha(INFO_COLOR, 0.1),
-                      width: 56,
-                      height: 56,
-                    }}
-                  >
-                    <AdminPanelSettings
-                      sx={{ color: INFO_COLOR, fontSize: 28 }}
-                    />
+                  <Avatar sx={{ bgcolor: alpha(INFO_COLOR, 0.1), width: 56, height: 56 }}>
+                    <AdminPanelSettings sx={{ color: INFO_COLOR, fontSize: 28 }} />
                   </Avatar>
                 </Box>
               </CardContent>
@@ -881,46 +655,23 @@ export default function UsersPage() {
           </Grid>
         </Grid>
 
+        {/* Search & Filters */}
         <Card sx={{ mb: 3, borderRadius: 0 }}>
           <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
-            <Box
-              sx={{
-                display: "flex",
-                gap: 1.5,
-                flexWrap: "wrap",
-                alignItems: "center",
-              }}
-            >
+            <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap", alignItems: "center" }}>
               <TextField
                 size="small"
                 placeholder="Search users..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                sx={{
-                  flex: 1, minWidth: 200, "& .MuiOutlinedInput-root": {
-                    borderRadius: "0px",
-                  }
-                }}
+                sx={{ flex: 1, minWidth: 200, "& .MuiOutlinedInput-root": { borderRadius: "0px" } }}
                 InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <Search sx={{ color: PRIMARY_COLOR, fontSize: 20 }} />
-                    </InputAdornment>
-                  ),
+                  startAdornment: (<InputAdornment position="start"><Search sx={{ color: PRIMARY_COLOR, fontSize: 20 }} /></InputAdornment>),
                 }}
               />
-
-              <FormControl sx={{
-                minWidth: 130, "& .MuiOutlinedInput-root": {
-                  borderRadius: "0px",
-                }
-              }} size="small">
+              <FormControl sx={{ minWidth: 130, "& .MuiOutlinedInput-root": { borderRadius: "0px" } }} size="small">
                 <InputLabel>Role</InputLabel>
-                <Select
-                  value={filterRole}
-                  label="Role"
-                  onChange={(e) => setFilterRole(e.target.value as UserRole | "all")}
-                >
+                <Select value={filterRole} label="Role" onChange={(e) => setFilterRole(e.target.value as UserRole | "all")}>
                   <MenuItem value="all">All Roles</MenuItem>
                   <MenuItem value="super_admin">Super Admin</MenuItem>
                   <MenuItem value="store_admin">Store Admin</MenuItem>
@@ -929,44 +680,22 @@ export default function UsersPage() {
                   <MenuItem value="staff">Staff</MenuItem>
                 </Select>
               </FormControl>
-
-              <FormControl sx={{
-                minWidth: 130, "& .MuiOutlinedInput-root": {
-                  borderRadius: "0px",
-                }
-              }} size="small">
+              <FormControl sx={{ minWidth: 130, "& .MuiOutlinedInput-root": { borderRadius: "0px" } }} size="small">
                 <InputLabel>Status</InputLabel>
-                <Select
-                  value={filterStatus}
-                  label="Status"
-                  onChange={(e) =>
-                    setFilterStatus(
-                      e.target.value as "all" | "active" | "inactive" | "locked"
-                    )
-                  }
-                >
+                <Select value={filterStatus} label="Status" onChange={(e) => setFilterStatus(e.target.value as "all" | "active" | "inactive" | "locked")}>
                   <MenuItem value="all">All Status</MenuItem>
                   <MenuItem value="active">Active</MenuItem>
                   <MenuItem value="inactive">Inactive</MenuItem>
                   <MenuItem value="locked">Locked</MenuItem>
                 </Select>
               </FormControl>
-
               <Button
                 variant="contained"
                 size="small"
                 startIcon={isAddLoading ? <CircularProgress size={20} color="inherit" /> : <Add />}
                 disabled={isAddLoading}
                 onClick={handleAddNew}
-                sx={{
-                  height: 40,
-                  bgcolor: PRIMARY_COLOR,
-                  "&:hover": { bgcolor: PRIMARY_DARK },
-                  textTransform: "none",
-                  fontWeight: 600,
-                  px: 3,
-                  borderRadius: 0,
-                }}
+                sx={{ height: 40, bgcolor: PRIMARY_COLOR, "&:hover": { bgcolor: PRIMARY_DARK }, textTransform: "none", fontWeight: 600, px: 3, borderRadius: 0 }}
               >
                 Add New User
               </Button>
@@ -974,21 +703,18 @@ export default function UsersPage() {
           </CardContent>
         </Card>
 
+        {/* Table */}
         <Card>
           <TableContainer>
             <Table>
               <TableHead>
                 <TableRow sx={{ bgcolor: alpha(PRIMARY_COLOR, 0.05) }}>
                   <TableCell sx={{ fontWeight: 700 }}>User</TableCell>
-                  {/* <TableCell sx={{ fontWeight: 700 }}>Full Name</TableCell> */}
                   <TableCell sx={{ fontWeight: 700 }}>Role</TableCell>
-                  {/* <TableCell sx={{ fontWeight: 700 }}>Staff</TableCell> */}
                   <TableCell sx={{ fontWeight: 700 }}>Store</TableCell>
                   <TableCell sx={{ fontWeight: 700 }}>Last Login</TableCell>
                   <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }} align="center">
-                    Actions
-                  </TableCell>
+                  <TableCell sx={{ fontWeight: 700 }} align="center">Actions</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -998,148 +724,53 @@ export default function UsersPage() {
                       key={user.id}
                       sx={{
                         "&:hover": { bgcolor: alpha(PRIMARY_COLOR, 0.02) },
-                        ...(!user.is_active && {
-                          bgcolor: alpha(ERROR_COLOR, 0.02),
-                          "&:hover": { bgcolor: alpha(ERROR_COLOR, 0.05) },
-                        }),
-                        ...(user.is_locked && {
-                          bgcolor: alpha(WARNING_COLOR, 0.02),
-                          "&:hover": { bgcolor: alpha(WARNING_COLOR, 0.05) },
-                        }),
+                        ...(!user.is_active && { bgcolor: alpha(ERROR_COLOR, 0.02), "&:hover": { bgcolor: alpha(ERROR_COLOR, 0.05) } }),
+                        ...(user.is_locked && { bgcolor: alpha(WARNING_COLOR, 0.02), "&:hover": { bgcolor: alpha(WARNING_COLOR, 0.05) } }),
                       }}
                     >
                       <TableCell>
-                        <Box
-                          sx={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 1.5,
-                          }}
-                        >
-                          <Avatar
-                            sx={{
-                              bgcolor: alpha(PRIMARY_COLOR, 0.1),
-                              color: PRIMARY_COLOR,
-                              width: 44,
-                              height: 44,
-                              fontWeight: 600,
-                            }}
-                          >
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                          <Avatar sx={{ bgcolor: alpha(PRIMARY_COLOR, 0.1), color: PRIMARY_COLOR, width: 44, height: 44, fontWeight: 600 }}>
                             {user.username.charAt(0).toUpperCase()}
                           </Avatar>
                           <Box>
-                            <Typography variant="body2" fontWeight="600">
-                              {user.username}
-                            </Typography>
-                            {user.email && (
-                              <Typography
-                                variant="caption"
-                                color="text.secondary"
-                              >
-                                {user.email}
-                              </Typography>
-                            )}
+                            <Typography variant="body2" fontWeight="600">{user.username}</Typography>
+                            {user.email && <Typography variant="caption" color="text.secondary">{user.email}</Typography>}
                           </Box>
                         </Box>
                       </TableCell>
-                      {/* <TableCell>
-                        <Typography variant="body2">
-                          {user.fullname}
-                        </Typography>
-                      </TableCell> */}
                       <TableCell>
                         <Chip
                           icon={getRoleIcon(user.role)}
                           label={getRoleLabel(user.role)}
                           size="small"
-                          sx={{
-                            bgcolor: alpha(getRoleColor(user.role), 0.1),
-                            color: getRoleColor(user.role),
-                            fontWeight: 600,
-                          }}
+                          sx={{ bgcolor: alpha(getRoleColor(user.role), 0.1), color: getRoleColor(user.role), fontWeight: 600 }}
                         />
                       </TableCell>
-                      {/* <TableCell>
-                        {user.staff_name ? (
-                          <Typography variant="body2">
-                            {user.staff_name}
-                          </Typography>
-                        ) : (
-                          <Typography variant="body2" color="text.secondary">
-                            Not linked
-                          </Typography>
-                        )}
-                      </TableCell> */}
                       <TableCell>
                         {user.store_name ? (
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 0.5,
-                            }}
-                          >
-                            <Store
-                              sx={{ fontSize: 16, color: "text.secondary" }}
-                            />
-                            <Typography variant="body2">
-                              {user.store_name}
-                            </Typography>
+                          <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                            <Store sx={{ fontSize: 16, color: "text.secondary" }} />
+                            <Typography variant="body2">{user.store_name}</Typography>
                           </Box>
-                        ) : (
-                          <Typography variant="body2" color="text.secondary">
-                            Not assigned
-                          </Typography>
-                        )}
+                        ) : (<Typography variant="body2" color="text.secondary">Not assigned</Typography>)}
                       </TableCell>
                       <TableCell>
                         {user.last_login ? (
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 0.5,
-                            }}
-                          >
-                            <CalendarToday
-                              sx={{ fontSize: 14, color: "text.secondary" }}
-                            />
-                            <Typography variant="body2">
-                              {new Date(user.last_login).toLocaleDateString()}
-                            </Typography>
+                          <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                            <CalendarToday sx={{ fontSize: 14, color: "text.secondary" }} />
+                            <Typography variant="body2">{new Date(user.last_login).toLocaleDateString()}</Typography>
                           </Box>
-                        ) : (
-                          <Typography variant="body2" color="text.secondary">
-                            Never
-                          </Typography>
-                        )}
+                        ) : (<Typography variant="body2" color="text.secondary">Never</Typography>)}
                       </TableCell>
                       <TableCell>
                         <Box sx={{ display: "flex", gap: 0.5 }}>
-                          {!user.is_active && (
-                            <Chip
-                              label="Inactive"
-                              size="small"
-                              color="default"
-                              variant="outlined"
-                            />
-                          )}
-                          {user.is_locked && (
-                            <Chip label="Locked" size="small" color="warning" />
-                          )}
-                          {user.is_active && !user.is_locked && (
-                            <Chip label="Active" size="small" color="success" />
-                          )}
+                          {!user.is_active && <Chip label="Inactive" size="small" color="default" variant="outlined" />}
+                          {user.is_locked && <Chip label="Locked" size="small" color="warning" />}
+                          {user.is_active && !user.is_locked && <Chip label="Active" size="small" color="success" />}
                           {user.login_attempts > 0 && (
-                            <Tooltip
-                              title={`${user.login_attempts} failed login attempts`}
-                            >
-                              <Chip
-                                label={user.login_attempts}
-                                size="small"
-                                color="error"
-                                variant="outlined"
-                              />
+                            <Tooltip title={`${user.login_attempts} failed login attempts`}>
+                              <Chip label={user.login_attempts} size="small" color="error" variant="outlined" />
                             </Tooltip>
                           )}
                         </Box>
@@ -1152,22 +783,25 @@ export default function UsersPage() {
                             editingId === user.id ? (
                               <CircularProgress size={16} color="inherit" />
                             ) : (
-                              <Edit sx={{ fontSize: '18px !important' }} />
+                              <Edit sx={{ fontSize: "18px !important" }} />
                             )
                           }
-                          onClick={() => handleRowEdit(user)}
                           disabled={!canModifyUser(user) || editingId === user.id}
+                          onClick={() => {
+                            setEditingId(user.id);
+                            router.push(`/users/${user.id}`);
+                          }}
                           sx={{
-                            bgcolor: '#f39c12',
-                            '&:hover': { bgcolor: '#e67e22' },
-                            textTransform: 'none',
+                            bgcolor: "#f39c12",
+                            "&:hover": { bgcolor: "#e67e22" },
+                            textTransform: "none",
                             fontWeight: 600,
-                            borderRadius: '0px',
+                            borderRadius: "0px",
                             px: 2,
-                            minWidth: '80px',
-                            boxShadow: 'none',
-                            height: '32px',
-                            color: '#fff'
+                            minWidth: "80px",
+                            boxShadow: "none",
+                            height: "32px",
+                            color: "#fff",
                           }}
                         >
                           Edit
@@ -1179,22 +813,10 @@ export default function UsersPage() {
                   <TableRow>
                     <TableCell colSpan={7}>
                       <Box sx={{ textAlign: "center", py: 6 }}>
-                        <Group
-                          sx={{ fontSize: 64, color: "text.disabled", mb: 2 }}
-                        />
-                        <Typography
-                          variant="h6"
-                          color="text.secondary"
-                          gutterBottom
-                        >
-                          No users found
-                        </Typography>
+                        <Group sx={{ fontSize: 64, color: "text.disabled", mb: 2 }} />
+                        <Typography variant="h6" color="text.secondary" gutterBottom>No users found</Typography>
                         <Typography variant="body2" color="text.secondary">
-                          {searchQuery ||
-                            filterRole !== "all" ||
-                            filterStatus !== "all"
-                            ? "Try adjusting your search or filters"
-                            : "Get started by adding your first user"}
+                          {searchQuery || filterRole !== "all" || filterStatus !== "all" ? "Try adjusting your search or filters" : "Get started by adding your first user"}
                         </Typography>
                       </Box>
                     </TableCell>
@@ -1213,534 +835,82 @@ export default function UsersPage() {
             onRowsPerPageChange={handleChangeRowsPerPage}
           />
         </Card>
+        
 
-        <Menu
-          anchorEl={anchorEl}
-          open={Boolean(anchorEl)}
-          onClose={handleMenuClose}
-        >
-          {/* <MenuItem onClick={handleView}>
-          <Visibility sx={{ mr: 1, fontSize: 20 }} />
-          View Details
-        </MenuItem> */}
-          <MenuItem
-            onClick={handleEdit}
-            disabled={!selectedUser || !canModifyUser(selectedUser)}
-          >
-            <Edit sx={{ mr: 1, fontSize: 20 }} />
-            Edit
-          </MenuItem>
-          {/* <MenuItem
-          onClick={handleLockUnlock}
-          disabled={!selectedUser || !canModifyUser(selectedUser)}
-        >
-          {selectedUser?.is_locked ? (
-            <>
-              <LockOpen sx={{ mr: 1, fontSize: 20, color: SUCCESS_COLOR }} />
-              Unlock User
-            </>
-          ) : (
-            <>
-              <Lock sx={{ mr: 1, fontSize: 20, color: WARNING_COLOR }} />
-              Lock User
-            </>
-          )}
-        </MenuItem> */}
-          <MenuItem
-            onClick={handleDelete}
-            disabled={
-              !selectedUser ||
-              !canModifyUser(selectedUser) ||
-              selectedUser.id === Number(currentUser.id)
-            }
-            sx={{ color: ERROR_COLOR }}
-          >
-            <Delete sx={{ mr: 1, fontSize: 20 }} />
-            Delete
-          </MenuItem>
-        </Menu>
-
-        <Dialog
-          open={openDialog}
-          onClose={handleDialogClose}
-          maxWidth="md"
-          fullWidth
-        >
-          <DialogTitle>
-            {dialogMode === "add"
-              ? "Add New User"
-              : dialogMode === "edit"
-                ? "Edit User"
-                : "User Details"}
-          </DialogTitle>
-          <DialogContent dividers>
-            {dialogMode === "view" && selectedUser ? (
-              <Grid container spacing={3} sx={{ mt: 0.5 }}>
-                <Grid sx={{ gridColumn: "span 12" }}>
-                  <Box
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 2,
-                      mb: 3,
-                    }}
-                  >
-                    <Avatar
-                      sx={{
-                        bgcolor: alpha(PRIMARY_COLOR, 0.1),
-                        color: PRIMARY_COLOR,
-                        width: 80,
-                        height: 80,
-                        fontSize: 32,
-                        fontWeight: 700,
-                      }}
-                    >
-                      {selectedUser.username.charAt(0).toUpperCase()}
-                    </Avatar>
-                    <Box>
-                      <Typography variant="h5" fontWeight="bold">
-                        {selectedUser.username}
-                      </Typography>
-                      <Box sx={{ display: "flex", gap: 1, mt: 1 }}>
-                        <Chip
-                          label={getRoleLabel(selectedUser.role)}
-                          size="small"
-                          sx={{
-                            bgcolor: alpha(
-                              getRoleColor(selectedUser.role),
-                              0.1
-                            ),
-                            color: getRoleColor(selectedUser.role),
-                          }}
-                        />
-                        {selectedUser.is_locked && (
-                          <Chip label="Locked" size="small" color="warning" />
-                        )}
-                        {!selectedUser.is_active && (
-                          <Chip
-                            label="Inactive"
-                            size="small"
-                            color="default"
-                            variant="outlined"
-                          />
-                        )}
-                      </Box>
-                    </Box>
-                  </Box>
-                </Grid>
-                <Grid size={{ xs: 12, sm: 6 }}>
-                  <Typography variant="caption" color="text.secondary">
-                    Username
-                  </Typography>
-                  <Typography variant="body1" fontWeight="600">
-                    {selectedUser.username}
-                  </Typography>
-                </Grid>
-                <Grid size={{ xs: 12, sm: 6 }}>
-                  <Typography variant="caption" color="text.secondary">
-                    Email
-                  </Typography>
-                  <Typography variant="body1">
-                    {selectedUser.email || "Not provided"}
-                  </Typography>
-                </Grid>
-                <Grid size={{ xs: 12, sm: 6 }}>
-                  <Typography variant="caption" color="text.secondary">
-                    Role
-                  </Typography>
-                  <Typography variant="body1">
-                    {getRoleLabel(selectedUser.role)}
-                  </Typography>
-                </Grid>
-                <Grid size={{ xs: 12, sm: 6 }}>
-                  <Typography variant="caption" color="text.secondary">
-                    Staff
-                  </Typography>
-                  <Typography variant="body1">
-                    {selectedUser.staff_name || "Not linked"}
-                  </Typography>
-                </Grid>
-                <Grid size={{ xs: 12, sm: 6 }}>
-                  <Typography variant="caption" color="text.secondary">
-                    Store
-                  </Typography>
-                  <Typography variant="body1">
-                    {selectedUser.store_name || "Not assigned"}
-                  </Typography>
-                </Grid>
-                <Grid size={{ xs: 12, sm: 6 }}>
-                  <Typography variant="caption" color="text.secondary">
-                    Last Login
-                  </Typography>
-                  <Typography variant="body1">
-                    {selectedUser.last_login
-                      ? new Date(selectedUser.last_login).toLocaleString()
-                      : "Never logged in"}
-                  </Typography>
-                </Grid>
-                <Grid size={{ xs: 12, sm: 6 }}>
-                  <Typography variant="caption" color="text.secondary">
-                    Failed Login Attempts
-                  </Typography>
-                  <Typography variant="body1">
-                    {selectedUser.login_attempts}
-                  </Typography>
-                </Grid>
-                <Grid size={{ xs: 12, sm: 6 }}>
-                  <Typography variant="caption" color="text.secondary">
-                    Account Status
-                  </Typography>
-                  <Typography variant="body1">
-                    {selectedUser.is_locked
-                      ? "Locked"
-                      : selectedUser.is_active
-                        ? "Active"
-                        : "Inactive"}
-                  </Typography>
-                </Grid>
-                <Grid sx={{ gridColumn: { xs: "span 12", sm: "span 6" } }}>
-                  <Typography variant="caption" color="text.secondary">
-                    Created At
-                  </Typography>
-                  <Typography variant="body1">
-                    {new Date(selectedUser.created_at).toLocaleDateString()}
-                  </Typography>
-                </Grid>
-                <Grid sx={{ gridColumn: { xs: "span 12", sm: "span 6" } }}>
-                  <Typography variant="caption" color="text.secondary">
-                    Last Updated
-                  </Typography>
-                  <Typography variant="body1">
-                    {new Date(selectedUser.updated_at).toLocaleDateString()}
-                  </Typography>
-                </Grid>
-              </Grid>
-            ) : (
-              <Grid container spacing={3} sx={{ mt: 0.5 }}>
-                <Grid size={{ xs: 12, sm: 4 }}>
-                  <TextField
-                    fullWidth
-                    label="Username"
-                    value={formData.username}
-                    onChange={handleFormChange("username")}
-                    required
-                    disabled={dialogMode === "view"}
-                    error={!!validationErrors.username}
-                    helperText={validationErrors.username}
-                  />
-                </Grid>
-                <Grid size={{ xs: 12, sm: 4 }}>
-                  <TextField
-                    fullWidth
-                    label="Full Name"
-                    value={formData.fullname}
-                    onChange={handleFormChange("fullname")}
-                    disabled={dialogMode === "view"}
-                    error={!!validationErrors.fullname}
-                    helperText={validationErrors.fullname}
-                  />
-                </Grid>
-                <Grid size={{ xs: 12, sm: 4 }}>
-                  <TextField
-                    fullWidth
-                    label="Email"
-                    type="email"
-                    value={formData.email}
-                    onChange={handleFormChange("email")}
-                    disabled={dialogMode === "view"}
-                    error={!!validationErrors.email}
-                    helperText={validationErrors.email}
-                  />
-                </Grid>
-                <Grid size={{ xs: 12, sm: 4 }}>
-                  <TextField
-                    fullWidth
-                    label="Password"
-                    type="password"
-                    value={formData.password}
-                    onChange={handleFormChange("password")}
-                    required={dialogMode === "add"}
-                    disabled={dialogMode === "view"}
-                    error={!!validationErrors.password}
-                    helperText={
-                      validationErrors.password ||
-                      (dialogMode === "edit"
-                        ? "Leave blank to keep current password"
-                        : "")
-                    }
-                  />
-                </Grid>
-                <Grid size={{ xs: 12, sm: 4 }}>
-                  <FormControl
-                    fullWidth
-                    required
-                    disabled={
-                      dialogMode === "view" ||
-                      (dialogMode === "edit" &&
-                        selectedUser?.id === Number(currentUser.id))
-                    }
-                    error={!!validationErrors.role}
-                  >
-                    <InputLabel>Role</InputLabel>
-                    <Select
-                      value={formData.role}
-                      label="Role"
-                      onChange={(e) => {
-                        setFormData({
-                          ...formData,
-                          role: e.target.value as UserRole,
-                        });
-                        setValidationErrors((prev) => ({
-                          ...prev,
-                          role: undefined,
-                        }));
-                      }}
-                      sx={{
-                        "& .MuiSelect-select": {
-                          paddingRight: "75px !important",
-                        },
-                      }}
-                    >
-                      {assignableRoles.map((role) => (
-                        <MenuItem key={role} value={role}>
-                          {getRoleLabel(role)}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                    {validationErrors.role && (
-                      <FormHelperText>{validationErrors.role}</FormHelperText>
-                    )}
-                  </FormControl>
-                </Grid>
-                {/* <Grid size={{ xs: 12, sm: 4 }}>
-                  <FormControl
-                    fullWidth
-                    disabled={dialogMode === "view"}
-                    error={!!validationErrors.staff_id}
-                  >
-                    <InputLabel>Staff</InputLabel>
-                    <Select
-                      value={formData.staff_id}
-                      label="Staff"
-                      onChange={handleFormChange("staff_id")}
-                      sx={{
-                        "& .MuiSelect-select": {
-                          paddingRight: "75px !important",
-                        },
-                      }}
-                    >
-                      <MenuItem value="">No Staff</MenuItem>
-                      {availableStaff.map((staff) => (
-                        <MenuItem key={staff.id} value={staff.id.toString()}>
-                          {staff.full_name}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                    {validationErrors.staff_id && (
-                      <FormHelperText>
-                        {validationErrors.staff_id}
-                      </FormHelperText>
-                    )}
-                  </FormControl>
-                </Grid> */}
-                <Grid size={{ xs: 12, sm: 4 }}>
-                  <FormControl
-                    fullWidth
-                    disabled={dialogMode === "view"}
-                    error={!!validationErrors.store_id}
-                  >
-                    <InputLabel>Store</InputLabel>
-                    <Select
-                      value={formData.store_id}
-                      label="Store"
-                      onChange={handleFormChange("store_id")}
-                      sx={{
-                        "& .MuiSelect-select": {
-                          paddingRight: "75px !important",
-                        },
-                      }}
-                    >
-                      <MenuItem value="">No Store</MenuItem>
-                      {availableStores.map((store) => (
-                        <MenuItem key={store.id} value={store.id.toString()}>
-                          {store.name}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                    {validationErrors.store_id && (
-                      <FormHelperText>
-                        {validationErrors.store_id}
-                      </FormHelperText>
-                    )}
-                  </FormControl>
-                </Grid>
-                <Grid size={{ xs: 12 }}>
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        checked={formData.is_active}
-                        onChange={handleSwitchChange("is_active")}
-                        disabled={dialogMode === "view"}
-                        sx={{}}
-                      />
-                    }
-                    label="Active User"
-                  />
-                </Grid>
-              </Grid>
-            )}
-          </DialogContent>
-          <DialogActions sx={{ padding: '16px 24px' }}>
-            {dialogMode !== "view" && (
-              <>
-                <Button onClick={handleDialogClose}>Cancel</Button>
-                <Button
-                  onClick={handleSubmit}
-                  variant="contained"
-                  sx={{
-                    bgcolor: PRIMARY_COLOR,
-                    "&:hover": { bgcolor: PRIMARY_DARK },
-                  }}
-                >
-                  {dialogMode === "add" ? "Create User" : "Save Changes"}
-                </Button>
-              </>
-            )}
-            {dialogMode === "view" && (
-              <Button onClick={handleDialogClose}>Close</Button>
-            )}
-          </DialogActions>
+        <Dialog open={openDialog} onClose={handleDialogClose} maxWidth="md" fullWidth>
+  
+            <DialogTitle>{dialogMode === "add" ? "Add New User" : dialogMode === "edit" ? "Edit User" : "User Details"}</DialogTitle>
+            <DialogContent dividers>
+              
+                {dialogMode === "view" && selectedUser ? (
+                    <Grid container spacing={3} sx={{ mt: 0.5 }}>
+                         <Grid size={{ xs: 12 }}>
+                            <Typography variant="body1">User details view...</Typography>
+                        </Grid>
+                    </Grid>
+                ) : (
+                     <Grid container spacing={3} sx={{ mt: 0.5 }}>
+                        <Grid size={{ xs: 12, sm: 4 }}>
+                            <TextField fullWidth label="Username" value={formData.username} onChange={handleFormChange("username")} required disabled={dialogMode === "view"} error={!!validationErrors.username} helperText={validationErrors.username} />
+                        </Grid>
+                        <Grid size={{ xs: 12, sm: 4 }}>
+                            <TextField fullWidth label="Full Name" value={formData.fullname} onChange={handleFormChange("fullname")} disabled={dialogMode === "view"} error={!!validationErrors.fullname} helperText={validationErrors.fullname} />
+                        </Grid>
+                        <Grid size={{ xs: 12, sm: 4 }}>
+                            <TextField fullWidth label="Email" type="email" value={formData.email} onChange={handleFormChange("email")} disabled={dialogMode === "view"} error={!!validationErrors.email} helperText={validationErrors.email} />
+                        </Grid>
+                        <Grid size={{ xs: 12, sm: 4 }}>
+                             <TextField fullWidth label="Password" type="password" value={formData.password} onChange={handleFormChange("password")} required={dialogMode === "add"} disabled={dialogMode === "view"} error={!!validationErrors.password} helperText={validationErrors.password || (dialogMode === "edit" ? "Leave blank to keep current" : "")} />
+                        </Grid>
+                        <Grid size={{ xs: 12, sm: 4 }}>
+                            <FormControl fullWidth required error={!!validationErrors.role}>
+                                <InputLabel>Role</InputLabel>
+                                <Select value={formData.role} label="Role" onChange={(e) => { setFormData({ ...formData, role: e.target.value as UserRole }); setValidationErrors((prev) => ({ ...prev, role: undefined })); }}>
+                                    {assignableRoles.map((role) => (<MenuItem key={role} value={role}>{getRoleLabel(role)}</MenuItem>))}
+                                </Select>
+                            </FormControl>
+                        </Grid>
+                         <Grid size={{ xs: 12, sm: 4 }}>
+                            <FormControl fullWidth error={!!validationErrors.store_id}>
+                                <InputLabel>Store</InputLabel>
+                                <Select value={formData.store_id} label="Store" onChange={handleFormChange("store_id")}>
+                                    <MenuItem value="">No Store</MenuItem>
+                                    {availableStores.map((store) => (<MenuItem key={store.id} value={store.id.toString()}>{store.name}</MenuItem>))}
+                                </Select>
+                            </FormControl>
+                        </Grid>
+                        <Grid size={{ xs: 12 }}>
+                            <FormControlLabel control={<Switch checked={formData.is_active} onChange={handleSwitchChange("is_active")} />} label="Active User" />
+                        </Grid>
+                     </Grid>
+                )}
+            </DialogContent>
+            <DialogActions sx={{ padding: '16px 24px' }}>
+                {dialogMode !== "view" && (
+                <>
+                    <Button onClick={handleDialogClose}>Cancel</Button>
+                    <Button onClick={handleSubmit} variant="contained" sx={{ bgcolor: PRIMARY_COLOR, "&:hover": { bgcolor: PRIMARY_DARK } }}>
+                    {dialogMode === "add" ? "Create User" : "Save Changes"}
+                    </Button>
+                </>
+                )}
+                {dialogMode === "view" && <Button onClick={handleDialogClose}>Close</Button>}
+            </DialogActions>
         </Dialog>
 
-        <Dialog
-          open={deleteConfirmOpen}
-          onClose={() => setDeleteConfirmOpen(false)}
-        >
-          <DialogTitle>Confirm Delete</DialogTitle>
-          <DialogContent>
-            <Alert severity="warning" sx={{ mb: 2 }}>
-              Are you sure you want to delete user {selectedUser?.username}? This
-              will deactivate their account and they will no longer be able to log in.
-            </Alert>
-            {selectedUser && (
-              <Box
-                sx={{ display: "flex", alignItems: "center", gap: 2, mt: 2 }}
-              >
-                <Avatar
-                  sx={{
-                    bgcolor: alpha(PRIMARY_COLOR, 0.1),
-                    color: PRIMARY_COLOR,
-                    width: 44,
-                    height: 44,
-                    fontWeight: 600,
-                  }}
-                >
-                  {selectedUser.username.charAt(0).toUpperCase()}
-                </Avatar>
-                <Box>
-                  <Typography variant="body1" fontWeight="600">
-                    {selectedUser.username}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {getRoleLabel(selectedUser.role)} • {selectedUser.email}
-                  </Typography>
-                </Box>
-              </Box>
-            )}
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setDeleteConfirmOpen(false)}>Cancel</Button>
-            <Button
-              onClick={confirmDelete}
-              variant="contained"
-              sx={{ bgcolor: ERROR_COLOR, "&:hover": { bgcolor: "#dc2626" } }}
-            >
-              Delete User
-            </Button>
-          </DialogActions>
+        <Dialog open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)}>
+            <DialogTitle>Confirm Delete</DialogTitle>
+             <DialogContent>
+                <Alert severity="warning">Are you sure you want to delete user {selectedUser?.username}?</Alert>
+             </DialogContent>
+             <DialogActions>
+                <Button onClick={() => setDeleteConfirmOpen(false)}>Cancel</Button>
+                <Button onClick={confirmDelete} variant="contained" sx={{ bgcolor: ERROR_COLOR }}>Delete User</Button>
+             </DialogActions>
         </Dialog>
 
-        <Dialog
-          open={lockConfirmOpen}
-          onClose={() => setLockConfirmOpen(false)}
-        >
-          <DialogTitle>
-            {selectedUser?.is_locked ? "Unlock User" : "Lock User"}
-          </DialogTitle>
-          <DialogContent>
-            <Alert
-              severity={selectedUser?.is_locked ? "info" : "warning"}
-              sx={{ mb: 2 }}
-            >
-              {selectedUser?.is_locked
-                ? `Are you sure you want to unlock user "${selectedUser.username}"?`
-                : `Are you sure you want to lock user "${selectedUser?.username}"? They will not be able to login until unlocked.`}
-            </Alert>
-            {selectedUser && (
-              <Box
-                sx={{ display: "flex", alignItems: "center", gap: 2, mt: 2 }}
-              >
-                <Avatar
-                  sx={{
-                    bgcolor: alpha(PRIMARY_COLOR, 0.1),
-                    color: PRIMARY_COLOR,
-                    width: 44,
-                    height: 44,
-                    fontWeight: 600,
-                  }}
-                >
-                  {selectedUser.username.charAt(0).toUpperCase()}
-                </Avatar>
-                <Box>
-                  <Typography variant="body1" fontWeight="600">
-                    {selectedUser.username}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {getRoleLabel(selectedUser.role)} •{" "}
-                    {selectedUser.store_name || "No store"}
-                  </Typography>
-                  {selectedUser.login_attempts > 0 && (
-                    <Typography variant="caption" color="warning.main">
-                      {selectedUser.login_attempts} failed login attempts
-                    </Typography>
-                  )}
-                </Box>
-              </Box>
-            )}
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setLockConfirmOpen(false)}>Cancel</Button>
-            <Button
-              onClick={confirmLockUnlock}
-              variant="contained"
-              color={selectedUser?.is_locked ? "success" : "warning"}
-            >
-              {selectedUser?.is_locked ? "Unlock User" : "Lock User"}
-            </Button>
-          </DialogActions>
-        </Dialog>
-
-        <Snackbar
-          open={snackbar.open}
-          autoHideDuration={5000}
-          onClose={handleSnackbarClose}
-          anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
-        >
-          <Alert
-            onClose={handleSnackbarClose}
-            severity={snackbar.severity}
-            sx={{ width: "100%" }}
-            action={
-              <IconButton
-                aria-label="close"
-                color="inherit"
-                size="small"
-                onClick={handleSnackbarClose}
-              >
-                <CloseIcon fontSize="inherit" />
-              </IconButton>
-            }
-          >
+        <Snackbar open={snackbar.open} autoHideDuration={5000} onClose={handleSnackbarClose} anchorOrigin={{ vertical: "bottom", horizontal: "left" }}>
+          <Alert onClose={handleSnackbarClose} severity={snackbar.severity} sx={{ width: "100%" }} action={<IconButton aria-label="close" color="inherit" size="small" onClick={handleSnackbarClose}><CloseIcon fontSize="inherit" /></IconButton>}>
             {snackbar.message}
           </Alert>
         </Snackbar>

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react'; //
+import React, { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import {
   Box,
@@ -25,7 +25,6 @@ import {
   EventNote as EventNoteIcon,
   Receipt as ReceiptIcon,
   LocalOffer as LocalOfferIcon,
-
   AccountBox as AccountBoxIcon,
   Category as CategoryOutlinedIcon,
 } from '@mui/icons-material';
@@ -41,7 +40,7 @@ const menuItems: MenuItem[] = [
   { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
   { text: 'Stores', icon: <StoreIcon />, path: '/stores' },
   { text: 'User', icon: <AccountBoxIcon />, path: '/users' },
-  { text: 'Staff', icon: <PeopleIcon />, path: '/staff' },
+  { text: 'Staff', icon: <PeopleIcon />, path: '/staff' }, // ĐÃ SỬA: không có / ở cuối
   { text: 'Customers', icon: <PersonOutlineIcon />, path: '/customers' },
   { text: 'Category', icon: <CategoryOutlinedIcon />, path: '/category' },
   { text: 'Services', icon: <LocalOfferIcon />, path: '/services' },
@@ -57,15 +56,12 @@ interface SidebarProps {
   drawerWidth: number;
 }
 
-
 const PRIMARY_COLOR = '#3b82f6';
-// const PRIMARY_LIGHT = '#60a5fa';
 const PRIMARY_DARK = '#1e40af';
 
 export default function Sidebar({
   mobileOpen,
   onDrawerToggle,
-
   onMenuSelect,
   drawerWidth,
 }: SidebarProps) {
@@ -75,14 +71,23 @@ export default function Sidebar({
   useEffect(() => {
     const timer = setTimeout(() => {
       setIsLoading(false);
-    }, 500); 
+    }, 500);
 
     return () => clearTimeout(timer);
   }, [pathname]);
 
+  // Sửa hàm isSelected để xử lý đúng với đường dẫn không có / cuối
   const isSelected = (itemPath: string) => {
-    if (itemPath === '/dashboard' && pathname === '/dashboard') return true;
-    if (itemPath !== '/#' && pathname.startsWith(itemPath)) return true;
+    // Xóa dấu / ở cuối nếu có
+    const normalizedPathname = pathname.endsWith('/') && pathname !== '/' 
+      ? pathname.slice(0, -1) 
+      : pathname;
+    const normalizedItemPath = itemPath.endsWith('/') && itemPath !== '/'
+      ? itemPath.slice(0, -1)
+      : itemPath;
+    
+    if (normalizedItemPath === '/dashboard' && normalizedPathname === '/dashboard') return true;
+    if (normalizedItemPath !== '/' && normalizedPathname.startsWith(normalizedItemPath)) return true;
     return false;
   };
 
@@ -90,7 +95,9 @@ export default function Sidebar({
     if (path !== pathname && !isSelected(path)) {
       setIsLoading(true);
     }
-
+  };
+  const normalizePath = (path: string) => {
+    return path.endsWith('/') && path !== '/' ? path.slice(0, -1) : path;
   };
 
   const drawerContent = (
@@ -107,11 +114,13 @@ export default function Sidebar({
       <List sx={{ flex: 1, px: 1.5, pt: 2 }}>
         {menuItems.map((item) => {
           const active = isSelected(item.path);
+          const normalizedPath = normalizePath(item.path);
 
           return (
             <ListItem key={item.text} disablePadding sx={{ mb: 0.5 }}>
               <Link
-                href={item.path}
+                href={normalizedPath}
+                prefetch={false}
                 style={{ textDecoration: 'none', width: '100%' }}
                 onClick={() => handleLinkClick(item.path)}
               >
@@ -181,11 +190,11 @@ export default function Sidebar({
       component="nav"
       sx={{ width: { sm: drawerWidth }, flexShrink: { sm: 0 } }}
     >
-      {/* Component Loading toàn màn hình */}
+      {/* Component Loading*/}
       <Backdrop
         sx={{
           color: PRIMARY_COLOR,
-          zIndex: (theme) => theme.zIndex.drawer + 999, 
+          zIndex: (theme) => theme.zIndex.drawer + 999,
           bgcolor: '#fff',
           display: 'flex',
           flexDirection: 'column',

@@ -4,7 +4,6 @@ import type { NextRequest } from 'next/server';
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // Redirect root path to /login
   if (pathname === '/') {
     const url = req.nextUrl.clone();
     url.pathname = '/login';

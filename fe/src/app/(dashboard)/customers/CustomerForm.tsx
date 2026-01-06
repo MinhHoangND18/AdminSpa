@@ -76,7 +76,7 @@ import {
   CreateCustomerDto,
   UpdateCustomerDto,
   CustomerResponse,
-  CustomerFormData, // Import từ types
+  CustomerFormData,
 } from "@/types/customer";
 import {
   getCustomers,
@@ -85,12 +85,15 @@ import {
   createCustomer,
   updateCustomer,
   getCustomer,
+  getCustomerById,
   CustomerStats,
 } from "@/lib/api/customers";
 import { storesApi } from "@/lib/api/stores";
 import { Store, StoreResponse } from "@/types/store";
+import { useRouter, useSearchParams } from "next/navigation";
 import CustomerDetail from "./CustomerDetail";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
+
 const blueTheme = createTheme({
   palette: {
     primary: {
@@ -99,6 +102,34 @@ const blueTheme = createTheme({
   },
 });
 
+// URL mapping constants
+const CUSTOMER_TYPE_MAP = {
+  [CustomerType.NEW]: "1",
+  [CustomerType.REGULAR]: "2", 
+  [CustomerType.VIP]: "3",
+} as const;
+
+const CUSTOMER_STATUS_MAP = {
+  [CustomerStatus.ACTIVE]: "1",
+  [CustomerStatus.INACTIVE]: "2",
+  [CustomerStatus.BLOCKED]: "3",
+} as const;
+
+// Reverse mapping
+const REVERSE_TYPE_MAP = {
+  "1": CustomerType.NEW,
+  "2": CustomerType.REGULAR,
+  "3": CustomerType.VIP,
+} as const;
+
+const REVERSE_STATUS_MAP = {
+  "1": CustomerStatus.ACTIVE,
+  "2": CustomerStatus.INACTIVE,
+  "3": CustomerStatus.BLOCKED,
+} as const;
+
+type UrlTypeCode = keyof typeof REVERSE_TYPE_MAP;
+type UrlStatusCode = keyof typeof REVERSE_STATUS_MAP;
 
 interface CustomerDetailResponse {
   data: Customer;
@@ -177,12 +208,61 @@ const formatCurrency = (amount: number) => {
   }).format(Number(amount));
 };
 
-export default function CustomersPage() {
+// Hàm helper để build URL với mapping
+const buildUrlWithMappings = (params: {
+  type?: CustomerType;
+  status?: CustomerStatus;
+  search?: string;
+}) => {
+  const query: Record<string, string> = {};
+  
+  if (params.type) {
+    query.type = CUSTOMER_TYPE_MAP[params.type];
+  }
+  if (params.status) {
+    query.status = CUSTOMER_STATUS_MAP[params.status];
+  }
+  if (params.search) {
+    query.search = params.search;
+  }
+  
+  const queryString = new URLSearchParams(query).toString();
+  return queryString ? `/customers?${queryString}` : "/customers";
+};
+
+// Hàm helper để parse URL với reverse mapping
+const parseUrlWithMappings = (query: URLSearchParams) => {
+  const typeCode = query.get("type") as UrlTypeCode | null;
+  const statusCode = query.get("status") as UrlStatusCode | null;
+  const search = query.get("search") || "";
+  
+  return {
+    customerType: typeCode && REVERSE_TYPE_MAP[typeCode] ? REVERSE_TYPE_MAP[typeCode] : undefined,
+    status: statusCode && REVERSE_STATUS_MAP[statusCode] ? REVERSE_STATUS_MAP[statusCode] : undefined,
+    search,
+  };
+};
+
+export default function CustomersPage({ slug }: { slug?: string[] }) {
   const queryClient = useQueryClient();
-  const [searchQuery, setSearchQuery] = useState("");
-  const [filters, setFilters] = useState({
-    customerType: undefined as CustomerType | undefined,
-    status: undefined as CustomerStatus | undefined,
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Invalidate queries on mount to ensure fresh data
+  useEffect(() => {
+    queryClient.invalidateQueries({ queryKey: ["customers"] });
+    queryClient.invalidateQueries({ queryKey: ["customerStats"] });
+  }, [queryClient]);
+
+  const [searchQuery, setSearchQuery] = useState(() => {
+    return searchParams.get("search") || "";
+  });
+  const [filters, setFilters] = useState(() => {
+    const parsed = parseUrlWithMappings(searchParams);
+    return {
+      customerType: parsed.customerType,
+      status: parsed.status,
+    };
   });
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -222,7 +302,7 @@ export default function CustomersPage() {
       page: page + 1,
       limit: rowsPerPage,
     }),
-    placeholderData: keepPreviousData,
+    staleTime: 0,
   });
 
   const customers = useMemo(() => paginatedCustomers?.data?.data ?? [], [paginatedCustomers]);
@@ -231,15 +311,105 @@ export default function CustomersPage() {
   const { data: customerStats, isLoading: isLoadingStats } = useQuery<CustomerStats>({
     queryKey: ["customerStats"],
     queryFn: () => getCustomerStats(),
+    staleTime: 0,
   });
+
+  const selectedCustomer = useMemo(() => customers.find((c) => c.id === selectedCustomerId), [customers, selectedCustomerId]);
+
+  const handleMenuClose = () => {
+    setAnchorEl(null);
+  };
+
+  const handleEdit = (customer?: Customer) => {
+    if (customer && customer.id) {
+      setSelectedCustomerId(customer.id);
+      setDialogMode("edit");
+      setShowDetail(true);
+    } else if (selectedCustomerId) {
+      setDialogMode("edit");
+      setShowDetail(true);
+    }
+    handleMenuClose();
+  };
+
+  useEffect(() => {
+    if (sessionStorage.getItem("showCustomerUpdateSuccess")) {
+      // Defer state update to avoid cascading renders
+      setTimeout(() => {
+        setSnackbar({
+          open: true,
+          message: "Customer updated successfully!",
+          severity: "success",
+        });
+        sessionStorage.removeItem("showCustomerUpdateSuccess");
+      }, 0);
+    }
+  }, []);
+
+  useEffect(() => {
+    const customerId = slug?.[0];
+
+    if (customerId) {
+      if (selectedCustomer?.id === Number(customerId) && showDetail) {
+        return;
+      }
+
+      getCustomerById(Number(customerId))
+        .then((Response: Customer | { data: Customer }) => {
+          const customerData = "data" in Response ? Response.data : Response;
+          handleEdit(customerData);
+          setEditingId(null); // Reset editingId after successful load
+        })
+        .catch(() => {
+          router.push(buildUrlWithMappings({
+            type: filters.customerType,
+            status: filters.status,
+            search: searchQuery,
+          }));
+          setEditingId(null); // Reset editingId on error
+        });
+    } else {
+      if (showDetail && dialogMode === "edit") {
+        // Defer state updates to avoid cascading renders
+        setTimeout(() => {
+          setShowDetail(false);
+          setSelectedCustomerId(null);
+          setEditingId(null); // Reset editingId when closing detail view
+        }, 0);
+      }
+    }
+  }, [slug, selectedCustomer, showDetail, dialogMode, router, handleEdit, filters, searchQuery]);
+
+  useEffect(() => {
+    const customerId = slug?.[0];
+    if (customerId) {
+      return;
+    }
+
+    const newUrl = buildUrlWithMappings({
+      type: filters.customerType,
+      status: filters.status,
+      search: searchQuery,
+    });
+
+    if (
+      typeof window !== "undefined" &&
+      window.location.pathname + window.location.search !== newUrl
+    ) {
+      router.push(newUrl, {
+        scroll: false,
+      });
+    }
+  }, [filters, searchQuery, slug, router]);
+
   const createMutation = useMutation({
     mutationFn: createCustomer,
     onSuccess: () => {
       handleSnackbarOpen("Customer created successfully!");
       queryClient.invalidateQueries({ queryKey: ["customers"] });
       queryClient.invalidateQueries({ queryKey: ["customerStats"] });
-      // setOpenDialog(false);
-      // setShowDetail(false);
+      setOpenDialog(false);
+      setShowDetail(false);
     },
     onError: (error) => handleSnackbarOpen(`Error: ${getErrorMessage(error)}`, "error"),
   });
@@ -247,11 +417,20 @@ export default function CustomersPage() {
   const updateMutation = useMutation({
     mutationFn: (data: { id: number; customer: UpdateCustomerDto }) => updateCustomer(data.id, data.customer),
     onSuccess: () => {
-      handleSnackbarOpen("Customer updated successfully!");
       queryClient.invalidateQueries({ queryKey: ["customers"] });
       queryClient.invalidateQueries({ queryKey: ["customerStats"] });
-      // setOpenDialog(false);
-      // setShowDetail(false);
+
+      sessionStorage.setItem("showCustomerUpdateSuccess", "true");
+
+      router.push(buildUrlWithMappings({
+        type: filters.customerType,
+        status: filters.status,
+        search: searchQuery,
+      }));
+
+      setOpenDialog(false);
+      setShowDetail(false);
+      setSelectedCustomerId(null);
     },
     onError: (error) => handleSnackbarOpen(`Error: ${getErrorMessage(error)}`, "error"),
   });
@@ -267,9 +446,6 @@ export default function CustomersPage() {
     onError: (error) => handleSnackbarOpen(`Error: ${getErrorMessage(error)}`, "error"),
   });
 
-
-  const selectedCustomer = useMemo(() => customers.find((c) => c.id === selectedCustomerId), [customers, selectedCustomerId]);
-
   const handleSnackbarOpen = (message: string, severity: "success" | "error" = "success") => {
     setSnackbar({ open: true, message, severity });
   };
@@ -279,19 +455,16 @@ export default function CustomersPage() {
       ...data,
     };
 
-    try {
-      if (dialogMode === "edit" && selectedCustomerId) {
-        await updateMutation.mutateAsync({
-          id: selectedCustomerId,
-          customer: dataToSubmit as UpdateCustomerDto
-        });
-      } else {
-        await createMutation.mutateAsync(dataToSubmit as CreateCustomerDto);
-      }
-    } catch (error) {
-      throw error;
+    if (dialogMode === "edit" && selectedCustomerId) {
+      updateMutation.mutate({
+        id: selectedCustomerId,
+        customer: dataToSubmit as UpdateCustomerDto,
+      });
+    } else {
+      createMutation.mutate(dataToSubmit as CreateCustomerDto);
     }
   };
+
   const handleFilterChange = <K extends keyof typeof filters>(
     key: K,
     value: (typeof filters)[K] | "all"
@@ -318,23 +491,7 @@ export default function CustomersPage() {
       setIsAddLoading(false);
     }, 500);
   };
-  const handleRowEdit = (customer: Customer) => {
-    setEditingId(customer.id);
 
-    setTimeout(() => {
-      setSelectedCustomerId(customer.id);
-      setDialogMode("edit");
-      setShowDetail(true);
-      setEditingId(null);
-    }, 500);
-  };
-  const handleEdit = () => {
-    if (selectedCustomerId) {
-      setDialogMode("edit");
-      setShowDetail(true);
-    }
-    setAnchorEl(null);
-  };
   const handleView = () => {
     if (selectedCustomerId) {
       setDialogMode("view");
@@ -344,10 +501,20 @@ export default function CustomersPage() {
   };
 
   const handleBack = () => {
+    router.push(buildUrlWithMappings({
+      type: filters.customerType,
+      status: filters.status,
+      search: searchQuery,
+    }));
+    
     setShowDetail(false);
     setSelectedCustomerId(null);
   };
-  const handleDelete = () => { setDeleteConfirmOpen(true); setAnchorEl(null); };
+
+  const handleDelete = () => { 
+    setDeleteConfirmOpen(true); 
+    setAnchorEl(null); 
+  };
 
   const stats = {
     new: customers.filter((c) => c.customerType === "new").length,
@@ -457,28 +624,38 @@ export default function CustomersPage() {
                 <FormControl sx={{ minWidth: 130 }} size="small">
                   <InputLabel>Type</InputLabel>
                   <Select
-                    value={filters.customerType || "all"}
+                    value={filters.customerType ? CUSTOMER_TYPE_MAP[filters.customerType] : "all"}
                     label="Type"
-                    onChange={(e) => handleFilterChange("customerType", e.target.value as CustomerType | "all")}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      handleFilterChange("customerType", 
+                        value === "all" ? "all" : REVERSE_TYPE_MAP[value as UrlTypeCode]
+                      );
+                    }}
                   >
                     <MenuItem value="all">All Types</MenuItem>
-                    <MenuItem value={CustomerType.NEW}>New</MenuItem>
-                    <MenuItem value={CustomerType.REGULAR}>Regular</MenuItem>
-                    <MenuItem value={CustomerType.VIP}>VIP</MenuItem>
+                    <MenuItem value={CUSTOMER_TYPE_MAP[CustomerType.NEW]}>New</MenuItem>
+                    <MenuItem value={CUSTOMER_TYPE_MAP[CustomerType.REGULAR]}>Regular</MenuItem>
+                    <MenuItem value={CUSTOMER_TYPE_MAP[CustomerType.VIP]}>VIP</MenuItem>
                   </Select>
                 </FormControl>
 
                 <FormControl sx={{ minWidth: 130 }} size="small">
                   <InputLabel>Status</InputLabel>
                   <Select
-                    value={filters.status || "all"}
+                    value={filters.status ? CUSTOMER_STATUS_MAP[filters.status] : "all"}
                     label="Status"
-                    onChange={(e) => handleFilterChange("status", e.target.value as CustomerStatus | "all")}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      handleFilterChange("status",
+                        value === "all" ? "all" : REVERSE_STATUS_MAP[value as UrlStatusCode]
+                      );
+                    }}
                   >
                     <MenuItem value="all">All Status</MenuItem>
-                    <MenuItem value={CustomerStatus.ACTIVE}>Active</MenuItem>
-                    <MenuItem value={CustomerStatus.INACTIVE}>Inactive</MenuItem>
-                    <MenuItem value={CustomerStatus.BLOCKED}>Blocked</MenuItem>
+                    <MenuItem value={CUSTOMER_STATUS_MAP[CustomerStatus.ACTIVE]}>Active</MenuItem>
+                    <MenuItem value={CUSTOMER_STATUS_MAP[CustomerStatus.INACTIVE]}>Inactive</MenuItem>
+                    <MenuItem value={CUSTOMER_STATUS_MAP[CustomerStatus.BLOCKED]}>Blocked</MenuItem>
                   </Select>
                 </FormControl>
 
@@ -503,7 +680,6 @@ export default function CustomersPage() {
               </Box>
             </CardContent>
           </Card>
-
 
           <Card>
             <TableContainer>
@@ -559,21 +735,25 @@ export default function CustomersPage() {
                               editingId === customer.id ? (
                                 <CircularProgress size={16} color="inherit" />
                               ) : (
-                                <Edit sx={{ fontSize: '18px !important' }} />
+                                <Edit sx={{ fontSize: "18px !important" }} />
                               )
                             }
                             disabled={editingId === customer.id}
-                            onClick={() => handleRowEdit(customer)}
+                            onClick={() => {
+                              setEditingId(customer.id);
+                              router.push(`/customers/${customer.id}`);
+                            }}
                             sx={{
-                              bgcolor: '#f39c12',
-                              '&:hover': { bgcolor: '#e67e22' },
-                              textTransform: 'none',
+                              bgcolor: "#f39c12",
+                              "&:hover": { bgcolor: "#e67e22" },
+                              textTransform: "none",
                               fontWeight: 600,
-                              borderRadius: '0px',
+                              borderRadius: "0px",
                               px: 2,
-                              minWidth: '80px',
-                              boxShadow: 'none',
-                              height: '32px'
+                              minWidth: "80px",
+                              boxShadow: "none",
+                              height: "32px",
+                              color: "#fff",
                             }}
                           >
                             Edit
@@ -592,7 +772,6 @@ export default function CustomersPage() {
         </>
       )}
 
-
       <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="lg" fullWidth>
         <CustomerDetail
           mode={dialogMode}
@@ -603,13 +782,6 @@ export default function CustomersPage() {
           loading={createMutation.isPending || updateMutation.isPending}
         />
       </Dialog>
-
-
-      <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)}>
-
-        <MenuItem onClick={handleEdit}><Edit sx={{ mr: 1, fontSize: 20 }} /> Edit</MenuItem>
-        <MenuItem onClick={handleDelete} sx={{ color: ERROR_COLOR }}><Delete sx={{ mr: 1, fontSize: 20 }} /> Delete</MenuItem>
-      </Menu>
 
       <Dialog open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)}>
         <DialogTitle>Confirm Delete</DialogTitle>

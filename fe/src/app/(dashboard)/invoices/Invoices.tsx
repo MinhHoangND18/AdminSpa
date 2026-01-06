@@ -2,10 +2,9 @@
 
 import React, {
   useState,
-  useEffect,
   useMemo,
-  useCallback,
   useRef,
+  useEffect,
 } from "react";
 import {
   Grid,
@@ -17,14 +16,12 @@ import {
   TextField,
   InputAdornment,
   Chip,
-  IconButton,
   Menu,
   MenuItem,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
-  Stack,
   alpha,
   Avatar,
   Divider,
@@ -39,49 +36,28 @@ import {
   TableHead,
   TableRow,
   TablePagination,
-  Tooltip,
-  Checkbox,
-  FormControlLabel,
-  Switch,
-  Badge,
-  Paper,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemIcon,
   CircularProgress,
-  Autocomplete,
   Backdrop,
 } from "@mui/material";
 import {
   Add,
   Search,
-  MoreVert,
   Edit,
   Delete,
-  Visibility,
   Receipt,
-  Person,
-  Store,
-  CalendarToday,
-  AttachMoney,
-  Discount,
-  LocalOffer,
-  Payment,
   Pending,
   CheckCircle,
   Inventory,
   Spa,
   ShoppingBag,
   Assignment,
-  FilterList,
   TrendingUp,
   Download,
   Print,
-  Share,
-  ContentCopy,
+  Payment,
 } from "@mui/icons-material";
-
+import { useQuery, keepPreviousData, useQueryClient } from "@tanstack/react-query";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Invoice as InvoiceType,
   DiscountType as DiscountTypeEnum,
@@ -93,33 +69,30 @@ import {
 import {
   InvoiceItem as InvoiceItemType,
   ItemType as ItemTypeEnum,
-  CreateInvoiceItemDto,
 } from "@/types/invoice-item";
 import {
   getInvoices,
   createInvoice,
   updateInvoice,
   deleteInvoice,
+  getInvoiceById,
 } from "@/lib/api/invoices";
 import {
-  createInvoiceItems,
   getItemsByInvoiceId,
-  deleteInvoiceItemsByInvoiceId,
 } from "@/lib/api/invoice-items";
 import { getCustomers } from "@/lib/api/customers";
 import { storesApi } from "@/lib/api/stores";
 import { getBookings } from "@/lib/api/bookings";
 import { getStaff } from "@/lib/api/staffs";
 
-import { getServices } from "@/lib/api/services";
 import { Customer as CustomerType } from "@/types/customer";
 import { Store as StoreType } from "@/types/store";
 import { Booking as BookingType } from "@/types/booking";
 import { Staff as StaffType } from "@/types/staff";
 
-import { Service as ServiceType } from "@/types/service";
 import InvoiceDetail from "./InvoiceDetail";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
+
 const blueTheme = createTheme({
   palette: {
     primary: {
@@ -128,17 +101,20 @@ const blueTheme = createTheme({
   },
 });
 
-interface ApiResponseWrapper<T> {
-  data?: {
+// --- TYPE DEFINITIONS ---
+
+// Helper type for API responses handling data list
+interface ApiListResponse<T> {
+  data: {
     data: T[];
   };
 }
 
-interface ApiErrorResponse {
-  response?: {
-    data?: {
-      message?: string | string[];
-    };
+// Helper for getInvoices specific response structure
+interface InvoiceListResponse {
+  data: InvoiceType[];
+  meta: {
+    total: number;
   };
 }
 
@@ -149,7 +125,6 @@ const ERROR_COLOR = "#ef4444";
 const WARNING_COLOR = "#f59e0b";
 const INFO_COLOR = "#3b82f6";
 const PURPLE_COLOR = "#a855f7";
-const EDIT_COLOR = "#f39c12";
 
 type DiscountType = "amount" | "percent";
 type PaymentStatus = "pending" | "paid";
@@ -198,22 +173,16 @@ interface InvoiceItemFormData {
   unit_price: string;
   discount: string;
 }
-
-interface SelectableItem {
-  id: number;
-  name: string;
-  price: number;
-  discount: number;
-  type: "product" | "service" | "package";
-}
-
-interface FetchError extends Error {
-  response?: {
-    data?: {
-      message?: string | string[];
-    };
+interface MasterDataResponse<T> {
+  data: {
+    data: T[];
   };
 }
+
+interface BookingListResponse {
+  data: BookingType[];
+}
+
 const getPaymentStatusColor = (status: PaymentStatus) => {
   switch (status) {
     case "paid":
@@ -234,6 +203,17 @@ const getPaymentStatusLabel = (status: PaymentStatus) => {
     default:
       return status;
   }
+};
+
+// Maps for URL query params (using numbers for shorter URLs)
+const paymentStatusToIdMap: Record<PaymentStatus, number> = {
+  paid: 1,
+  pending: 2,
+};
+
+const idToPaymentStatusMap: Record<number, PaymentStatus> = {
+  1: "paid",
+  2: "pending",
 };
 
 const getItemTypeIcon = (type: ItemType) => {
@@ -262,7 +242,6 @@ const getItemTypeColor = (type: ItemType) => {
   }
 };
 
-
 const formatCurrency = (amount: number) => {
   return new Intl.NumberFormat("vi-VN", {
     style: "currency",
@@ -270,15 +249,10 @@ const formatCurrency = (amount: number) => {
   }).format(amount);
 };
 
-const generateVoucher = () => {
-  const timestamp = new Date().getTime();
-  return `INV-${timestamp}`;
-};
-
 function useDebounce<T>(value: T, delay: number): T {
   const [debouncedValue, setDebouncedValue] = useState<T>(value);
 
-  useEffect(() => {
+  React.useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedValue(value);
     }, delay);
@@ -291,46 +265,126 @@ function useDebounce<T>(value: T, delay: number): T {
   return debouncedValue;
 }
 
-export default function InvoicesPage() {
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [totalItems, setTotalItems] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [isItemsLoading, setIsItemsLoading] = useState(false);
-  const [itemsForView, setItemsForView] = useState<InvoiceItem[]>([]);
-  const [selectedBooking, setSelectedBooking] = useState<BookingType | null>(
-    null
-  );
+export default function InvoicesPage({ slug }: { slug?: string[] }) {
+  const queryClient = useQueryClient();
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
-  const [customers, setCustomers] = useState<CustomerType[]>([]);
-  const [stores, setStores] = useState<StoreType[]>([]);
-  const [bookings, setBookings] = useState<BookingType[]>([]);
-  const [staff, setStaff] = useState<StaffType[]>([]);
-
-  const [services, setServices] = useState<ServiceType[]>([]);
-
-  const [searchQuery, setSearchQuery] = useState("");
+  // Filter and pagination states
+  const [searchQuery, setSearchQuery] = useState(() => {
+    return searchParams.get("search") || "";
+  });
   const debouncedSearchQuery = useDebounce(searchQuery, 500);
-  const [filterStatus, setFilterStatus] = useState<PaymentStatus | "all">(
-    "all"
-  );
-  const [filterStore, setFilterStore] = useState<number | "all">("all");
+  const [filterStatus, setFilterStatus] = useState<PaymentStatus | "all">(() => {
+    const statusId = searchParams.get("status");
+    return statusId && idToPaymentStatusMap[parseInt(statusId, 10)]
+      ? idToPaymentStatusMap[parseInt(statusId, 10)]
+      : "all";
+  });
+  const [filterStore, setFilterStore] = useState<number | "all">(() => {
+    const storeId = searchParams.get("storeId");
+    return storeId ? parseInt(storeId, 10) : "all";
+  });
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+
+  // Dialog and UI states
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [openDialog, setOpenDialog] = useState(false);
   const [openItemsDialog, setOpenItemsDialog] = useState(false);
   const [dialogMode, setDialogMode] = useState<"add" | "edit" | "view">("add");
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const [isFormDataLoading, setIsFormDataLoading] = useState(false);
-  const isMountedRef = useRef(true);
-  const abortControllerRef = useRef<AbortController | null>(null);
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [isFormDataLoading, _setIsFormDataLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showDetail, setShowDetail] = useState(false);
   const [isCreateLoading, setIsCreateLoading] = useState(false);
+  const [isItemsLoading, setIsItemsLoading] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [itemsForView, setItemsForView] = useState<InvoiceItem[]>([]);
+
+  // Refs for cleanup and control
+  const isMountedRef = useRef(true);
+
+
+  const { data: customers = [] } = useQuery({
+    queryKey: ['customers'],
+    queryFn: () => getCustomers({ limit: 1000 }).then((res) => {
+
+      const response = res as unknown as MasterDataResponse<CustomerType>;
+      return response?.data?.data || [];
+    }),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: stores = [] } = useQuery({
+    queryKey: ['stores'],
+    queryFn: () => storesApi.getAll({ limit: 1000 }).then((res) => {
+      const response = res as unknown as MasterDataResponse<StoreType>;
+      return response?.data?.data || [];
+    }),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: staff = [] } = useQuery({
+    queryKey: ['staff'],
+    queryFn: () => getStaff({ limit: 1000 }).then((res) => {
+      const response = res as unknown as MasterDataResponse<StaffType>;
+      return response?.data?.data || [];
+    }),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: bookings = [] } = useQuery({
+    queryKey: ['bookings'],
+    queryFn: () => getBookings({ limit: 1000 }).then((res) => {
+      const response = res as unknown as BookingListResponse;
+      return response?.data || [];
+    }),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const {
+    data: invoiceResponse,
+    isLoading: isInvoiceLoading,
+  } = useQuery({
+    queryKey: ['invoices', page, rowsPerPage, filterStatus, filterStore],
+    queryFn: async () => {
+      const params: QueryInvoiceDto = {
+        page: page + 1,
+        limit: rowsPerPage,
+        paymentStatus: filterStatus === "all" ? undefined : (filterStatus as PaymentStatusEnum),
+        storeId: filterStore === "all" ? undefined : filterStore,
+      };
+      return getInvoices(params);
+    },
+    placeholderData: keepPreviousData,
+  });
+
+  const rawInvoices = (invoiceResponse as unknown as InvoiceListResponse)?.data || [];
+  const totalItems = (invoiceResponse as unknown as InvoiceListResponse)?.meta?.total || 0;
+
+  const invoices: Invoice[] = useMemo(() => {
+    return rawInvoices.map((apiInvoice: InvoiceType) => ({
+      ...apiInvoice,
+      booking_id: apiInvoice.bookingId,
+      customer_id: apiInvoice.customerId,
+      store_id: apiInvoice.storeId,
+      discount_amount: apiInvoice.discountAmount,
+      discount_type: apiInvoice.discountType as DiscountType | null,
+      tax_amount: apiInvoice.taxAmount,
+      total_amount: apiInvoice.totalAmount,
+      paid_amount: apiInvoice.paidAmount,
+      payment_status: apiInvoice.paymentStatus as PaymentStatus,
+      created_by: apiInvoice.createdBy,
+      created_at: apiInvoice.createdAt,
+      updated_at: apiInvoice.updatedAt,
+      customer: undefined,
+      store: undefined,
+      booking: undefined,
+      items: undefined,
+    }));
+  }, [rawInvoices]);
 
   const initialFormData: InvoiceFormData = useMemo(
     () => ({
@@ -357,219 +411,148 @@ export default function InvoicesPage() {
     }),
     []
   );
-  useEffect(() => {
-    isMountedRef.current = true;
-
-    return () => {
-      isMountedRef.current = false;
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-    };
-  }, []);
 
   const [formData, setFormData] = useState<InvoiceFormData>(initialFormData);
   const [items, setItems] = useState<InvoiceItemFormData[]>([]);
-  const [currentItem, setCurrentItem] =
-    useState<InvoiceItemFormData>(initialItemFormData);
+  const [_currentItem, _setCurrentItem] = useState<InvoiceItemFormData>(initialItemFormData);
 
-  const fetchCustomers = async () => {
-    try {
-      const data = (await getCustomers({
-        limit: 1000,
-      })) as unknown as ApiResponseWrapper<CustomerType>;
-      setCustomers(data?.data?.data ?? []);
-    } catch (err) {
-      console.error("Failed to fetch customers:", err);
-    }
-  };
+  // Cleanup on unmount
+  React.useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
-  const fetchStores = async () => {
-    try {
-      const data = (await storesApi.getAll({
-        limit: 1000,
-      })) as unknown as ApiResponseWrapper<StoreType>;
-      setStores(data?.data?.data ?? []);
-    } catch (err) {
-      console.error("Failed to fetch stores:", err);
-    }
-  };
-
-  const fetchBookings = async () => {
-    try {
-      const response = await getBookings({ limit: 1000 });
-      const bookingsData = response?.data ?? [];
-      console.log("Extracted bookings data (count):", bookingsData.length);
-      setBookings(bookingsData);
-    } catch (err) {
-      console.error("Failed to fetch bookings:", err);
-    }
-  };
-
-  const fetchStaff = async () => {
-    try {
-      const data = (await getStaff({
-        limit: 1000,
-      })) as unknown as ApiResponseWrapper<StaffType>;
-      setStaff(data?.data?.data ?? []);
-    } catch (err) {
-      console.error("Failed to fetch staff:", err);
-    }
-  };
-
-
-
-  const fetchServices = async () => {
-    try {
-      const data = await getServices({ limit: 1000 });
-      const servicesData = data?.data ?? [];
-      setServices(servicesData);
-    } catch (err) {
-      console.error("Failed to fetch services:", err);
-    }
-  };
-
+  // Handle slug to load invoice detail
   useEffect(() => {
-    const loadInitialData = async () => {
-      if (!isMountedRef.current) return;
+    const invoiceId = slug?.[0];
 
-      setIsLoading(true);
-
+    const loadInvoiceForDetail = async (id: number) => {
       try {
-        await Promise.all([fetchCustomers(), fetchStores(), fetchStaff()]);
+        setIsItemsLoading(true);
+        const apiInvoice: InvoiceType = await getInvoiceById(id);
+        const invoiceData: Invoice = {
+          ...apiInvoice,
+          booking_id: apiInvoice.bookingId,
+          customer_id: apiInvoice.customerId,
+          store_id: apiInvoice.storeId,
+          discount_amount: apiInvoice.discountAmount,
+          discount_type: apiInvoice.discountType as DiscountType | null,
+          tax_amount: apiInvoice.taxAmount,
+          total_amount: apiInvoice.totalAmount,
+          paid_amount: apiInvoice.paidAmount,
+          payment_status: apiInvoice.paymentStatus as PaymentStatus,
+          created_by: apiInvoice.createdBy,
+          created_at: apiInvoice.createdAt,
+          updated_at: apiInvoice.updatedAt,
+          customer: undefined,
+          store: undefined,
+          booking: undefined,
+        };
 
-        if (isMountedRef.current) {
-          fetchBookings();
-        }
+        const items = await getItemsByInvoiceId(id);
+        setSelectedInvoice({ ...invoiceData, items });
+        setDialogMode("edit");
+        setShowDetail(true);
+        setEditingId(null); // Reset editingId after successful load
       } catch (err) {
-        console.error("Failed to load initial data:", err);
-      } finally {
-        if (isMountedRef.current) {
-          setIsInitialLoad(false);
+        alert("Failed to load invoice details.");
+        console.error("Failed to load invoice details:", err);
+        const query: Record<string, string> = {};
+        if (searchQuery) {
+          query.search = searchQuery;
         }
+        if (filterStatus !== "all") {
+          query.status = paymentStatusToIdMap[filterStatus].toString();
+        }
+        if (filterStore !== "all") {
+          query.storeId = filterStore.toString();
+        }
+        const queryString = new URLSearchParams(query).toString();
+        router.push(queryString ? `/invoices?${queryString}` : "/invoices");
+        setEditingId(null); // Reset editingId on error
+      } finally {
+        setIsItemsLoading(false);
       }
     };
 
-    loadInitialData();
-  }, []);
+    if (invoiceId) {
+      if (
+        selectedInvoice?.id === Number(invoiceId) &&
+        showDetail &&
+        dialogMode === "edit"
+      ) {
+        return;
+      }
+      loadInvoiceForDetail(Number(invoiceId));
+    } else {
+      if (showDetail) {
+        setShowDetail(false);
+        setSelectedInvoice(null);
+        setEditingId(null); // Reset editingId when closing detail view
+      }
+    }
+  }, [slug, router, selectedInvoice?.id, showDetail, dialogMode, searchQuery, filterStatus, filterStore]);
 
-  const fetchInvoices = useCallback(async () => {
-    if (customers.length === 0 || stores.length === 0) {
+  useEffect(() => {
+    const invoiceId = slug?.[0];
+    if (invoiceId) {
       return;
     }
 
-    setIsLoading(true);
-    setError(null);
-    try {
-      const params: QueryInvoiceDto = {
-        page: page + 1,
-        limit: rowsPerPage,
-        paymentStatus:
-          filterStatus === "all"
-            ? undefined
-            : (filterStatus as PaymentStatusEnum),
-        storeId: filterStore === "all" ? undefined : filterStore,
-      };
-
-      const data = await getInvoices(params);
-
-      const processedInvoices: Invoice[] = data.data.map((apiInvoice) => ({
-        ...apiInvoice,
-        booking_id: apiInvoice.bookingId,
-        customer_id: apiInvoice.customerId,
-        store_id: apiInvoice.storeId,
-        discount_amount: apiInvoice.discountAmount,
-        discount_type: apiInvoice.discountType as DiscountType | null,
-        tax_amount: apiInvoice.taxAmount,
-        total_amount: apiInvoice.totalAmount,
-        paid_amount: apiInvoice.paidAmount,
-        payment_status: apiInvoice.paymentStatus as PaymentStatus,
-        created_by: apiInvoice.createdBy,
-        created_at: apiInvoice.createdAt,
-        updated_at: apiInvoice.updatedAt,
-        customer: customers.find((c) => c.id === apiInvoice.customerId),
-        store: stores.find((s) => s.id === apiInvoice.storeId),
-        booking: bookings.find((b) => b.id === apiInvoice.bookingId),
-      }));
-
-      setInvoices(processedInvoices);
-      setTotalItems(data.meta.total);
-    } catch (err) {
-      console.error("Failed to fetch invoices:", err);
-      setError("Failed to load invoices. Please try again.");
-    } finally {
-      setIsLoading(false);
+    const query: Record<string, string> = {};
+    if (searchQuery) {
+      query.search = searchQuery;
     }
-  }, [
-    page,
-    rowsPerPage,
-    filterStatus,
-    filterStore,
-    bookings,
-    customers,
-    stores,
-  ]);
-
-  const handleBookingSelect = (bookingId: string) => {
-    setFormData((prev) => ({ ...prev, booking_id: bookingId }));
-
-    if (bookingId) {
-      const selectedBooking = bookings.find(
-        (b) => b.id.toString() === bookingId
-      );
-
-      if (selectedBooking) {
-        const customer = customers.find(
-          (c) => c.id === selectedBooking.customerId
-        );
-
-        setFormData((prev) => ({
-          ...prev,
-          customer_id: selectedBooking.customerId?.toString() || "",
-          store_id: selectedBooking.storeId.toString(),
-        }));
-      }
-    } else {
-      setFormData((prev) => ({
-        ...prev,
-        customer_id: initialFormData.customer_id,
-        store_id: initialFormData.store_id,
-      }));
+    if (filterStatus !== "all") {
+      query.status = paymentStatusToIdMap[filterStatus].toString();
     }
-  };
-  useEffect(() => {
-    if (!isInitialLoad && customers.length > 0 && stores.length > 0 && bookings.length > 0) {
-      fetchInvoices();
+    if (filterStore !== "all") {
+      query.storeId = filterStore.toString();
     }
-  }, [
-    isInitialLoad,
-    customers.length,
-    stores.length,
-    bookings.length,
-    page,
-    rowsPerPage,
-    filterStatus,
-    filterStore,
-    fetchInvoices,
-  ]);
 
-  // useEffect(() => {
-  //     if (bookings.length > 0 && invoices.length > 0) {
-  //         // Re-map invoices với bookings data
-  //         const updatedInvoices = invoices.map(invoice => ({
-  //             ...invoice,
-  //             booking: bookings.find((b) => b.id === invoice.booking_id),
-  //         }));
-  //         setInvoices(updatedInvoices);
-  //     }
-  // }, [bookings, invoices]);
+    const queryString = new URLSearchParams(query).toString();
+    const currentPath = "/invoices";
+    const newUrl = queryString ? `${currentPath}?${queryString}` : currentPath;
 
+    if (
+      typeof window !== "undefined" &&
+      window.location.pathname + window.location.search !== newUrl
+    ) {
+      router.push(newUrl, {
+        scroll: false,
+      });
+    }
+  }, [filterStatus, filterStore, searchQuery, slug, router]);
+
+  const customerMap = useMemo(() => {
+    return customers.reduce((acc: Record<number, CustomerType>, cur: CustomerType) => ({ ...acc, [cur.id]: cur }), {} as Record<number, CustomerType>);
+  }, [customers]);
+
+  const storeMap = useMemo(() => {
+    return stores.reduce((acc: Record<number, StoreType>, cur: StoreType) => ({ ...acc, [cur.id]: cur }), {} as Record<number, StoreType>);
+  }, [stores]);
+
+  const bookingMap = useMemo(() => {
+    return bookings.reduce((acc: Record<number, BookingType>, cur: BookingType) => ({ ...acc, [cur.id]: cur }), {} as Record<number, BookingType>);
+  }, [bookings]);
+  const processedInvoices = useMemo(() => {
+    return invoices.map((invoice) => ({
+      ...invoice,
+      customer: customerMap[invoice.customer_id] || undefined,
+      store: storeMap[invoice.store_id] || undefined,
+      booking: invoice.booking_id ? bookingMap[invoice.booking_id] : undefined,
+    }));
+  }, [invoices, customerMap, storeMap, bookingMap]);
+
+  // Client-side search filtering
   const filteredInvoices = useMemo(() => {
     if (!debouncedSearchQuery) {
-      return invoices;
+      return processedInvoices;
     }
     const lowercasedQuery = debouncedSearchQuery.toLowerCase();
-    return invoices.filter((invoice) => {
+    return processedInvoices.filter((invoice) => {
       const customerName = invoice.customer?.fullName?.toLowerCase() || "";
       const customerPhone = invoice.customer?.phone?.toLowerCase() || "";
       const voucher = invoice.voucher?.toLowerCase() || "";
@@ -580,7 +563,7 @@ export default function InvoicesPage() {
         voucher.includes(lowercasedQuery)
       );
     });
-  }, [invoices, debouncedSearchQuery]);
+  }, [processedInvoices, debouncedSearchQuery]);
 
   const paginatedInvoices = useMemo(() => filteredInvoices, [filteredInvoices]);
 
@@ -588,24 +571,14 @@ export default function InvoicesPage() {
     () => ({
       total: filteredInvoices.length,
       paid: filteredInvoices.filter((i) => i.payment_status === "paid").length,
-      pending: filteredInvoices.filter((i) => i.payment_status === "pending")
-        .length,
-      totalRevenue: filteredInvoices.reduce(
-        (sum, i) => sum + (Number(i.total_amount) || 0),
-        0
-      ),
-      collectedRevenue: filteredInvoices.reduce(
-        (sum, i) => sum + (Number(i.paid_amount) || 0),
-        0
-      ),
+      pending: filteredInvoices.filter((i) => i.payment_status === "pending").length,
+      totalRevenue: filteredInvoices.reduce((sum, i) => sum + (Number(i.total_amount) || 0), 0),
+      collectedRevenue: filteredInvoices.reduce((sum, i) => sum + (Number(i.paid_amount) || 0), 0),
     }),
     [filteredInvoices]
   );
 
-  const handleMenuOpen = (
-    event: React.MouseEvent<HTMLElement>,
-    invoice: Invoice
-  ) => {
+  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, invoice: Invoice) => {
     setAnchorEl(event.currentTarget);
     setSelectedInvoice(invoice);
   };
@@ -623,9 +596,8 @@ export default function InvoicesPage() {
       setIsCreateLoading(false);
     }, 500);
   };
-  const fetchInvoiceItemsAndOpenDialog = async (
-    mode: "view" | "edit" | "view_items"
-  ) => {
+
+  const fetchInvoiceItemsAndOpenDialog = async (mode: "view" | "edit" | "view_items") => {
     if (!selectedInvoice) return;
 
     setIsItemsLoading(true);
@@ -636,7 +608,7 @@ export default function InvoicesPage() {
 
       const processedItems: InvoiceItem[] = items.map((apiItem) => ({
         ...apiItem,
-        staff_name: staff.find((s) => s.id === apiItem.staffId)?.full_name,
+        staff_name: staff.find((s: StaffType) => s.id === apiItem.staffId)?.full_name,
       }));
 
       setItemsForView(processedItems);
@@ -653,7 +625,6 @@ export default function InvoicesPage() {
           booking_id: selectedInvoice.booking_id?.toString() || "",
           discount_amount: selectedInvoice.discount_amount.toString(),
           discount_type: (selectedInvoice.discount_type as DiscountType) || "",
-          // tax_amount: selectedInvoice.tax_amount.toString(),
           notes: selectedInvoice.notes || "",
           payment_status: selectedInvoice.payment_status,
         });
@@ -681,26 +652,8 @@ export default function InvoicesPage() {
     handleMenuClose();
   };
 
-  const handleEdit = async (invoice: Invoice) => {
-    setSelectedInvoice(invoice);
-    setIsItemsLoading(true);
-    setEditingId(invoice.id);
-    try {
-
-      const [items] = await Promise.all([
-        getItemsByInvoiceId(invoice.id),
-        new Promise((resolve) => setTimeout(resolve, 500))
-      ]);
-
-      setSelectedInvoice({ ...invoice, items });
-      setDialogMode("edit");
-      setShowDetail(true);
-    } catch (err) {
-      alert("Failed to load invoice items");
-    } finally {
-
-      setEditingId(null);
-    }
+  const handleEdit = (invoice: Invoice) => {
+    router.push(`/invoices/${invoice.id}`);
   };
 
   const handleSaveInvoice = async (submissionData: CreateInvoiceDto | UpdateInvoiceDto) => {
@@ -711,82 +664,13 @@ export default function InvoicesPage() {
       } else if (dialogMode === "edit" && selectedInvoice) {
         await updateInvoice(selectedInvoice.id, submissionData as UpdateInvoiceDto);
       }
-      fetchInvoices();
-      // setShowDetail(false);
+      await queryClient.invalidateQueries({ queryKey: ['invoices'] });
     } catch (err) {
       console.error(err);
       throw err;
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    setCurrentItem((prev) => ({
-      ...prev,
-      item_id: "",
-      item_name: "",
-      unit_price: "0",
-      discount: "0",
-    }));
-  }, [currentItem.item_type]);
-
-  const selectableItems = useMemo((): SelectableItem[] => {
-
-
-    if (currentItem.item_type === "service") {
-      const items = (services || [])
-        .filter((service) => !service.isCombo)
-        .map((service) => ({
-          id: service.id,
-          name: service.name,
-          price: service.price,
-          discount: service.discountPrice
-            ? service.price - service.discountPrice
-            : 0,
-          type: "service" as const,
-        }));
-      return items;
-    }
-    if (currentItem.item_type === "package") {
-      const items = (services || [])
-        .filter((service) => service.isCombo)
-        .map((service) => ({
-          id: service.id,
-          name: service.name,
-          price: service.price,
-          discount: service.discountPrice
-            ? service.price - service.discountPrice
-            : 0,
-          type: "package" as const,
-        }));
-      return items;
-    }
-    return [];
-  }, [services, currentItem.item_type]);
-
-  if (showDetail) {
-    return (
-      <InvoiceDetail
-        mode={dialogMode}
-        initialData={selectedInvoice}
-        customers={customers}
-        stores={stores}
-        staff={staff}
-        onSave={handleSaveInvoice}
-        onBack={() => setShowDetail(false)}
-        loading={loading}
-      />
-    );
-  }
-  const formatVoucherToBK = (voucher?: string) => {
-    if (!voucher) return "";
-    const parts = voucher.split("-");
-    return parts.length >= 2 ? `BK${parts[1]}` : voucher;
-  };
-
-  const handleView = () => {
-    fetchInvoiceItemsAndOpenDialog("view");
   };
 
   const handleViewItems = () => {
@@ -802,7 +686,7 @@ export default function InvoicesPage() {
     if (selectedInvoice) {
       try {
         await deleteInvoice(selectedInvoice.id);
-        fetchInvoices();
+        await queryClient.invalidateQueries({ queryKey: ['invoices'] });
       } catch (err) {
         console.error("Failed to delete invoice:", err);
         alert("Failed to delete invoice. Please try again.");
@@ -812,186 +696,8 @@ export default function InvoicesPage() {
     }
   };
 
-  const handleDialogClose = () => {
-    setOpenDialog(false);
-    setFormData(initialFormData);
-    setItems([]);
-    setSelectedInvoice(null);
-  };
-
   const handleItemsDialogClose = () => {
     setOpenItemsDialog(false);
-  };
-
-  const handleFormChange =
-    (field: keyof InvoiceFormData) =>
-      (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-        setFormData({
-          ...formData,
-          [field]: event.target.value as InvoiceFormData[typeof field],
-        });
-      };
-
-  const handleItemChange =
-    (field: keyof InvoiceItemFormData) =>
-      (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-        setCurrentItem({
-          ...currentItem,
-          [field]: event.target.value as InvoiceItemFormData[typeof field],
-        });
-      };
-
-  const addItem = () => {
-    if (currentItem.item_name && parseFloat(currentItem.unit_price) > 0) {
-      setItems([...items, currentItem]);
-      setCurrentItem(initialItemFormData);
-    }
-  };
-
-  const removeItem = (index: number) => {
-    setItems(items.filter((_, i) => i !== index));
-  };
-
-  const calculateTotals = () => {
-    const subtotal = items.reduce((sum, item) => {
-      const quantity = parseInt(item.quantity) || 1;
-      const unitPrice = parseFloat(item.unit_price) || 0;
-      const discount = parseFloat(item.discount) || 0;
-      return sum + (unitPrice * quantity - discount);
-    }, 0);
-
-    const inputDiscountAmount = parseFloat(formData.discount_amount) || 0;
-
-    const TAX_RATE = 0.08;
-    let finalDiscountAmount = inputDiscountAmount;
-    let amountAfterDiscount = subtotal;
-
-    if (formData.discount_type === "percent" && inputDiscountAmount > 0) {
-      finalDiscountAmount = subtotal * (inputDiscountAmount / 100);
-      amountAfterDiscount = subtotal - finalDiscountAmount;
-    } else {
-      amountAfterDiscount = subtotal - finalDiscountAmount;
-    }
-
-    const calculatedTaxAmount = amountAfterDiscount * TAX_RATE;
-
-    const total = amountAfterDiscount + calculatedTaxAmount;
-
-    return {
-      subtotal,
-      discountAmount: finalDiscountAmount,
-      taxAmount: calculatedTaxAmount,
-      total: Math.max(0, total),
-    };
-  };
-
-  const handleSubmit = async () => {
-    const {
-      subtotal: finalSubtotal,
-      total: finalTotal,
-      discountAmount: finalDiscountAmount,
-    } = calculateTotals();
-
-    try {
-      if (dialogMode === "add") {
-        const itemsToSubmit = items.map((item) => {
-          const quantity = parseInt(item.quantity) || 1;
-          const unitPrice = parseFloat(item.unit_price) || 0;
-          const discount = parseFloat(item.discount) || 0;
-          return {
-            itemType: item.item_type as ItemTypeEnum,
-            itemId: parseInt(item.item_id) || 0,
-            itemName: item.item_name,
-            staffId: item.staff_id ? parseInt(item.staff_id) : undefined,
-            quantity: quantity,
-            unitPrice: unitPrice,
-            discount: discount,
-            totalPrice: unitPrice * quantity - discount,
-          };
-        });
-
-        const createData: CreateInvoiceDto = {
-          voucher: generateVoucher(),
-          customerId: parseInt(formData.customer_id),
-          storeId: parseInt(formData.store_id),
-          subtotal: finalSubtotal,
-          totalAmount: finalTotal,
-          items: itemsToSubmit,
-          bookingId: formData.booking_id
-            ? parseInt(formData.booking_id)
-            : undefined,
-          discountAmount: finalDiscountAmount,
-          discountType:
-            (formData.discount_type as DiscountTypeEnum) || undefined,
-          taxAmount: calculatedTaxAmount,
-          paidAmount: formData.payment_status === "paid" ? finalTotal : 0,
-          paymentStatus: formData.payment_status as PaymentStatusEnum,
-          notes: formData.notes || undefined,
-          createdBy: 1,
-        };
-
-        await createInvoice(createData);
-      } else if (dialogMode === "edit" && selectedInvoice) {
-        const updateData: UpdateInvoiceDto = {
-          voucher: selectedInvoice.voucher,
-          customerId: parseInt(formData.customer_id),
-          storeId: parseInt(formData.store_id),
-          bookingId: formData.booking_id ? parseInt(formData.booking_id) : null,
-          subtotal: finalSubtotal,
-          discountAmount: finalDiscountAmount,
-          discountType: (formData.discount_type as DiscountTypeEnum) || null,
-          taxAmount: calculatedTaxAmount,
-          totalAmount: finalTotal,
-          paidAmount: formData.payment_status === "paid" ? finalTotal : 0,
-          paymentStatus: formData.payment_status as PaymentStatusEnum,
-          notes: formData.notes || null,
-        };
-
-        await updateInvoice(selectedInvoice.id, updateData);
-
-        await deleteInvoiceItemsByInvoiceId(selectedInvoice.id);
-        if (items.length > 0) {
-          const invoiceItems: CreateInvoiceItemDto[] = items.map((item) => {
-            const quantity = parseInt(item.quantity) || 1;
-            const unitPrice = parseFloat(item.unit_price) || 0;
-            const discount = parseFloat(item.discount) || 0;
-
-            return {
-              invoiceId: selectedInvoice.id,
-              itemType: item.item_type as ItemTypeEnum,
-              itemId: parseInt(item.item_id) || 0,
-              itemName: item.item_name,
-              staffId: item.staff_id ? parseInt(item.staff_id) : undefined,
-              quantity: quantity,
-              unitPrice: unitPrice,
-              discount: discount,
-              totalPrice: unitPrice * quantity - discount,
-            };
-          });
-          await createInvoiceItems(invoiceItems);
-        }
-      }
-
-      fetchInvoices();
-      handleDialogClose();
-    } catch (err) {
-      console.error("Failed to submit invoice:", err);
-      let errorMessage =
-        "An error occurred while submitting the invoice. Please check the data and try again.";
-
-      const fetchError = err as FetchError;
-      if (fetchError.response?.data?.message) {
-        const backendMessage = fetchError.response.data.message;
-        if (Array.isArray(backendMessage)) {
-          errorMessage +=
-            "\n\nServer errors:\n- " + backendMessage.join("\n- ");
-        } else {
-          errorMessage += "\n\nServer error: " + backendMessage;
-        }
-      }
-
-      alert(errorMessage);
-    }
   };
 
   const markAsPaid = async () => {
@@ -1002,7 +708,7 @@ export default function InvoicesPage() {
           paidAmount: selectedInvoice.total_amount,
         };
         await updateInvoice(selectedInvoice.id, updateData);
-        fetchInvoices();
+        await queryClient.invalidateQueries({ queryKey: ['invoices'] });
       } catch (err) {
         console.error("Failed to mark as paid:", err);
         alert("Failed to update payment status.");
@@ -1011,101 +717,77 @@ export default function InvoicesPage() {
     }
   };
 
-  const handleChangePage = (event: unknown, newPage: number) => {
+  const handleChangePage = (_event: unknown, newPage: number) => {
     setPage(newPage);
   };
 
-  const handleChangeRowsPerPage = (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
+  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
     setRowsPerPage(parseInt(event.target.value, 10));
     setPage(0);
   };
 
-  const {
-    subtotal,
-    total,
-    discountAmount: calculatedDiscountAmount,
-    taxAmount: calculatedTaxAmount,
-  } = calculateTotals();
-
-  const invoiceToView: Invoice | null = selectedInvoice
-    ? {
-      ...selectedInvoice,
-      items: itemsForView.length > 0 ? itemsForView : selectedInvoice.items,
-      tax_amount: selectedInvoice.tax_amount,
-    }
-    : null;
-
-  const handleItemSelection = (item: SelectableItem | null) => {
-    if (!item) {
-      setCurrentItem((prev) => ({
-        ...prev,
-        item_id: "",
-        item_name: "",
-        unit_price: "0",
-        discount: "0",
-      }));
-      return;
-    }
-
-    setCurrentItem((prev) => ({
-      ...prev,
-      item_id: item.id.toString(),
-      item_name: item.name,
-      unit_price: item.price.toString(),
-      discount: item.discount.toString(),
-    }));
+  const formatVoucherToBK = (voucher?: string) => {
+    if (!voucher) return "";
+    const parts = voucher.split("-");
+    return parts.length >= 2 ? `BK${parts[1]}` : voucher;
   };
-  const isAnyLoading = (isInitialLoad || isFormDataLoading || isItemsLoading) && invoices.length === 0;
+
+  // Show detail view if needed
+  if (showDetail) {
+    return (
+      <InvoiceDetail
+        mode={dialogMode}
+        initialData={selectedInvoice}
+        customers={customers}
+        stores={stores}
+        staff={staff}
+        onSave={handleSaveInvoice}
+        onBack={() => {
+          setShowDetail(false);
+          const query: Record<string, string> = {};
+          if (searchQuery) {
+            query.search = searchQuery;
+          }
+          if (filterStatus !== "all") {
+            query.status = paymentStatusToIdMap[filterStatus].toString();
+          }
+          if (filterStore !== "all") {
+            query.storeId = filterStore.toString();
+          }
+          const queryString = new URLSearchParams(query).toString();
+          router.push(queryString ? `/invoices?${queryString}` : "/invoices");
+        }}
+        loading={loading}
+      />
+    );
+  }
+
+  const isAnyLoading = (isInvoiceLoading || isFormDataLoading || isItemsLoading) && invoices.length === 0;
 
   return (
     <ThemeProvider theme={blueTheme}>
-      {/* <Box sx={{ mb: 3 }}>
-                <Typography variant="h4" fontWeight="bold" gutterBottom>
-                    Invoice Management
-                </Typography>
-                <Typography variant="body1" color="text.secondary">
-                    Manage customer invoices and payments
-                </Typography>
-            </Box> */}
       <Backdrop
         sx={{ color: "#fff", zIndex: (theme) => theme.zIndex.drawer + 1 }}
         open={isAnyLoading}
       >
         <CircularProgress color="inherit" />
       </Backdrop>
+
       {/* Stats Cards */}
       <Grid container spacing={3} sx={{ mb: 3 }}>
         <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
           <Card sx={{ borderRadius: 0 }}>
             <CardContent>
-              <Box
-                sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                }}
-              >
+              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <Box>
-                  <Typography
-                    color="text.secondary"
-                    variant="body2"
-                    gutterBottom
-                  >
+                  <Typography color="text.secondary" variant="body2" gutterBottom>
                     Total Invoices
                   </Typography>
                   <Typography variant="h4" fontWeight="bold">
                     {totalItems}
                   </Typography>
                 </Box>
-                <Avatar
-                  sx={{
-                    bgcolor: alpha(PRIMARY_COLOR, 0.1),
-                    width: 56,
-                    height: 56,
-                  }}
-                >
+                <Avatar sx={{ bgcolor: alpha(PRIMARY_COLOR, 0.1), width: 56, height: 56 }}>
                   <Receipt sx={{ color: PRIMARY_COLOR, fontSize: 28 }} />
                 </Avatar>
               </Box>
@@ -1115,36 +797,16 @@ export default function InvoicesPage() {
         <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
           <Card sx={{ borderRadius: 0 }}>
             <CardContent>
-              <Box
-                sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                }}
-              >
+              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <Box>
-                  <Typography
-                    color="text.secondary"
-                    variant="body2"
-                    gutterBottom
-                  >
+                  <Typography color="text.secondary" variant="body2" gutterBottom>
                     Paid Invoices
                   </Typography>
-                  <Typography
-                    variant="h4"
-                    fontWeight="bold"
-                    color={SUCCESS_COLOR}
-                  >
+                  <Typography variant="h4" fontWeight="bold" color={SUCCESS_COLOR}>
                     {stats.paid}
                   </Typography>
                 </Box>
-                <Avatar
-                  sx={{
-                    bgcolor: alpha(SUCCESS_COLOR, 0.1),
-                    width: 56,
-                    height: 56,
-                  }}
-                >
+                <Avatar sx={{ bgcolor: alpha(SUCCESS_COLOR, 0.1), width: 56, height: 56 }}>
                   <CheckCircle sx={{ color: SUCCESS_COLOR, fontSize: 28 }} />
                 </Avatar>
               </Box>
@@ -1154,36 +816,16 @@ export default function InvoicesPage() {
         <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
           <Card sx={{ borderRadius: 0 }}>
             <CardContent>
-              <Box
-                sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                }}
-              >
+              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <Box>
-                  <Typography
-                    color="text.secondary"
-                    variant="body2"
-                    gutterBottom
-                  >
+                  <Typography color="text.secondary" variant="body2" gutterBottom>
                     Pending Payments
                   </Typography>
-                  <Typography
-                    variant="h4"
-                    fontWeight="bold"
-                    color={WARNING_COLOR}
-                  >
+                  <Typography variant="h4" fontWeight="bold" color={WARNING_COLOR}>
                     {stats.pending}
                   </Typography>
                 </Box>
-                <Avatar
-                  sx={{
-                    bgcolor: alpha(WARNING_COLOR, 0.1),
-                    width: 56,
-                    height: 56,
-                  }}
-                >
+                <Avatar sx={{ bgcolor: alpha(WARNING_COLOR, 0.1), width: 56, height: 56 }}>
                   <Pending sx={{ color: WARNING_COLOR, fontSize: 28 }} />
                 </Avatar>
               </Box>
@@ -1193,32 +835,16 @@ export default function InvoicesPage() {
         <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
           <Card sx={{ borderRadius: 0 }}>
             <CardContent>
-              <Box
-                sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                }}
-              >
+              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <Box>
-                  <Typography
-                    color="text.secondary"
-                    variant="body2"
-                    gutterBottom
-                  >
+                  <Typography color="text.secondary" variant="body2" gutterBottom>
                     Total Revenue
                   </Typography>
                   <Typography variant="h4" fontWeight="bold">
                     {formatCurrency(stats.totalRevenue)}
                   </Typography>
                 </Box>
-                <Avatar
-                  sx={{
-                    bgcolor: alpha(INFO_COLOR, 0.1),
-                    width: 56,
-                    height: 56,
-                  }}
-                >
+                <Avatar sx={{ bgcolor: alpha(INFO_COLOR, 0.1), width: 56, height: 56 }}>
                   <TrendingUp sx={{ color: INFO_COLOR, fontSize: 28 }} />
                 </Avatar>
               </Box>
@@ -1230,23 +856,16 @@ export default function InvoicesPage() {
       {/* Actions Bar */}
       <Card sx={{ mb: 3, borderRadius: 0 }}>
         <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
-          <Box
-            sx={{
-              display: "flex",
-              gap: 1.5,
-              flexWrap: "wrap",
-              alignItems: "center",
-            }}
-          >
+          <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap", alignItems: "center" }}>
             <TextField
               size="small"
               placeholder="Search by invoice code..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               sx={{
-                flex: 1, minWidth: 200, "& .MuiOutlinedInput-root": {
-                  borderRadius: "0px",
-                }
+                flex: 1,
+                minWidth: 200,
+                "& .MuiOutlinedInput-root": { borderRadius: "0px" }
               }}
               InputProps={{
                 startAdornment: (
@@ -1257,11 +876,10 @@ export default function InvoicesPage() {
               }}
             />
 
-            <FormControl sx={{
-              minWidth: 130, "& .MuiOutlinedInput-root": {
-                borderRadius: "0px",
-              }
-            }} size="small">
+            <FormControl
+              sx={{ minWidth: 130, "& .MuiOutlinedInput-root": { borderRadius: "0px" } }}
+              size="small"
+            >
               <InputLabel>Payment Status</InputLabel>
               <Select
                 value={filterStatus}
@@ -1274,11 +892,10 @@ export default function InvoicesPage() {
               </Select>
             </FormControl>
 
-            <FormControl sx={{
-              minWidth: 150, "& .MuiOutlinedInput-root": {
-                borderRadius: "0px",
-              }
-            }} size="small">
+            <FormControl
+              sx={{ minWidth: 150, "& .MuiOutlinedInput-root": { borderRadius: "0px" } }}
+              size="small"
+            >
               <InputLabel>Store</InputLabel>
               <Select
                 value={filterStore}
@@ -1286,7 +903,7 @@ export default function InvoicesPage() {
                 onChange={(e) => setFilterStore(e.target.value as number | "all")}
               >
                 <MenuItem value="all">All Stores</MenuItem>
-                {stores.map((store) => (
+                {stores.map((store: StoreType) => (
                   <MenuItem key={store.id} value={store.id}>
                     {store.name}
                   </MenuItem>
@@ -1327,7 +944,6 @@ export default function InvoicesPage() {
                 <TableCell sx={{ fontWeight: 700 }}>Store</TableCell>
                 <TableCell sx={{ fontWeight: 700 }}>Booking</TableCell>
                 <TableCell sx={{ fontWeight: 700 }}>Subtotal</TableCell>
-                {/* <TableCell sx={{ fontWeight: 700 }}>Discount</TableCell> */}
                 <TableCell sx={{ fontWeight: 700 }}>Tax</TableCell>
                 <TableCell sx={{ fontWeight: 700 }}>Total</TableCell>
                 <TableCell sx={{ fontWeight: 700 }}>Paid</TableCell>
@@ -1342,16 +958,10 @@ export default function InvoicesPage() {
                 paginatedInvoices.map((invoice) => (
                   <TableRow
                     key={invoice.id}
-                    sx={{
-                      "&:hover": { bgcolor: alpha(PRIMARY_COLOR, 0.02) },
-                    }}
+                    sx={{ "&:hover": { bgcolor: alpha(PRIMARY_COLOR, 0.02) } }}
                   >
                     <TableCell>
-                      <Typography
-                        variant="body2"
-                        fontWeight="600"
-                        color={PRIMARY_COLOR}
-                      >
+                      <Typography variant="body2" fontWeight="600" color={PRIMARY_COLOR}>
                         {invoice.voucher}
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
@@ -1359,13 +969,10 @@ export default function InvoicesPage() {
                       </Typography>
                     </TableCell>
                     <TableCell>
-                      <Box
-                        sx={{ display: "flex", alignItems: "center", gap: 1.5 }}
-                      >
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
                         <Box>
                           <Typography variant="body2" fontWeight="600">
-                            {invoice.customer?.fullName ||
-                              `ID: ${invoice.customer_id}`}
+                            {invoice.customer?.fullName || `ID: ${invoice.customer_id}`}
                           </Typography>
                           <Typography variant="caption" color="text.secondary">
                             {invoice.customer?.phone || "N/A"}
@@ -1383,31 +990,21 @@ export default function InvoicesPage() {
                         label={formatVoucherToBK(invoice.voucher)}
                         size="small"
                         variant="outlined"
-                        sx={{
-                          color: "#ed6c02",
-                          borderColor: "#ed6c02",
-                          fontWeight: 400,
-                        }}
+                        sx={{ color: "#ed6c02", borderColor: "#ed6c02", fontWeight: 400 }}
                       />
                     </TableCell>
-
                     <TableCell>
                       <Typography variant="body2" fontWeight="600">
                         {formatCurrency(invoice.subtotal)}
                       </Typography>
                     </TableCell>
-
                     <TableCell>
                       <Typography variant="body2">
                         {formatCurrency(invoice.tax_amount)}
                       </Typography>
                     </TableCell>
                     <TableCell>
-                      <Typography
-                        variant="body2"
-                        fontWeight="600"
-                        color={PRIMARY_COLOR}
-                      >
+                      <Typography variant="body2" fontWeight="600" color={PRIMARY_COLOR}>
                         {formatCurrency(invoice.total_amount)}
                       </Typography>
                     </TableCell>
@@ -1421,63 +1018,65 @@ export default function InvoicesPage() {
                         label={getPaymentStatusLabel(invoice.payment_status)}
                         size="small"
                         sx={{
-                          bgcolor: alpha(
-                            getPaymentStatusColor(invoice.payment_status),
-                            0.1
-                          ),
+                          bgcolor: alpha(getPaymentStatusColor(invoice.payment_status), 0.1),
                           color: getPaymentStatusColor(invoice.payment_status),
                           fontWeight: 600,
                         }}
                       />
                     </TableCell>
                     <TableCell align="center">
-                      <Button
-                        variant="contained"
-                        size="small"
-                        startIcon={
-                          editingId === invoice.id ? (
-                            <CircularProgress size={16} color="inherit" />
-                          ) : (
-                            <Edit sx={{ fontSize: '18px !important' }} />
-                          )
-                        }
-                        disabled={editingId === invoice.id}
-                        onClick={() => handleEdit(invoice)}
-                        sx={{
-                          bgcolor: '#f39c12',
-                          '&:hover': { bgcolor: '#e67e22' },
-                          textTransform: 'none',
-                          fontWeight: 600,
-                          borderRadius: '0px',
-                          px: 2,
-                          minWidth: '80px',
-                          boxShadow: 'none',
-                          height: '32px'
-                        }}
-                      >
-                        Edit
-                      </Button>
+                      <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
+                        <Button
+                          variant="contained"
+                          size="small"
+                          startIcon={
+                            editingId === invoice.id ? (
+                              <CircularProgress size={16} color="inherit" />
+                            ) : (
+                              <Edit sx={{ fontSize: '18px !important' }} />
+                            )
+                          }
+                          disabled={editingId === invoice.id}
+                          onClick={() => {
+                            setEditingId(invoice.id);
+                            handleEdit(invoice);
+                          }}
+                          sx={{
+                            bgcolor: '#f39c12',
+                            '&:hover': { bgcolor: '#e67e22' },
+                            textTransform: 'none',
+                            fontWeight: 600,
+                            borderRadius: '0px',
+                            px: 2,
+                            minWidth: '80px',
+                            boxShadow: 'none',
+                            height: '32px',
+                            color: '#fff',
+                          }}
+                        >
+                          Edit
+                        </Button>
+                        {/* <Button
+                          size="small"
+                          onClick={(e) => handleMenuOpen(e, invoice)}
+                          sx={{ minWidth: 0, px: 1 }}
+                        >
+                          <Menu sx={{ fontSize: 20 }} />
+                        </Button> */}
+                      </Box>
                     </TableCell>
                   </TableRow>
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={11}>
+                  <TableCell colSpan={10}>
                     <Box sx={{ textAlign: "center", py: 6 }}>
-                      <Receipt
-                        sx={{ fontSize: 64, color: "text.disabled", mb: 2 }}
-                      />
-                      <Typography
-                        variant="h6"
-                        color="text.secondary"
-                        gutterBottom
-                      >
+                      <Receipt sx={{ fontSize: 64, color: "text.disabled", mb: 2 }} />
+                      <Typography variant="h6" color="text.secondary" gutterBottom>
                         No invoices found
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
-                        {searchQuery ||
-                          filterStatus !== "all" ||
-                          filterStore !== "all"
+                        {searchQuery || filterStatus !== "all" || filterStore !== "all"
                           ? "Try adjusting your search or filters"
                           : "Get started by creating your first invoice"}
                       </Typography>
@@ -1505,9 +1104,6 @@ export default function InvoicesPage() {
           <Inventory sx={{ mr: 1, fontSize: 20 }} />
           View Items
         </MenuItem>
-        <MenuItem onClick={() => handleEdit(selectedInvoice!)}>
-          <Edit sx={{ mr: 1, fontSize: 20 }} /> Edit
-        </MenuItem>
         <Divider />
         {selectedInvoice?.payment_status === "pending" && (
           <MenuItem onClick={markAsPaid}>
@@ -1530,7 +1126,7 @@ export default function InvoicesPage() {
         </MenuItem>
       </Menu>
 
-
+      {/* View Items Dialog */}
       <Dialog
         open={openItemsDialog}
         onClose={handleItemsDialogClose}
@@ -1562,18 +1158,11 @@ export default function InvoicesPage() {
                   {itemsForView.map((item) => (
                     <TableRow key={item.id}>
                       <TableCell>
-                        <Box
-                          sx={{ display: "flex", alignItems: "center", gap: 1 }}
-                        >
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                           <Avatar
                             sx={{
-                              bgcolor: alpha(
-                                getItemTypeColor(item.itemType as ItemType),
-                                0.1
-                              ),
-                              color: getItemTypeColor(
-                                item.itemType as ItemType
-                              ),
+                              bgcolor: alpha(getItemTypeColor(item.itemType as ItemType), 0.1),
+                              color: getItemTypeColor(item.itemType as ItemType),
                               width: 32,
                               height: 32,
                             }}
@@ -1592,10 +1181,7 @@ export default function InvoicesPage() {
                           label={item.itemType}
                           size="small"
                           sx={{
-                            bgcolor: alpha(
-                              getItemTypeColor(item.itemType as ItemType),
-                              0.1
-                            ),
+                            bgcolor: alpha(getItemTypeColor(item.itemType as ItemType), 0.1),
                             color: getItemTypeColor(item.itemType as ItemType),
                             textTransform: "capitalize",
                           }}
@@ -1603,9 +1189,7 @@ export default function InvoicesPage() {
                       </TableCell>
                       <TableCell>{item.staff_name || "-"}</TableCell>
                       <TableCell align="right">{item.quantity}</TableCell>
-                      <TableCell align="right">
-                        {formatCurrency(item.unitPrice)}
-                      </TableCell>
+                      <TableCell align="right">{formatCurrency(item.unitPrice)}</TableCell>
                       <TableCell align="right" sx={{ color: SUCCESS_COLOR }}>
                         -{formatCurrency(item.discount)}
                       </TableCell>
@@ -1632,14 +1216,11 @@ export default function InvoicesPage() {
       </Dialog>
 
       {/* Delete Confirmation Dialog */}
-      <Dialog
-        open={deleteConfirmOpen}
-        onClose={() => setDeleteConfirmOpen(false)}
-      >
+      <Dialog open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)}>
         <DialogTitle>Confirm Delete</DialogTitle>
         <DialogContent>
           <Alert severity="warning" sx={{ mb: 2 }}>
-            Are you sure you want to delete invoice {selectedInvoice?.voucher} ?
+            Are you sure you want to delete invoice {selectedInvoice?.voucher}?
             This action cannot be undone.
           </Alert>
           {selectedInvoice && (
@@ -1659,8 +1240,7 @@ export default function InvoicesPage() {
                   {selectedInvoice.voucher}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  {selectedInvoice.customer?.fullName} •{" "}
-                  {formatCurrency(selectedInvoice.total_amount)}
+                  {selectedInvoice.customer?.fullName} • {formatCurrency(selectedInvoice.total_amount)}
                 </Typography>
               </Box>
             </Box>

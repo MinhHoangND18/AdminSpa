@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 import {
   Grid,
   Card,
@@ -16,6 +17,7 @@ import {
   Chip,
   Avatar,
   LinearProgress,
+  CircularProgress
 } from '@mui/material';
 import {
   AttachMoney,
@@ -29,6 +31,7 @@ import {
   Star,
   Spa,
   AccessTime,
+  
 } from '@mui/icons-material';
 import type { SvgIconProps } from '@mui/material';
 import {
@@ -193,6 +196,7 @@ const StatCard = ({
 );
 
 export default function DashboardPage() {
+  const pathname = usePathname();
   const [monthlyRevenue, setMonthlyRevenue] = useState(0);
   const [totalBookings, setTotalBookings] = useState(0);
   const [todaysPaidInvoices, setTodaysPaidInvoices] = useState(0);
@@ -273,52 +277,58 @@ export default function DashboardPage() {
     };
 
     fetchDashboardData();
-  }, []);
+  }, [pathname]);
 
   return (
     <>
-      {/* Stats Cards */}
-      <Grid container spacing={3} sx={{ mb: 3}}>
-        <Grid size={{ xs: 12, sm: 6, md: 3}}>
-          <StatCard
-            title="Monthly Revenue"
-            value={new Intl.NumberFormat('vi-VN', {
-              style: 'currency',
-              currency: 'VND',
-            }).format(monthlyRevenue)}
-            icon={<TrendingUp sx={{ fontSize: 32 }} />}
-            color={SUCCESS_COLOR}
-            subtitle={'revenue this month'}
-          />
-        </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <StatCard
-            title="Total Bookings"
-            value={totalBookings.toString()}
-            icon={<CalendarToday sx={{ fontSize: 32 }} />}
-            color={PRIMARY_COLOR}
-            subtitle="appointments this month"
-          />
-        </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <StatCard
-            title="New Customers"
-            value={newCustomersThisMonth.toString()}
-            icon={<PersonAdd sx={{ fontSize: 32 }} />}
-            color={INFO_COLOR}
-            subtitle="new this month"
-          />
-        </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <StatCard
-            title="Today's Schedule"
-            value={todaysPaidInvoices.toString()}
-            icon={<Schedule sx={{ fontSize: 32 }} />}
-            color={WARNING_COLOR}
-            subtitle="paid invoices today"
-          />
-        </Grid>
-      </Grid>
+      {isLoading ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '70vh' }}>
+          <CircularProgress size={60} sx={{ color: PRIMARY_COLOR }} />
+        </Box>
+      ) : (
+        <>
+          {/* Stats Cards */}
+          <Grid container spacing={3} sx={{ mb: 3}}>
+            <Grid size={{ xs: 12, sm: 6, md: 3}}>
+              <StatCard
+                title="Monthly Revenue"
+                value={new Intl.NumberFormat('vi-VN', {
+                  style: 'currency',
+                  currency: 'VND',
+                }).format(monthlyRevenue)}
+                icon={<TrendingUp sx={{ fontSize: 32 }} />}
+                color={SUCCESS_COLOR}
+                subtitle={'revenue this month'}
+              />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+              <StatCard
+                title="Total Bookings"
+                value={totalBookings.toString()}
+                icon={<CalendarToday sx={{ fontSize: 32 }} />}
+                color={PRIMARY_COLOR}
+                subtitle="appointments this month"
+              />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+              <StatCard
+                title="New Customers"
+                value={newCustomersThisMonth.toString()}
+                icon={<PersonAdd sx={{ fontSize: 32 }} />}
+                color={INFO_COLOR}
+                subtitle="new this month"
+              />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+              <StatCard
+                title="Today's Schedule"
+                value={todaysPaidInvoices.toString()}
+                icon={<Schedule sx={{ fontSize: 32 }} />}
+                color={WARNING_COLOR}
+                subtitle="paid invoices today"
+              />
+            </Grid>
+          </Grid>
 
       {/* Charts Row 1 */}
       <Grid container spacing={3} sx={{ mb: 3 }}>
@@ -586,6 +596,8 @@ export default function DashboardPage() {
           </Card>
         </Grid>
       </Grid>
+        </>
+      )}
     </>
   );
 }
